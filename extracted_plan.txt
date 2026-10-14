@@ -1,0 +1,342 @@
+﻿Build the MLM platform as a completely separate application and make ZEX the authoritative system for subscription activation, expiry, renewal, cancellation, and refunds.
+The safest commercial structure is:
+The MLM company acts as an authorized ZEX sales agent.
+The customer starts the purchase on the MLM website.
+Payment is collected in ZEX’s merchant account through a ZEX-created checkout session.
+ZEX issues the customer invoice and activates the subscription.
+ZEX records the sale against the MLM company and originating MLM seller.
+ZEX periodically pays the contracted commission to the MLM company.
+The MLM company distributes the six-level commissions from its own commission pool.
+This avoids the two platforms independently deciding whether a subscription has been paid for.
+Important compliance condition
+The compensation system must reward completed retail sales—not enrollment or recruitment. The customer should not receive any MLM benefit merely because another person joins underneath them.
+Under India’s Consumer Protection (Direct Selling) Rules, a direct-selling entity cannot be a pyramid or money-circulation scheme, and participant agreements, grievance handling, cooling-off/refund processes, records, and other controls are required. Have an Indian direct-selling lawyer and tax adviser approve the final compensation plan, agreements, invoices, GST treatment, and marketing claims before development or launch. See the official Consumer Protection rules page and Direct Selling Rules, 2021.
+A purchaser may be inserted into the referral tree immediately, but should become an active seller only after:
+Explicitly accepting the seller agreement.
+Completing required KYC and tax details.
+Accepting the compensation, refund, and conduct policies.
+Passing account and fraud checks.
+There should be no joining fee or mandatory purchase whose real purpose is eligibility to earn.
+Compensation plan
+For every eligible ₹2500 subscription sale:
+Beneficiary
+Relationship to buyer
+Commission
+Level 1
+Direct referring seller
+₹1000
+Level 2
+Referrer’s sponsor
+₹300
+Level 3
+Third upline
+₹150
+Level 4
+Fourth upline
+₹50
+Level 5
+Fifth upline
+₹25
+Level 6
+Sixth upline
+₹25
+Level 7
+Seventh upline
+₹25
+Level 8
+eighth upline
+₹10
+Level 9
+nineth upline
+₹10
+Level 10
+Tenth upline
+₹5
+The total network payout is ₹1600.
+Before launch, the ZEX–MLM contract must specify a company commission large enough to fund:
+₹400 network payout.
+Payment-gateway costs.
+GST and applicable withholding.
+Refunds and chargebacks.
+MLM operating margin.
+Do not calculate payouts from MRP unless the agreement explicitly defines whether ₹3,000 is inclusive or exclusive of GST.
+Commission rules to freeze before development
+Commission is created only after confirmed payment and ZEX activation.
+It remains pending during the refund/cooling-off period.
+It becomes available only after that period expires.
+Refunds and chargebacks reverse the corresponding commission.
+A seller cannot earn from their own purchase unless specifically approved as a genuine retail-sale incentive.
+If fewer than six ancestors exist, the missing commission should go to a predefined company reserve—not automatically jump to another person.
+The sponsor of a member should normally be immutable.
+Any exceptional sponsor correction requires approval and a permanent audit record.
+Renewals need a separately documented rule: same six-level payout, reduced payout, or no payout.
+Referral-tree model
+Use a unilevel sponsor tree rather than a binary or forced-matrix tree.
+Every account has at most one sponsor:
+Seller A
+├── Customer/Seller B
+│   ├── Customer C
+│   └── Customer/Seller D
+└── Customer/Seller E
+If D later sells to F, F becomes D’s direct child. For F’s purchase, the commission chain starts at D and walks upward for a maximum of six eligible sellers.
+“Bottom line” should mean “a new child under the referring seller.” The system should not automatically place customers under unrelated members, because spillover placement complicates consent, auditability, and compliance.
+Maintain two separate statuses:
+customer_status: registered, active subscriber, expired, cancelled.
+seller_status: not_enrolled, pending_KYC, active, suspended, terminated.
+Thus every seller can be a customer, but every customer does not automatically become a seller.
+System architecture
+Customer
+   |
+   v
+MLM Website and Mobile UI
+   |
+   v
+MLM Backend ───── signed API requests ─────> ZEX Subscription API
+   |                                            |
+   |                                            v
+   |                                      ZEX account,
+   |                                      payment and
+   |                                      subscription
+   |                                      systems
+   |
+   <──── signed activation/refund webhooks ────
+   |
+   v
+Referral Tree + Commission Ledger + Payout System
+ZEX remains authoritative for
+ZEX customer identity.
+Subscription product and price.
+Payment status.
+Subscription activation and expiry.
+Renewal, cancellation, refund, and chargeback status.
+Invoice and tax record if ZEX is merchant of record.
+Total commission payable to the MLM company.
+MLM remains authoritative for
+MLM member profile and consent.
+Seller KYC and seller agreement.
+Sponsor relationship.
+Six-level ancestry.
+Individual commission allocation.
+Wallet and payout status.
+Seller-facing reports.
+Marketing links and referral codes.
+Data mirrored in both systems
+Every order should carry:
+mlm_company_agent_id
+mlm_member_id
+referral_code
+external_order_id
+zex_customer_id
+zex_subscription_id
+product_code
+price
+currency
+payment_status
+subscription_status
+commissionable_amount
+order_created_at
+ZEX should display the originating seller and MLM company in its agent panel. It does not need to own the MLM payout ledger, but it should retain enough information to reconcile every sale.
+Recommended purchase flow
+Customer opens a seller’s referral URL, such as mlm.example/join/ABC123.
+MLM validates the referral code and stores it in a secure session.
+Customer enters or verifies the mobile number/email used for ZEX.
+MLM calls ZEX to find or create a linked ZEX customer.
+MLM freezes the sponsor chain for that order.
+MLM calls ZEX to create a ₹3,000 checkout session.
+The payment gateway collects payment into the designated merchant account.
+ZEX verifies the gateway webhook.
+ZEX activates or renews the subscription.
+ZEX sends a signed subscription.activated webhook to MLM.
+MLM records the sale and creates six pending commission entries.
+After the refund-hold period, pending entries become available.
+Eligible sellers request payout or receive it on a scheduled cycle.
+ZEX and MLM run daily reconciliation.
+The browser’s “payment successful” redirect must never activate a subscription or create commission. Only a verified server-to-server confirmation should do so.
+ZEX subscription API
+Suggested endpoints:
+POST /v1/customers/resolve
+POST /v1/checkout-sessions
+GET  /v1/orders/{order_id}
+GET  /v1/subscriptions/{subscription_id}
+POST /v1/subscriptions/{subscription_id}/cancel
+GET  /v1/agent-sales
+GET  /v1/agent-settlements
+Suggested webhook events:
+payment.succeeded
+payment.failed
+subscription.activated
+subscription.renewed
+subscription.cancelled
+refund.created
+refund.completed
+chargeback.created
+commission.settlement.created
+Every mutating API request must support an Idempotency-Key. Retrying a timed-out request must not create a second order, subscription, or commission.
+Webhooks should include:
+Unique event ID.
+Event type and version.
+UTC timestamp.
+Order and subscription identifiers.
+Payload hash.
+HMAC signature.
+Replay-protection timestamp.
+The MLM webhook handler should save the event first and then process it asynchronously. Duplicate event IDs must be ignored safely.
+Core MLM database
+Principal tables:
+members
+member_id, zex_customer_id, sponsor_member_id,
+customer_status, seller_status, referral_code
+seller_kyc
+member_id, legal_name, PAN, bank_details_token,
+verification_status, agreement_version
+orders
+order_id, zex_order_id, buyer_member_id,
+seller_member_id, sponsor_path_snapshot,
+amount, payment_status, subscription_status
+subscriptions
+zex_subscription_id, member_id, product_code,
+start_at, expire_at, status
+commission_rules
+version, product_code, level, amount,
+effective_from, effective_to
+commission_entries
+entry_id, order_id, beneficiary_member_id,
+level, amount, status, rule_version
+wallet_ledger
+ledger_id, member_id, transaction_type,
+amount, reference_id, balance_effect
+payouts
+payout_id, member_id, amount, tax_deduction,
+bank_reference, status
+webhook_events
+event_id, event_type, payload_hash,
+received_at, processing_status
+audit_log
+actor, action, object_type, object_id,
+before_state, after_state, timestamp
+Store a snapshot of the six ancestors on each order. Historical commission must not change if a member is later suspended or a permitted sponsor correction occurs.
+Use an append-only wallet ledger. Never maintain wallet balance as an editable number; calculate it from ledger entries or maintain a derived balance protected by database transactions.
+Portals
+Customer and seller portal
+ZEX subscription status and expiry.
+Referral link and QR code.
+Direct customers and permitted downline view.
+Pending, available, paid, reversed, and withheld commission.
+KYC and bank-account status.
+Payout history and downloadable statements.
+Refund and grievance requests.
+Approved marketing materials.
+Clear income disclaimer.
+Avoid displaying unnecessary personal data from deeper levels.
+MLM administration
+Member and KYC review.
+Referral-tree investigation.
+Order and subscription reconciliation.
+Commission-rule versioning.
+Refund and commission reversal.
+Payout batch approval.
+Fraud and duplicate-account alerts.
+Grievance management.
+Immutable audit logs.
+Tax and settlement exports.
+ZEX agent panel
+Sales attributed to the MLM company.
+MLM seller/member reference for each sale.
+Activation, renewal, cancellation, and refund status.
+Gross sales and commissionable sales.
+MLM company commission and settlement status.
+Date-wise reconciliation export.
+Security requirements
+OAuth 2.0 client credentials or signed service credentials between platforms.
+Prefer mutual TLS plus HMAC-signed webhooks.
+Separate production and staging credentials.
+Encrypt PAN, bank, and identity data.
+Tokenize bank information through the payout provider where possible.
+MFA for administrators and payout approvers.
+Role-based permissions and maker-checker approval for payouts.
+Rate limiting, bot protection, device/IP risk checks, and referral-abuse detection.
+No sharing of ZEX passwords with the MLM platform.
+Daily encrypted backups and tested recovery procedures.
+Centralized logs and alerts for failed activation, mismatched payments, webhook backlog, and abnormal commission activity.
+Fraud controls
+Detect and hold transactions involving:
+Repeated purchases using the same device, card, bank account, PAN, or phone.
+Circular or self-referral patterns.
+Large bursts of accounts under one seller.
+Multiple identities using the same payout account.
+Refunds immediately after commission availability.
+Sponsor changes around high-value transactions.
+Sellers promising guaranteed income.
+Purchases made only to unlock earning eligibility.
+Suspicious commission should be placed in held status rather than deleted.
+Reconciliation
+Run three automated reconciliations daily:
+Payment reconciliation: gateway payment versus ZEX order.
+Subscription reconciliation: paid ZEX order versus active entitlement.
+Commission reconciliation: eligible ZEX sale versus MLM commission ledger.
+Every discrepancy should enter an exception queue. Neither system should silently overwrite the other.
+A monthly settlement statement should include:
+Gross successful sales
+- Refunds
+- Chargebacks
+= Net eligible sales
+× Contracted MLM-company commission
+- Applicable deductions
+= Amount payable to MLM company
+Development phases
+Phase 0 — Business and legal design: 1–2 weeks
+Freeze merchant-of-record arrangement.
+Approve seller agreement and refund policy.
+Confirm GST, withholding, invoice, and payout treatment.
+Approve the six-level compensation rules.
+Define renewals, missing uplines, self-purchases, suspension, and termination.
+Produce API and data-processing agreements.
+Phase 1 — Technical design: 1–2 weeks
+Finalize database and referral-tree design.
+Publish an OpenAPI specification.
+Define webhook schemas and state transitions.
+Design identity linking between MLM and ZEX.
+Create threat model and reconciliation rules.
+Phase 2 — ZEX integration layer: 2–3 weeks
+Customer resolve/link API.
+Checkout-session API.
+Subscription-status API.
+Agent attribution.
+Signed webhook service.
+Agent-panel reporting.
+Phase 3 — MLM MVP: 4–6 weeks
+Registration and login.
+Referral links and sponsor tree.
+ZEX purchase journey.
+Seller onboarding and KYC.
+Commission engine and wallet ledger.
+Admin portal.
+Basic reports and reconciliation.
+Phase 4 — Payouts and controls: 2–3 weeks
+Bank-account verification.
+Maker-checker payout batches.
+Tax deductions and statements.
+Refund/chargeback reversal.
+Fraud controls and grievance workflow.
+Phase 5 — Verification and pilot: 2–3 weeks
+API contract and load testing.
+Payment retry and duplicate-event testing.
+Security assessment.
+Financial-ledger testing.
+Disaster-recovery exercise.
+Limited pilot with controlled sellers.
+Independent reconciliation before public launch.
+A realistic initial production timeline is approximately 12–16 weeks after the commercial and legal rules are finalized.
+Minimum launch acceptance criteria
+Do not launch until the following tests pass:
+A repeated API call cannot create duplicate subscriptions.
+A duplicated webhook cannot create duplicate commission.
+The six payouts always total exactly ₹400 for a fully eligible chain.
+A refund reverses the correct six original entries.
+Sponsor changes cannot rewrite historical orders.
+A customer can purchase without being forced to become a seller.
+A seller cannot receive payout before agreement, KYC, and hold-period completion.
+MLM and ZEX reports reconcile to the payment gateway.
+Every manual financial change identifies the administrator, reason, and previous value.
+ZEX access continues safely if the MLM platform is temporarily unavailable.
+The first deliverables should be the compensation-rule specification, identity-linking design, OpenAPI contract, webhook contract, database model, and a clickable purchase-flow prototype. These documents will remove the largest ambiguities before engineering begins.
