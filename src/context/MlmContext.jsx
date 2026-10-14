@@ -52,7 +52,7 @@ export function MlmProvider({ children }) {
 
   // Modals state
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState('Pro');
+  const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState('Joining');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('register'); // 'register' | 'login'
 
@@ -106,7 +106,7 @@ export function MlmProvider({ children }) {
     .reduce((sum, r) => sum + r.amount, 0);
 
   // Open Checkout for a plan
-  const openCheckout = (planName = 'Pro') => {
+  const openCheckout = (planName = 'Joining') => {
     setSelectedPlanForCheckout(planName);
     setIsCheckoutOpen(true);
   };
@@ -119,7 +119,7 @@ export function MlmProvider({ children }) {
       cs_order_id: `ord_cs_${Math.floor(1000 + Math.random() * 9000)}`,
       buyer_member_id: currentMember.member_id,
       product_code: 'CS-PRO-SUITE',
-      product_name: `CyberShield ${selectedPlanForCheckout} Enterprise Security Plan`,
+      product_name: 'CyberShield Partner Joining Membership License',
       amount: 2500,
       gst: 450,
       total_amount: 2950,

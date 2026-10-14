@@ -17,7 +17,6 @@ import {
 
 export default function PublicHome() {
   const { openCheckout, setIsAuthModalOpen, setAuthMode, commissionRules } = useMlm();
-  const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
 
   return (
     <div className="public-home-wrapper">
@@ -50,7 +49,7 @@ export default function PublicHome() {
             </div>
             <div className="pill-item">
               <Zap size={15} className="text-primary-blue" />
-              <span>Flexible Subscription</span>
+              <span>Single ₹2,500 Joining</span>
             </div>
             <div className="pill-item">
               <ShieldCheck size={15} className="text-primary-blue" />
@@ -67,12 +66,12 @@ export default function PublicHome() {
               }}
               className="btn btn-primary btn-lg"
             >
-              <span>Join Now</span>
+              <span>Join Now (₹2,500)</span>
               <ArrowRight size={18} />
             </button>
 
             <button
-              onClick={() => openCheckout('Pro')}
+              onClick={() => openCheckout('Joining')}
               className="btn btn-outline-blue btn-lg"
             >
               <Play size={16} fill="currentColor" />
@@ -140,111 +139,128 @@ export default function PublicHome() {
         </div>
       </section>
 
-      {/* 2. PRODUCTS / MEMBERSHIP PLANS (Matching Screen 2) */}
+      {/* 2. OFFICIAL JOINING PLAN (Single Pricing: ₹2,500/- for Joining) */}
       <section id="plans-section" className="plans-section-coach">
         <div className="section-head-center">
-          <h2 className="section-title-large">Choose Your Subscription Plan</h2>
-          <p className="section-subtitle">
-            Access institutional AI Cyber Coach software tools and community. Earn commissions on every qualifying subscription sale in your network.
-          </p>
-
-          {/* Billing Toggle */}
-          <div className="billing-toggle-container">
-            <button
-              onClick={() => setBillingCycle('monthly')}
-              className={`toggle-option ${billingCycle === 'monthly' ? 'active' : ''}`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle('yearly')}
-              className={`toggle-option ${billingCycle === 'yearly' ? 'active' : ''}`}
-            >
-              Yearly <span className="discount-pill">Save 20%</span>
-            </button>
+          <div className="single-plan-pill">
+            <Sparkles size={14} className="text-primary-blue" />
+            <span>Single Transparent Pricing • Direct Joining</span>
           </div>
+          <h2 className="section-title-large">Official Joining & Partner Membership</h2>
+          <p className="section-subtitle">
+            Only one standard pricing for joining. Get authorized access to the CyberShield enterprise cyber defense suite and start earning multi-tier direct selling commissions.
+          </p>
         </div>
 
-        {/* 3 Pricing Cards */}
-        <div className="pricing-cards-grid">
-          {/* Card 1: Starter */}
-          <div className="plan-card card-white">
-            <div className="plan-header">
-              <h3 className="plan-title">Starter</h3>
-              <div className="plan-price">
-                <span className="currency">₹</span>
-                <span className="price-num">{billingCycle === 'monthly' ? '499' : '4,790'}</span>
-                <span className="cycle">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+        {/* Single Centered Joining Plan Card */}
+        <div className="single-plan-wrapper">
+          <div className="plan-card card-white single-joining-card">
+            <div className="popular-ribbon">Only One Pricing • ₹2,500 For Joining</div>
+
+            <div className="single-plan-header">
+              <div className="single-plan-header-flex">
+                <div className="single-plan-info">
+                  <div className="plan-badge-tag">
+                    <ShieldCheck size={16} className="text-primary-blue" />
+                    <span>Authorized Partner License</span>
+                  </div>
+                  <h3 className="single-plan-title">CyberShield Partner Membership</h3>
+                  <p className="single-plan-sub">
+                    Complete institutional endpoint protection software suite and authorized direct selling distribution rights.
+                  </p>
+                </div>
+
+                <div className="single-price-box">
+                  <div className="single-price-display">
+                    <span className="single-currency">₹</span>
+                    <span className="single-amount">2,500</span>
+                    <span className="single-term">/- For Joining</span>
+                  </div>
+                  <div className="single-price-subnote">
+                    +18% Statutory GST (₹450) • Total ₹2,950
+                  </div>
+                </div>
               </div>
             </div>
 
-            <ul className="plan-features-list">
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Core AI Cyber trading tools</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Community access</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Email support</li>
-            </ul>
+            {/* Inclusions Split in 2 Distinct Columns */}
+            <div className="single-plan-grid">
+              <div className="plan-column-box">
+                <h4 className="plan-column-heading">
+                  <ShieldCheck size={18} className="text-primary-blue" />
+                  <span>Enterprise Cyber Defense Software</span>
+                </h4>
+                <ul className="single-features-list">
+                  <li>
+                    <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+                    <span>Full CyberShield Cloud Endpoint Protection & AI Scanner</span>
+                  </li>
+                  <li>
+                    <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+                    <span>Verified Software License Key & Continuous Updates</span>
+                  </li>
+                  <li>
+                    <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+                    <span>Real-time Anti-Phishing & Network Defense Tools</span>
+                  </li>
+                  <li>
+                    <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+                    <span>24/7 Priority Support & Technical Helpdesk</span>
+                  </li>
+                </ul>
+              </div>
 
-            <button
-              onClick={() => openCheckout('Starter')}
-              className="btn btn-secondary full-width"
-            >
-              Get Started
-            </button>
-          </div>
-
-          {/* Card 2: Pro (Most Popular) */}
-          <div className="plan-card card-white plan-card-popular">
-            <div className="popular-ribbon">Most Popular</div>
-            <div className="plan-header">
-              <h3 className="plan-title text-primary-blue">Pro</h3>
-              <div className="plan-price">
-                <span className="currency text-primary-blue">₹</span>
-                <span className="price-num text-primary-blue">{billingCycle === 'monthly' ? '999' : '2,500'}</span>
-                <span className="cycle">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+              <div className="plan-column-box">
+                <h4 className="plan-column-heading">
+                  <TrendingUp size={18} className="text-success" />
+                  <span>Authorized Partner & Sales Program</span>
+                </h4>
+                <ul className="single-features-list">
+                  <li>
+                    <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
+                    <span><strong>Authorized Direct Seller Status:</strong> Instant referral link</span>
+                  </li>
+                  <li>
+                    <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
+                    <span><strong>6-Level Network Commissions:</strong> ₹1,000 Direct (Level 1) + override bonuses</span>
+                  </li>
+                  <li>
+                    <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
+                    <span><strong>Partner Dashboard:</strong> Real-time genealogy tree & calculation matrix</span>
+                  </li>
+                  <li>
+                    <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
+                    <span><strong>Manual Bank Disbursal:</strong> Admin-verified IMPS payouts with 5% TDS compliance</span>
+                  </li>
+                </ul>
               </div>
             </div>
 
-            <ul className="plan-features-list">
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Full institutional software suite</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Verified Software License</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Priority technical support</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> <strong>Direct Selling commissions (6–10 levels)</strong></li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Automated AI risk analysis tools</li>
-            </ul>
-
-            <button
-              onClick={() => openCheckout('Pro')}
-              className="btn btn-primary full-width"
-            >
-              Get Started
-            </button>
-          </div>
-
-          {/* Card 3: Premium */}
-          <div className="plan-card card-white">
-            <div className="plan-header">
-              <h3 className="plan-title">Premium</h3>
-              <div className="plan-price">
-                <span className="currency">₹</span>
-                <span className="price-num">{billingCycle === 'monthly' ? '1,999' : '18,990'}</span>
-                <span className="cycle">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+            {/* Bottom Actions & Statutory Reassurance */}
+            <div className="single-plan-bottom">
+              <div className="single-guarantee-badges">
+                <div className="guarantee-badge">
+                  <CheckCircle2 size={15} className="text-success" />
+                  <span>7-Day Cooling-off Period (100% Refund Guarantee)</span>
+                </div>
+                <div className="guarantee-badge">
+                  <CheckCircle2 size={15} className="text-primary-blue" />
+                  <span>Consumer Protection (Direct Selling) Rules, 2021 Compliant</span>
+                </div>
+                <div className="guarantee-badge">
+                  <CheckCircle2 size={15} className="text-purple" />
+                  <span>Zero Hidden Charges • One-Time ₹2,500 Joining Fee</span>
+                </div>
               </div>
+
+              <button
+                onClick={() => openCheckout('Joining')}
+                className="btn btn-primary btn-lg single-join-cta-btn"
+              >
+                <span>Join Now for ₹2,500</span>
+                <ArrowRight size={18} />
+              </button>
             </div>
-
-            <ul className="plan-features-list">
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Everything in Pro</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> 1:1 strategy & setup onboarding</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Advanced algorithmic execution tools</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Direct API integration access</li>
-              <li><CheckCircle2 size={16} className="text-primary-blue" /> Higher sales volume incentives</li>
-            </ul>
-
-            <button
-              onClick={() => openCheckout('Premium')}
-              className="btn btn-secondary full-width"
-            >
-              Get Started
-            </button>
           </div>
         </div>
       </section>

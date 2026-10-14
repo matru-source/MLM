@@ -46,7 +46,7 @@ export default function Navbar() {
             }} 
             className="nav-link"
           >
-            Products
+            Joining Plan (₹2,500)
           </button>
           <button 
             onClick={() => {

@@ -891,8 +891,8 @@ export default function MemberDashboardView() {
               <div className="sub-card-header">
                 <div>
                   <span className="badge badge-green mb-2">Active</span>
-                  <h3 className="sub-title-bold">CyberShield Pro Enterprise Security Plan</h3>
-                  <p className="text-muted text-sm">Monthly / Annual Enterprise License</p>
+                  <h3 className="sub-title-bold">CyberShield Partner Joining Membership</h3>
+                  <p className="text-muted text-sm">Official Authorized Member License • ₹2,500 Joining Plan</p>
                 </div>
                 <div className="sub-price-callout">
                   <span className="text-muted text-xs">Amount Paid</span>

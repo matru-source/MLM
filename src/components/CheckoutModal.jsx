@@ -63,43 +63,43 @@ export default function CheckoutModal() {
                 <span className="order-icon-letter">🛡️</span>
               </div>
               <div>
-                <h4 className="order-item-name">CyberShield {selectedPlanForCheckout} Plan</h4>
-                <p className="order-item-sub">Enterprise Cyber Security Suite</p>
+                <h4 className="order-item-name">CyberShield Partner Joining Membership</h4>
+                <p className="order-item-sub">Official Joining Fee • Enterprise Security Suite</p>
               </div>
             </div>
 
             <div className="order-cost-breakdown">
               <div className="cost-row">
-                <span>Subtotal</span>
+                <span>Joining Fee</span>
                 <span className="font-semibold">₹2,500</span>
               </div>
               <div className="cost-row">
-                <span>GST (18%)</span>
+                <span>GST (18% Statutory)</span>
                 <span className="font-semibold">₹450</span>
               </div>
               <div className="cost-row total-row">
-                <span className="font-bold">Total</span>
+                <span className="font-bold">Total Payable</span>
                 <span className="font-bold text-primary-blue text-large">₹2,950</span>
               </div>
             </div>
 
-            {/* 4 Trust Points (Matching Screen 4) */}
+            {/* 4 Trust Points */}
             <div className="checkout-trust-points">
               <div className="trust-point-item">
                 <CheckCircle2 size={16} className="text-success" />
-                <span>Secure Payment (Razorpay/Stripe)</span>
+                <span>Secure 256-Bit SSL Encrypted Gateway</span>
               </div>
               <div className="trust-point-item">
                 <CheckCircle2 size={16} className="text-success" />
-                <span>Payment processed in ZEX account</span>
+                <span>Payment processed via CyberShield Corporate Gateway</span>
               </div>
               <div className="trust-point-item">
                 <CheckCircle2 size={16} className="text-success" />
-                <span>Instant subscription activation</span>
+                <span>Instant partner account & license activation</span>
               </div>
               <div className="trust-point-item">
                 <CheckCircle2 size={16} className="text-success" />
-                <span>Eligible for MLM commissions</span>
+                <span>Eligible for 6-Level Direct Selling commissions</span>
               </div>
             </div>
           </div>

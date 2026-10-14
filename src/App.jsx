@@ -69,7 +69,7 @@ function MainApp() {
               <div className="footer-col-links">
                 <h4 className="footer-title">Platform</h4>
                 <button onClick={() => setCurrentPage('home')} className="footer-link-btn">Home</button>
-                <a href="#plans-section" className="footer-link-btn">Subscription Plans</a>
+                <a href="#plans-section" className="footer-link-btn">Joining Plan (₹2,500)</a>
                 <a href="#compensation-section" className="footer-link-btn">Commission Plan</a>
                 <a href="#faq-section" className="footer-link-btn">FAQ</a>
               </div>
