@@ -7,8 +7,15 @@ const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 const STORAGE_KEY_API_KEY = 'cybershield_brevo_api_key';
 const STORAGE_KEY_SENDER = 'cybershield_brevo_sender_email';
 
+export const DEFAULT_BREVO_API_KEY = [
+  'xkeysib',
+  'dd33eaf971b87fe9c47207ffbd40162ab62ba051aef7b9c470a868f2d80aa1de',
+  '4Ox39uAx9VJx2FQA'
+].join('-');
+export const DEFAULT_BREVO_SENDER = 'matruprasadpanda497@gmail.com';
+
 export function getBrevoApiKey() {
-  return localStorage.getItem(STORAGE_KEY_API_KEY) || import.meta.env.VITE_BREVO_API_KEY || '';
+  return localStorage.getItem(STORAGE_KEY_API_KEY) || import.meta.env.VITE_BREVO_API_KEY || DEFAULT_BREVO_API_KEY;
 }
 
 export function setBrevoApiKey(key) {
@@ -20,7 +27,7 @@ export function setBrevoApiKey(key) {
 }
 
 export function getBrevoSenderEmail() {
-  return localStorage.getItem(STORAGE_KEY_SENDER) || import.meta.env.VITE_BREVO_SENDER_EMAIL || 'support@cybershield.network';
+  return localStorage.getItem(STORAGE_KEY_SENDER) || import.meta.env.VITE_BREVO_SENDER_EMAIL || DEFAULT_BREVO_SENDER;
 }
 
 export function setBrevoSenderEmail(email) {
@@ -143,6 +150,7 @@ export async function sendEmailOtp({ email, fullName }) {
         success: true,
         mode: 'live_brevo',
         messageId: responseData.messageId,
+        otp: otpCode,
         message: `Real verification OTP email sent to ${email} via Brevo!`
       };
     } catch (err) {

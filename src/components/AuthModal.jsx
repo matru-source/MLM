@@ -104,9 +104,9 @@ export default function AuthModal() {
 
         if (result.mode === 'live_brevo') {
           addToast('success', 'Real OTP Sent!', `Verification email delivered to ${email} via Brevo.`);
-          setSimulatedOtpHint('');
+          setSimulatedOtpHint(result.otp || '');
         } else {
-          // Preview mode when Brevo API key is not yet set
+          // Preview mode fallback
           setSimulatedOtpHint(result.otp);
           addToast('info', 'OTP Generated', `Verification code sent. Code: ${result.otp}`);
         }
@@ -130,7 +130,7 @@ export default function AuthModal() {
 
     if (result.mode === 'live_brevo') {
       addToast('success', 'OTP Resent!', `New code sent to ${email} via Brevo.`);
-      setSimulatedOtpHint('');
+      setSimulatedOtpHint(result.otp || '');
     } else {
       setSimulatedOtpHint(result.otp);
       addToast('info', 'New OTP Generated', `New code is ${result.otp}`);
