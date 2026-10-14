@@ -30,12 +30,15 @@ export default function AdminPortalView() {
     transactions, 
     totalEarnings, 
     payoutRequests,
+    pendingActivations = [],
+    approveMemberActivation,
+    rejectMemberActivation,
     approvePayout,
     rejectPayout,
     addToast 
   } = useMlm();
 
-  const [adminTab, setAdminTab] = useState('payouts'); // 'payouts' | 'orders' | 'kyc' | 'webhooks'
+  const [adminTab, setAdminTab] = useState('activations'); // 'activations' | 'payouts' | 'orders' | 'kyc' | 'webhooks'
   const [selectedPayoutForManualPay, setSelectedPayoutForManualPay] = useState(null);
   const [selectedPayoutToView, setSelectedPayoutToView] = useState(null);
 
@@ -176,6 +179,7 @@ export default function AdminPortalView() {
 
   const pendingRequests = payoutRequests.filter(p => p.status === 'pending');
   const pendingTotalAmount = pendingRequests.reduce((sum, p) => sum + p.amount, 0);
+  const pendingActivationList = (pendingActivations || []).filter(a => a.status === 'pending');
 
   return (
     <div className="admin-dedicated-app">
@@ -211,9 +215,11 @@ export default function AdminPortalView() {
           </div>
 
           <div className="admin-stat-card card-white">
-            <span className="stat-label-muted">Network Commission Plan</span>
-            <div className="stat-number-bold text-primary-blue">₹1,600 / Sale</div>
-            <span className="stat-badge-tag text-primary-blue">6-Tier Unilevel Matrix</span>
+            <span className="stat-label-muted">New Partner Activations</span>
+            <div className={`stat-number-bold ${pendingActivationList.length > 0 ? 'text-amber' : 'text-success'}`}>
+              {pendingActivationList.length} Pending
+            </div>
+            <span className="stat-badge-tag text-primary-blue">Dual Accounts (API)</span>
           </div>
 
           <div className="admin-stat-card card-white">
@@ -235,6 +241,15 @@ export default function AdminPortalView() {
 
         {/* Admin Navigation Tabs */}
         <div className="admin-tabs-bar-clean card-white">
+          <button
+            onClick={() => setAdminTab('activations')}
+            className={`admin-clean-tab ${adminTab === 'activations' ? 'active' : ''}`}
+          >
+            New Partner Activations ({pendingActivations.length})
+            {pendingActivationList.length > 0 && (
+              <span className="admin-tab-alert-badge">{pendingActivationList.length} Pending</span>
+            )}
+          </button>
           <button
             onClick={() => setAdminTab('payouts')}
             className={`admin-clean-tab ${adminTab === 'payouts' ? 'active' : ''}`}
@@ -263,6 +278,169 @@ export default function AdminPortalView() {
             Webhook Simulator
           </button>
         </div>
+
+        {/* TAB 0: NEW PARTNER ACTIVATIONS & DUAL ACCOUNTS PROVISIONING */}
+        {adminTab === 'activations' && (
+          <div className="admin-panel-card card-white p-6">
+            <div className="card-head-between mb-4">
+              <div>
+                <h3 className="section-title-large mb-1">New Partner Activations & Dual Accounts Provisioning</h3>
+                <p className="text-muted text-sm">
+                  Review new ₹2,500 joining payments. Each registration provisions 2 accounts via API: Account 1 (MLM Direct Selling Partner) and Account 2 (Enterprise Software License Key). Verify and click Approve to unlock partner portal access.
+                </p>
+              </div>
+              {pendingActivationList.length > 0 && (
+                <div className="admin-head-alert-box">
+                  <Clock size={16} className="text-amber" />
+                  <span>{pendingActivationList.length} Pending Admin Approval</span>
+                </div>
+              )}
+            </div>
+
+            <div className="activation-cards-grid">
+              {pendingActivations.length === 0 ? (
+                <div className="text-center py-8 text-muted card-white p-6">
+                  No partner activation requests in queue.
+                </div>
+              ) : (
+                pendingActivations.map((act) => (
+                  <div key={act.id} className={`admin-activation-card ${act.status === 'pending' ? 'border-pending' : 'border-approved'}`}>
+                    <div className="activation-card-top">
+                      <div className="activation-user-meta">
+                        <div className="avatar-chip">
+                          <Users size={18} />
+                        </div>
+                        <div>
+                          <h4 className="activation-user-name">{act.member_name}</h4>
+                          <span className="activation-user-sub">{act.member_email} • {act.member_phone}</span>
+                        </div>
+                      </div>
+
+                      <div className="activation-status-pill">
+                        {act.status === 'pending' ? (
+                          <span className="badge badge-amber font-xs">Pending Admin Verification</span>
+                        ) : act.status === 'approved' ? (
+                          <span className="badge badge-green font-xs">Active & Verified ✓</span>
+                        ) : (
+                          <span className="badge badge-rose font-xs">Rejected</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="activation-meta-strip">
+                      <div className="meta-strip-item">
+                        <span className="meta-strip-label">Joining Fee</span>
+                        <strong className="meta-strip-val text-primary-blue">₹{act.total_paid?.toLocaleString('en-IN') || '2,950'} (₹2,500 + GST)</strong>
+                      </div>
+                      <div className="meta-strip-item">
+                        <span className="meta-strip-label">Payment Mode</span>
+                        <span className="meta-strip-val">{act.payment_method || 'UPI'}</span>
+                      </div>
+                      <div className="meta-strip-item">
+                        <span className="meta-strip-label">Order / Ref ID</span>
+                        <span className="meta-strip-val code-font">{act.payment_ref}</span>
+                      </div>
+                      <div className="meta-strip-item">
+                        <span className="meta-strip-label">UTR Number</span>
+                        <span className="meta-strip-val code-font">{act.utr_number}</span>
+                      </div>
+                      <div className="meta-strip-item">
+                        <span className="meta-strip-label">Sponsor Code</span>
+                        <span className="meta-strip-val code-font">{act.sponsor_code}</span>
+                      </div>
+                    </div>
+
+                    {/* DUAL ACCOUNTS PROVISIONED VIA API */}
+                    <div className="dual-accounts-container">
+                      {/* Account 1: Partner MLM Account */}
+                      <div className="dual-account-box mlm-account-box">
+                        <div className="account-box-badge">
+                          <span>Account 1: Partner MLM Account</span>
+                        </div>
+                        <div className="account-specs-compact">
+                          <div className="spec-item-compact">
+                            <span className="spec-k">Partner ID:</span>
+                            <span className="spec-v code-font">{act.account1_mlm?.partner_id || act.member_id}</span>
+                          </div>
+                          <div className="spec-item-compact">
+                            <span className="spec-k">Referral Code:</span>
+                            <span className="spec-v code-font font-bold text-primary-blue">{act.account1_mlm?.referral_code || 'CS-NEW01'}</span>
+                          </div>
+                          <div className="spec-item-compact">
+                            <span className="spec-k">Commission Wallet:</span>
+                            <span className="spec-v code-font">{act.account1_mlm?.commission_wallet_id || 'WAL-CS-NEW'}</span>
+                          </div>
+                          <div className="spec-item-compact">
+                            <span className="spec-k">Matrix Hierarchy:</span>
+                            <span className="spec-v">6-Tier Unilevel Matrix</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Account 2: Software License Account */}
+                      <div className="dual-account-box software-account-box">
+                        <div className="account-box-badge software-badge">
+                          <span>Account 2: Enterprise Cyber Defense License</span>
+                        </div>
+                        <div className="account-specs-compact">
+                          <div className="spec-item-compact">
+                            <span className="spec-k">License Key:</span>
+                            <span className="spec-v code-font font-bold text-success">{act.account2_software?.license_key || 'CS-PRO-XXXX-XXXX'}</span>
+                          </div>
+                          <div className="spec-item-compact">
+                            <span className="spec-k">Endpoint Seats:</span>
+                            <span className="spec-v font-bold">{act.account2_software?.endpoint_protection_seats || 5} Protected Devices</span>
+                          </div>
+                          <div className="spec-item-compact">
+                            <span className="spec-k">Software Suite:</span>
+                            <span className="spec-v">CyberShield Pro Enterprise Suite</span>
+                          </div>
+                          <div className="spec-item-compact">
+                            <span className="spec-k">Client Portal User:</span>
+                            <span className="spec-v">{act.account2_software?.client_portal_username || act.member_email}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="activation-actions-footer">
+                      {act.status === 'pending' ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const reason = prompt('Please enter reason for rejection:', 'Payment reference not found or invalid');
+                              if (reason) rejectMemberActivation(act.id, reason);
+                            }}
+                            className="btn btn-secondary btn-sm text-rose"
+                          >
+                            <X size={15} />
+                            <span>Reject</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => approveMemberActivation(act.id)}
+                            className="btn btn-primary btn-sm flex-center gap-1"
+                          >
+                            <CheckCircle2 size={16} />
+                            <span>Approve & Activate Both Accounts</span>
+                          </button>
+                        </>
+                      ) : (
+                        <div className="activation-approved-note">
+                          <CheckCircle2 size={16} className="text-success" />
+                          <span>Both accounts activated & operational. Dashboard access unlocked on {act.approved_at || act.requested_at}.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {/* TAB 1: BANK PAYOUT DISBURSEMENTS */}
         {adminTab === 'payouts' && (

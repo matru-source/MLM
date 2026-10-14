@@ -1,6 +1,6 @@
 import React from 'react';
 import { useMlm } from '../context/MlmContext';
-import { LayoutDashboard, LogIn, UserPlus, Shield } from 'lucide-react';
+import { LayoutDashboard, LogIn, UserPlus, Shield, LogOut, Clock } from 'lucide-react';
 
 export default function Navbar() {
   const { 
@@ -9,7 +9,8 @@ export default function Navbar() {
     isLoggedIn, 
     setIsAuthModalOpen, 
     setAuthMode,
-    currentMember
+    currentMember,
+    logout
   } = useMlm();
 
   return (
@@ -86,6 +87,7 @@ export default function Navbar() {
                 className="user-pill-mini"
                 onClick={() => setCurrentPage('profile')}
                 style={{ cursor: 'pointer' }}
+                title="View Partner Profile & KYC"
               >
                 <img 
                   src={currentMember?.avatar || '/matru-avatar.jpg'} 
@@ -93,10 +95,19 @@ export default function Navbar() {
                   className="user-avatar-mini"
                 />
                 <div className="user-mini-info">
-                  <span className="user-mini-name">{currentMember?.name?.split(' ')[0] || 'Matru'}</span>
-                  <span className="user-mini-rank">{currentMember?.rank || 'Silver Member'}</span>
+                  <span className="user-mini-name">{currentMember?.name?.split(' ')[0] || 'Partner'}</span>
+                  <span className="user-mini-rank">{currentMember?.rank || 'Partner'}</span>
                 </div>
               </div>
+
+              <button
+                onClick={logout}
+                className="btn btn-secondary btn-sm sign-out-btn"
+                title="Sign Out to Visitor Mode"
+              >
+                <LogOut size={14} />
+                <span>Sign Out</span>
+              </button>
             </div>
           ) : (
             <div className="auth-buttons-group">

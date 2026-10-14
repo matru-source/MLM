@@ -9,6 +9,7 @@ import {
   initialPayoutRequests
 } from '../data/initialData';
 import { generateId } from '../utils/cryptoSim';
+import { provisionDualAccounts } from '../services/accountProvisioningService';
 
 const MlmContext = createContext(null);
 
@@ -48,7 +49,10 @@ export function MlmProvider({ children }) {
   // User navigation state: 'home', 'plans', 'compensation', 'dashboard', 'network', 'wallet', 'subscriptions', 'profile'
   const [currentPage, setCurrentPage] = useState('home');
   const [currentMemberId, setCurrentMemberId] = useState('mem_matru');
-  const [isLoggedIn, setIsLoggedIn] = useState(true); // Logged in as Matru by default to show member dashboard easily
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const stored = localStorage.getItem('cybershield_isLoggedIn');
+    return stored !== null ? stored === 'true' : true;
+  });
 
   // Modals state
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -66,10 +70,51 @@ export function MlmProvider({ children }) {
     }
   };
 
+  const initialPendingActivations = [
+    {
+      id: 'act_cs_01',
+      member_id: 'mem_rahul',
+      member_name: 'Rahul Sharma',
+      member_email: 'rahul.s@example.com',
+      member_phone: '+91 98111 22334',
+      sponsor_code: 'CS123456',
+      amount_paid: 2500,
+      gst_paid: 450,
+      total_paid: 2950,
+      payment_method: 'UPI (PhonePe)',
+      payment_ref: 'CS20261011',
+      utr_number: 'UTR-CS-492019482',
+      status: 'pending',
+      requested_at: '14 Oct 2026, 05:45 PM',
+      account1_mlm: {
+        partner_id: 'mem_rahul',
+        full_name: 'Rahul Sharma',
+        email: 'rahul.s@example.com',
+        phone: '+91 98111 22334',
+        sponsor_code: 'CS123456',
+        referral_code: 'CS-RAHU01',
+        commission_wallet_id: 'WAL-CS-892144',
+        membership_plan: 'CyberShield Partner Membership (₹2,500)',
+        joining_fee_paid: 2500,
+        total_order_amount: 2950,
+        status: 'pending_admin_verification'
+      },
+      account2_software: {
+        license_id: 'LIC-7749102',
+        software_suite: 'CyberShield Pro Enterprise Security Suite',
+        license_key: 'CS-PRO-8K92-MN34-X781',
+        client_portal_username: 'rahul.s@example.com',
+        endpoint_protection_seats: 5,
+        activation_status: 'ready_for_admin_activation'
+      }
+    }
+  ];
+
   const [members, setMembers] = useState(() => getStored('members', initialMembers));
   const [orders, setOrders] = useState(() => getStored('orders', initialOrders));
   const [transactions, setTransactions] = useState(() => getStored('txs', initialTransactions));
   const [payoutRequests, setPayoutRequests] = useState(() => getStored('payouts', initialPayoutRequests));
+  const [pendingActivations, setPendingActivations] = useState(() => getStored('activations', initialPendingActivations));
   const [availableBalance, setAvailableBalance] = useState(() => getStored('balance', 4320));
   const [totalEarnings, setTotalEarnings] = useState(() => getStored('earnings', 25680));
   const [teamMembersCount, setTeamMembersCount] = useState(() => getStored('teamCount', 86));
@@ -81,10 +126,11 @@ export function MlmProvider({ children }) {
     localStorage.setItem('cybershield_orders', JSON.stringify(orders));
     localStorage.setItem('cybershield_txs', JSON.stringify(transactions));
     localStorage.setItem('cybershield_payouts', JSON.stringify(payoutRequests));
+    localStorage.setItem('cybershield_activations', JSON.stringify(pendingActivations));
     localStorage.setItem('cybershield_balance', JSON.stringify(availableBalance));
     localStorage.setItem('cybershield_earnings', JSON.stringify(totalEarnings));
     localStorage.setItem('cybershield_teamCount', JSON.stringify(teamMembersCount));
-  }, [members, orders, transactions, payoutRequests, availableBalance, totalEarnings, teamMembersCount]);
+  }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings, teamMembersCount]);
 
   const addToast = (type, title, message) => {
     const id = generateId('tst');
@@ -111,9 +157,23 @@ export function MlmProvider({ children }) {
     setIsCheckoutOpen(true);
   };
 
-  // Complete Payment (CyberShield Engine)
-  const completePayment = (paymentMethod = 'UPI (Google Pay)') => {
+  // Complete Payment & Provision Dual Accounts via API (₹2,500 Joining Plan)
+  const completePayment = async (paymentMethod = 'UPI (Google Pay)') => {
     const newOrderId = `CS${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const utrNumber = `UTR-CS-${Math.floor(100000000 + Math.random() * 900000000)}`;
+
+    // Call Dual Account Provisioning Service (API endpoints)
+    const dualAccounts = await provisionDualAccounts({
+      memberDetails: currentMember,
+      paymentDetails: {
+        orderId: newOrderId,
+        amount: 2500,
+        paymentMethod
+      }
+    });
+
+    const isMemberAlreadyActive = currentMember?.seller_status === 'active';
+
     const newOrder = {
       order_id: newOrderId,
       cs_order_id: `ord_cs_${Math.floor(1000 + Math.random() * 9000)}`,
@@ -126,29 +186,84 @@ export function MlmProvider({ children }) {
       currency: 'INR',
       payment_method: paymentMethod,
       payment_status: 'paid',
-      subscription_status: 'active',
-      activated_by: 'CyberShield Trust Engine',
+      subscription_status: isMemberAlreadyActive ? 'active' : 'pending_approval',
+      activated_by: isMemberAlreadyActive ? 'CyberShield Trust Engine' : 'Pending Admin Verification',
       activation_date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      next_renewal: '10 Nov 2026',
-      created_at: new Date().toISOString()
+      next_renewal: '14 Oct 2027',
+      created_at: new Date().toISOString(),
+      account1_mlm: dualAccounts.account1_mlm,
+      account2_software: dualAccounts.account2_software
     };
 
     setOrders(prev => [newOrder, ...prev]);
+
+    // Create New Partner Activation Item for Admin Approval Gate
+    const newActivation = {
+      id: `act_${Date.now()}`,
+      member_id: currentMember.member_id,
+      member_name: currentMember.name,
+      member_email: currentMember.email,
+      member_phone: currentMember.phone,
+      sponsor_code: currentMember.sponsor_member_id || 'CS123456',
+      amount_paid: 2500,
+      gst_paid: 450,
+      total_paid: 2950,
+      payment_method: paymentMethod,
+      payment_ref: newOrderId,
+      utr_number: utrNumber,
+      status: isMemberAlreadyActive ? 'approved' : 'pending',
+      requested_at: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      account1_mlm: dualAccounts.account1_mlm,
+      account2_software: dualAccounts.account2_software
+    };
+
+    setPendingActivations(prev => [newActivation, ...prev]);
+
+    // Update member's status
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === currentMember.member_id) {
+        return {
+          ...m,
+          customer_status: 'active_subscriber',
+          seller_status: isMemberAlreadyActive ? 'active' : 'pending_approval',
+          pending_activation_id: newActivation.id,
+          accounts: {
+            account1_mlm: dualAccounts.account1_mlm,
+            account2_software: dualAccounts.account2_software
+          }
+        };
+      }
+      return m;
+    }));
+
     setIsCheckoutOpen(false);
 
-    // Credit retail direct commission to wallet
-    setAvailableBalance(prev => prev + 1000);
-    setTotalEarnings(prev => prev + 1000);
-    setTransactions(prev => [{
-      id: generateId('tx'),
-      date: 'Just Now',
-      description: 'Retail Partner Commission (Level 1) - CyberShield Pro Sale',
-      amount: 1000,
-      type: 'credit',
-      status: 'Available'
-    }, ...prev]);
+    if (isMemberAlreadyActive) {
+      // For existing active partner, credit commission immediately
+      setAvailableBalance(prev => prev + 1000);
+      setTotalEarnings(prev => prev + 1000);
+      setTransactions(prev => [{
+        id: generateId('tx'),
+        date: 'Just Now',
+        description: 'Retail Partner Commission (Level 1) - CyberShield Pro Sale',
+        amount: 1000,
+        type: 'credit',
+        status: 'Available'
+      }, ...prev]);
 
-    addToast('success', 'Software Subscription Activated!', `Order #${newOrderId} authorized successfully via CyberShield Merchant Gateway.`);
+      addToast(
+        'success',
+        'Dual Accounts Provisioned & Active!',
+        `Order #${newOrderId} authorized. Software License ${dualAccounts.account2_software.license_key} ready.`
+      );
+    } else {
+      addToast(
+        'success',
+        'Dual Accounts Provisioned via API!',
+        `Order #${newOrderId} received. Account 1 (MLM) and Account 2 (${dualAccounts.account2_software.license_key}) sent to Admin for activation verification.`
+      );
+    }
+
     setCurrentPage('dashboard');
   };
 
@@ -292,7 +407,7 @@ export function MlmProvider({ children }) {
     return true;
   };
 
-  // Register New User
+  // Register New User (Step 2 of Brevo Email OTP verification)
   const registerUser = ({ fullName, email, mobile, password, sponsorId, isSeller }) => {
     const newMemberId = generateId('mem');
     const newMember = {
@@ -301,13 +416,14 @@ export function MlmProvider({ children }) {
       email: email,
       phone: mobile,
       avatar: '/matru-avatar.jpg',
-      rank: isSeller ? 'Active Partner' : 'Customer',
+      rank: isSeller ? 'Partner (Pending Plan Purchase)' : 'Customer',
       cs_customer_id: `CS${Math.floor(10000000 + Math.random() * 90000000)}`,
-      sponsor_member_id: 'mem_matru',
-      customer_status: 'active_subscriber',
-      seller_status: isSeller ? 'active' : 'not_enrolled',
+      sponsor_member_id: sponsorId || 'CS123456',
+      customer_status: 'registered',
+      seller_status: 'pending_payment',
       referral_code: `CS${Math.floor(100000 + Math.random() * 900000)}`,
       joined_at: new Date().toISOString(),
+      email_verified: true,
       kyc: {
         legal_name: fullName,
         pan: 'ABCDE1234F',
@@ -330,11 +446,105 @@ export function MlmProvider({ children }) {
     setMembers(prev => [...prev, newMember]);
     setCurrentMemberId(newMemberId);
     setIsLoggedIn(true);
+    localStorage.setItem('cybershield_isLoggedIn', 'true');
     setIsAuthModalOpen(false);
     setTeamMembersCount(prev => prev + 1);
 
-    addToast('success', 'Account Created!', `Welcome to CyberShield Network, ${fullName}!`);
+    addToast('success', 'Email Verified & Account Created!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
+  };
+
+  // 1. Admin Approves Partner Activation & Software License
+  const approveMemberActivation = (activationId) => {
+    const act = pendingActivations.find(a => a.id === activationId);
+    if (!act) return false;
+
+    const approvedAt = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    setPendingActivations(prev => prev.map(a => {
+      if (a.id === activationId) {
+        return {
+          ...a,
+          status: 'approved',
+          approved_at: approvedAt
+        };
+      }
+      return a;
+    }));
+
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === act.member_id) {
+        return {
+          ...m,
+          rank: 'Active Partner',
+          seller_status: 'active',
+          customer_status: 'active_subscriber',
+          software_license: act.account2_software,
+          mlm_account: act.account1_mlm
+        };
+      }
+      return m;
+    }));
+
+    // Update order subscription status to active
+    setOrders(prev => prev.map(o => {
+      if (o.order_id === act.payment_ref || o.buyer_member_id === act.member_id) {
+        return { ...o, subscription_status: 'active', activated_by: 'Admin Approved' };
+      }
+      return o;
+    }));
+
+    // Credit direct retail partner commission (₹1,000) to current sponsor wallet
+    setAvailableBalance(prev => prev + 1000);
+    setTotalEarnings(prev => prev + 1000);
+    setTransactions(prev => [{
+      id: generateId('tx'),
+      date: 'Just Now',
+      description: `Retail Partner Commission (Level 1) - ₹2,500 Joining Activation from ${act.member_name}`,
+      amount: 1000,
+      type: 'credit',
+      status: 'Available'
+    }, ...prev]);
+
+    addToast('success', 'Dual Accounts Activated!', `Partner ${act.member_name} approved. MLM ID & Software License (${act.account2_software?.license_key || ''}) unlocked!`);
+    return true;
+  };
+
+  // 2. Admin Rejects Partner Activation
+  const rejectMemberActivation = (activationId, reason = 'Payment verification failed') => {
+    setPendingActivations(prev => prev.map(a => {
+      if (a.id === activationId) {
+        return { ...a, status: 'rejected', rejection_reason: reason };
+      }
+      return a;
+    }));
+
+    setMembers(prev => prev.map(m => {
+      const act = pendingActivations.find(a => a.id === activationId);
+      if (act && m.member_id === act.member_id) {
+        return { ...m, seller_status: 'rejected' };
+      }
+      return m;
+    }));
+
+    addToast('warning', 'Activation Rejected', `Partner activation rejected: ${reason}`);
+    return true;
+  };
+
+  // Logout / Switch to Visitor mode
+  const logout = () => {
+    setIsLoggedIn(false);
+    localStorage.setItem('cybershield_isLoggedIn', 'false');
+    setCurrentPage('home');
+    addToast('info', 'Signed Out', 'You are now viewing CyberShield Network as a visitor.');
+  };
+
+  // Login as existing member (e.g. Matru)
+  const loginAsMember = (memberId = 'mem_matru') => {
+    setCurrentMemberId(memberId);
+    setIsLoggedIn(true);
+    localStorage.setItem('cybershield_isLoggedIn', 'true');
     setCurrentPage('dashboard');
+    addToast('success', 'Logged In', 'Welcome back to your CyberShield Partner Portal.');
   };
 
   const resetAllData = () => {
@@ -343,11 +553,13 @@ export function MlmProvider({ children }) {
     setOrders(initialOrders);
     setTransactions(initialTransactions);
     setPayoutRequests(initialPayoutRequests);
+    setPendingActivations(initialPendingActivations);
     setAvailableBalance(4320);
     setTotalEarnings(25680);
     setTeamMembersCount(86);
     setCurrentMemberId('mem_matru');
     setIsLoggedIn(true);
+    localStorage.setItem('cybershield_isLoggedIn', 'true');
     setCurrentPage('home');
     addToast('info', 'Demo Reset', 'Reset to initial CyberShield Network state.');
   };
@@ -362,10 +574,15 @@ export function MlmProvider({ children }) {
       isLoggedIn,
       setIsLoggedIn,
       currentMember,
+      currentMemberId,
+      setCurrentMemberId,
+      loginAsMember,
+      logout,
       members,
       orders,
       transactions,
       payoutRequests,
+      pendingActivations,
       pendingPayoutsTotal,
       availableBalance,
       totalEarnings,
@@ -386,6 +603,8 @@ export function MlmProvider({ children }) {
       requestWithdrawal,
       approvePayout,
       rejectPayout,
+      approveMemberActivation,
+      rejectMemberActivation,
       toasts,
       addToast,
       removeToast,

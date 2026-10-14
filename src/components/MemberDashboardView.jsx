@@ -48,6 +48,7 @@ export default function MemberDashboardView() {
     payoutRequests,
     pendingPayoutsTotal,
     requestWithdrawal,
+    logout,
     addToast
   } = useMlm();
 
@@ -136,7 +137,7 @@ export default function MemberDashboardView() {
           </button>
         </nav>
 
-        {/* Back to website button at bottom of sidebar */}
+        {/* Back to website and Sign out button at bottom of sidebar */}
         <div className="sidebar-footer">
           <button
             onClick={() => setCurrentPage('home')}
@@ -144,6 +145,14 @@ export default function MemberDashboardView() {
           >
             <ArrowLeft size={16} />
             <span>Back to Website</span>
+          </button>
+
+          <button
+            onClick={logout}
+            className="sidebar-logout-btn mt-2"
+            title="Sign out to visitor mode"
+          >
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>
@@ -173,6 +182,38 @@ export default function MemberDashboardView() {
         {/* SUBVIEW 1: DASHBOARD OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="dash-overview-view">
+            {/* PENDING ADMIN APPROVAL BANNER IF USER JUST PURCHASED PLAN */}
+            {currentMember?.seller_status === 'pending_approval' && (
+              <div className="pending-activation-banner card-white mb-4">
+                <div className="pending-banner-left">
+                  <div className="pending-banner-icon">
+                    <Clock size={24} className="text-amber" />
+                  </div>
+                  <div>
+                    <h4 className="pending-banner-title">Joining Payment Verified • Dual Accounts Awaiting Admin Activation</h4>
+                    <p className="pending-banner-desc">
+                      Your ₹2,500 Joining Fee (Total ₹2,950 incl. 18% GST) has been successfully recorded. Account 1 (Partner MLM Account) and Account 2 (Enterprise Software License) have been provisioned via API and queued for Admin verification. Full features and referral links unlock immediately upon admin approval.
+                    </p>
+                    <div className="pending-banner-dual-info mt-2">
+                      <span className="code-font text-primary-blue mr-3">Partner ID: {currentMember.member_id}</span>
+                      <span className="code-font text-success">License Key: {currentMember.accounts?.account2_software?.license_key || 'CS-PRO-XXXX-XXXX'}</span>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    window.location.hash = '#admin';
+                    window.location.reload();
+                  }}
+                  className="btn btn-secondary btn-sm flex-center gap-1"
+                  title="Open Admin to test instant approval"
+                >
+                  <span>Admin Desk</span>
+                  <ExternalLink size={14} />
+                </button>
+              </div>
+            )}
+
             {/* 4 Top KPI Cards */}
             <div className="dash-kpi-grid">
               {/* Card 1: Total Earnings */}
@@ -977,6 +1018,73 @@ export default function MemberDashboardView() {
                   <Download size={14} />
                   <span>Download Official Tax Invoice</span>
                 </button>
+              </div>
+            </div>
+
+            {/* DUAL ACCOUNTS PROVISIONED VIA API CARD */}
+            <div className="dual-accounts-showcase-card card-white mt-4 p-5">
+              <div className="card-head-between mb-4">
+                <div>
+                  <h3 className="chart-card-title mb-1">Dual Accounts Provisioned via API</h3>
+                  <p className="text-muted text-sm">
+                    Two independent enterprise accounts generated upon ₹2,500 joining fee completion.
+                  </p>
+                </div>
+                <span className="badge badge-green font-xs">2 Accounts Active ✓</span>
+              </div>
+
+              <div className="dual-accounts-container">
+                {/* Account 1 */}
+                <div className="dual-account-box mlm-account-box">
+                  <div className="account-box-badge">
+                    <span>Account 1: Partner MLM Account</span>
+                  </div>
+                  <div className="account-specs-compact">
+                    <div className="spec-item-compact">
+                      <span className="spec-k">Member / Partner ID:</span>
+                      <span className="spec-v code-font">{currentMember.member_id}</span>
+                    </div>
+                    <div className="spec-item-compact">
+                      <span className="spec-k">Distributor Referral Code:</span>
+                      <span className="spec-v code-font font-bold text-primary-blue">{currentMember.referral_code}</span>
+                    </div>
+                    <div className="spec-item-compact">
+                      <span className="spec-k">Commission Wallet:</span>
+                      <span className="spec-v code-font">{currentMember.accounts?.account1_mlm?.commission_wallet_id || 'WAL-CS-482910'}</span>
+                    </div>
+                    <div className="spec-item-compact">
+                      <span className="spec-k">Tier Hierarchy:</span>
+                      <span className="spec-v">6-Tier Matrix Operational</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Account 2 */}
+                <div className="dual-account-box software-account-box">
+                  <div className="account-box-badge software-badge">
+                    <span>Account 2: Enterprise Cyber Defense License</span>
+                  </div>
+                  <div className="account-specs-compact">
+                    <div className="spec-item-compact">
+                      <span className="spec-k">Software License Key:</span>
+                      <span className="spec-v code-font font-bold text-success">
+                        {currentMember.software_license?.license_key || currentMember.accounts?.account2_software?.license_key || 'CS-PRO-78K2-91QA-M892'}
+                      </span>
+                    </div>
+                    <div className="spec-item-compact">
+                      <span className="spec-k">Endpoint Device Seats:</span>
+                      <span className="spec-v font-bold">5 Protected Devices</span>
+                    </div>
+                    <div className="spec-item-compact">
+                      <span className="spec-k">Software Suite:</span>
+                      <span className="spec-v">CyberShield Pro Enterprise Suite</span>
+                    </div>
+                    <div className="spec-item-compact">
+                      <span className="spec-k">Client Portal Access:</span>
+                      <span className="spec-v">{currentMember.email}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
