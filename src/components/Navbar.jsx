@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useMlm } from '../context/MlmContext';
-import { LayoutDashboard, LogIn, UserPlus, Shield, LogOut, Clock } from 'lucide-react';
+import { LayoutDashboard, LogIn, UserPlus, Shield, LogOut, Clock, Menu, X, ArrowRight } from 'lucide-react';
 
 export default function Navbar() {
   const { 
@@ -13,13 +13,26 @@ export default function Navbar() {
     logout
   } = useMlm();
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleNavClick = (pageId, sectionId) => {
+    setCurrentPage(pageId);
+    setMobileMenuOpen(false);
+    if (sectionId) {
+      setTimeout(() => {
+        const el = document.getElementById(sectionId);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
   return (
     <header className="site-header">
       <div className="header-container">
-        {/* Logo */}
+        {/* Brand Logo */}
         <div 
           className="brand-logo" 
-          onClick={() => setCurrentPage('home')} 
+          onClick={() => handleNavClick('home')} 
           style={{ cursor: 'pointer' }}
         >
           <div className="brand-logo-icon">
@@ -31,48 +44,36 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Public Nav Menu */}
-        <nav className="header-nav">
+        {/* Desktop Public Nav Menu */}
+        <nav className="header-nav desktop-only-nav">
           <button 
-            onClick={() => setCurrentPage('home')} 
+            onClick={() => handleNavClick('home')} 
             className={`nav-link ${currentPage === 'home' ? 'active' : ''}`}
           >
             Home
           </button>
           <button 
-            onClick={() => {
-              setCurrentPage('home');
-              const el = document.getElementById('plans-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }} 
+            onClick={() => handleNavClick('home', 'plans-section')} 
             className="nav-link"
           >
             Joining Plan (₹2,500)
           </button>
           <button 
-            onClick={() => {
-              setCurrentPage('home');
-              const el = document.getElementById('compensation-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }} 
+            onClick={() => handleNavClick('home', 'compensation-section')} 
             className="nav-link"
           >
             Compensation
           </button>
           <button 
-            onClick={() => {
-              setCurrentPage('home');
-              const el = document.getElementById('faq-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }} 
+            onClick={() => handleNavClick('home', 'faq-section')} 
             className="nav-link"
           >
             FAQ
           </button>
         </nav>
 
-        {/* Action Buttons */}
-        <div className="header-actions">
+        {/* Desktop Action Buttons */}
+        <div className="header-actions desktop-only-actions">
           {isLoggedIn ? (
             <div className="user-logged-group">
               <button
@@ -135,7 +136,130 @@ export default function Navbar() {
             </div>
           )}
         </div>
+
+        {/* Mobile Hamburger Button */}
+        <div className="mobile-header-controls">
+          {isLoggedIn && (
+            <div 
+              className="user-avatar-touch-btn"
+              onClick={() => setCurrentPage('profile')}
+              title="Profile"
+            >
+              <img 
+                src={currentMember?.avatar || '/matru-avatar.jpg'} 
+                alt="Avatar" 
+                className="user-avatar-mini"
+              />
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="mobile-hamburger-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
+
+      {/* Mobile Slide-down Drawer / Menu */}
+      {mobileMenuOpen && (
+        <div className="mobile-nav-drawer">
+          <div className="mobile-drawer-content">
+            <div className="mobile-drawer-links">
+              <button 
+                onClick={() => handleNavClick('home')}
+                className={`mobile-nav-item ${currentPage === 'home' ? 'active' : ''}`}
+              >
+                Home
+              </button>
+              <button 
+                onClick={() => handleNavClick('home', 'plans-section')}
+                className="mobile-nav-item"
+              >
+                Joining Plan (₹2,500)
+              </button>
+              <button 
+                onClick={() => handleNavClick('home', 'compensation-section')}
+                className="mobile-nav-item"
+              >
+                Compensation Plan
+              </button>
+              <button 
+                onClick={() => handleNavClick('home', 'faq-section')}
+                className="mobile-nav-item"
+              >
+                FAQ & Support
+              </button>
+            </div>
+
+            <div className="mobile-drawer-actions">
+              {isLoggedIn ? (
+                <>
+                  <div className="mobile-user-profile-card" onClick={() => handleNavClick('profile')}>
+                    <img 
+                      src={currentMember?.avatar || '/matru-avatar.jpg'} 
+                      alt="Avatar" 
+                      className="user-avatar-mini"
+                    />
+                    <div>
+                      <div className="font-bold text-sm">{currentMember?.name}</div>
+                      <div className="text-muted font-xs">{currentMember?.rank} • {currentMember?.email}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleNavClick('dashboard')}
+                    className="btn btn-primary full-width"
+                  >
+                    <LayoutDashboard size={16} />
+                    <span>Open Partner Dashboard</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      logout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="btn btn-secondary full-width text-rose"
+                  >
+                    <LogOut size={16} />
+                    <span>Sign Out (Visitor Mode)</span>
+                  </button>
+                </>
+              ) : (
+                <div className="mobile-auth-grid">
+                  <button
+                    onClick={() => {
+                      setAuthMode('login');
+                      setIsAuthModalOpen(true);
+                      setMobileMenuOpen(false);
+                    }}
+                    className="btn btn-secondary full-width"
+                  >
+                    <LogIn size={16} />
+                    <span>Login</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setAuthMode('register');
+                      setIsAuthModalOpen(true);
+                      setMobileMenuOpen(false);
+                    }}
+                    className="btn btn-primary full-width"
+                  >
+                    <UserPlus size={16} />
+                    <span>Join Now (₹2,500)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

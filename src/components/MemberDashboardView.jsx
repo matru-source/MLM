@@ -83,8 +83,8 @@ export default function MemberDashboardView() {
 
   return (
     <div className="member-app-layout">
-      {/* 1. DARK NAVY SIDEBAR */}
-      <aside className="member-sidebar">
+      {/* 1. DARK NAVY SIDEBAR (Desktop) */}
+      <aside className="member-sidebar desktop-sidebar">
         <div className="sidebar-brand-box">
           <div className="sidebar-logo-icon">
             <Shield size={20} />
@@ -159,8 +159,36 @@ export default function MemberDashboardView() {
 
       {/* 2. MAIN DASHBOARD CONTENT AREA */}
       <div className="member-main-content">
-        {/* Top Header Bar */}
-        <header className="member-topbar">
+        {/* Mobile Top Header */}
+        <div className="mobile-dash-topbar">
+          <div className="mobile-dash-brand" onClick={() => setCurrentPage('home')}>
+            <div className="sidebar-logo-icon-sm">
+              <Shield size={16} />
+            </div>
+            <span className="mobile-dash-title">CyberShield</span>
+          </div>
+
+          <div className="mobile-dash-actions">
+            <button
+              onClick={() => setCurrentPage('home')}
+              className="mobile-dash-btn"
+              title="Return to Public Website"
+            >
+              <ArrowLeft size={13} />
+              <span>Website</span>
+            </button>
+            <button
+              onClick={logout}
+              className="mobile-dash-btn text-rose"
+              title="Sign Out"
+            >
+              <span>Exit</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop Top Header Bar */}
+        <header className="member-topbar desktop-only-topbar">
           <div className="topbar-welcome">
             <h2 className="welcome-name">Welcome Back, {currentMember?.name?.split(' ')[0] || 'Matru'}!</h2>
             <p className="welcome-sub">Authorized Cyber Security & Partner Network</p>
@@ -1613,6 +1641,50 @@ export default function MemberDashboardView() {
           </div>
         </div>
       )}
+
+      {/* 3. MOBILE BOTTOM NAVIGATION BAR (Fixed at bottom on phones) */}
+      <nav className="mobile-bottom-nav">
+        <button
+          type="button"
+          onClick={() => setActiveTab('overview')}
+          className={`bottom-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+        >
+          <LayoutDashboard size={19} />
+          <span>Home</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('network')}
+          className={`bottom-nav-item ${activeTab === 'network' ? 'active' : ''}`}
+        >
+          <GitBranch size={19} />
+          <span>Network</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('wallet')}
+          className={`bottom-nav-item ${activeTab === 'wallet' ? 'active' : ''}`}
+        >
+          <Wallet size={19} />
+          <span>Wallet</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('subscriptions')}
+          className={`bottom-nav-item ${activeTab === 'subscriptions' ? 'active' : ''}`}
+        >
+          <CreditCard size={19} />
+          <span>License</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('kyc')}
+          className={`bottom-nav-item ${activeTab === 'kyc' ? 'active' : ''}`}
+        >
+          <UserCheck size={19} />
+          <span>Profile</span>
+        </button>
+      </nav>
     </div>
   );
 }
