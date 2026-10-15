@@ -37,12 +37,25 @@ export function MlmProvider({ children }) {
   }, []);
 
   const navigateToAdmin = () => {
-    window.location.hash = '#admin';
+    try {
+      window.history.pushState(null, '', '/admin');
+    } catch (e) {
+      window.location.hash = '#admin';
+    }
     setIsAdminMode(true);
   };
 
   const navigateToUserSite = () => {
-    window.location.hash = '';
+    try {
+      if (window.location.pathname.startsWith('/admin')) {
+        window.history.pushState(null, '', '/');
+      }
+      if (window.location.hash) {
+        window.location.hash = '';
+      }
+    } catch (e) {
+      window.location.hash = '';
+    }
     setIsAdminMode(false);
   };
 
