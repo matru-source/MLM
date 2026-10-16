@@ -261,10 +261,10 @@ export default function AuthModal() {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-box auth-modal-width">
+      <div className={`modal-box ${authMode === 'register' && authStep === 'form' ? 'auth-modal-wide' : 'auth-modal-width'}`}>
         {/* Header */}
         <div className="auth-modal-header" style={{ position: 'relative' }}>
-          <div className="brand-logo-text-small mb-2">
+          <div className="brand-logo-text-small mb-1">
             <span className="brand-title">CyberShield</span>
             <span className="brand-subtitle">Security Network</span>
           </div>
@@ -293,159 +293,166 @@ export default function AuthModal() {
             authStep === 'form' ? (
               /* STEP 1: Registration Form */
               <form onSubmit={handleInitiateRegister}>
-                {/* Input Fields */}
-                <div className="form-group-clean">
-                  <label className="form-label-clean">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Enter your full name"
-                    className="form-input-clean"
-                  />
-                </div>
-
-                <div className="form-group-clean">
-                  <label className="form-label-clean">Email Address (OTP Verified)</label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="form-input-clean"
-                  />
-                </div>
-
-                <div className="form-group-clean">
-                  <label className="form-label-clean">Mobile Number</label>
-                  <input
-                    type="tel"
-                    required
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    placeholder="10-digit mobile number"
-                    className="form-input-clean"
-                  />
-                </div>
-
-                <div className="form-group-clean">
-                  <label className="form-label-clean">Create Password</label>
-                  <div className="relative-input-wrapper">
+                {/* 2-Column Responsive Input Grid */}
+                <div className="auth-form-grid">
+                  <div className="form-group-clean">
+                    <label className="form-label-clean">Full Name</label>
                     <input
-                      type={showPassword ? 'text' : 'password'}
+                      type="text"
                       required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Create a secure password (min 6 chars)"
-                      className="form-input-clean pr-10"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="form-input-clean"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="input-eye-btn"
-                      aria-label="Toggle password visibility"
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                  </div>
+
+                  <div className="form-group-clean">
+                    <label className="form-label-clean">Email Address (OTP Verified)</label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="form-input-clean"
+                    />
+                  </div>
+
+                  <div className="form-group-clean">
+                    <label className="form-label-clean">Mobile Number</label>
+                    <input
+                      type="tel"
+                      required
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      placeholder="10-digit mobile number"
+                      className="form-input-clean"
+                    />
+                  </div>
+
+                  <div className="form-group-clean">
+                    <label className="form-label-clean">Create Password</label>
+                    <div className="relative-input-wrapper">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Create password (min 6 chars)"
+                        className="form-input-clean pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="input-eye-btn"
+                        aria-label="Toggle password visibility"
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="form-group-clean">
-                  <div className="flex-between items-center mb-1">
-                    <label className="form-label-clean mb-0">
-                      Sponsor Referral Code
-                    </label>
-                    {activeReferral ? (
-                      <span className="badge badge-green font-2xs font-bold">
-                        ✓ Auto-filled from Referral
-                      </span>
-                    ) : (sponsorId && sponsorId.trim()) ? (
-                      <span className="badge badge-blue font-2xs font-bold">
-                        Sponsor Specified
-                      </span>
-                    ) : (
-                      <span className="badge font-2xs" style={{ background: '#F1F5F9', color: '#64748B' }}>
-                        Optional (Direct Head Office)
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={sponsorId}
-                    onChange={(e) => {
-                      setSponsorId(e.target.value.toUpperCase().trim());
-                      setSponsorError('');
-                    }}
-                    placeholder="Enter Sponsor Code or leave empty for Head Office Root"
-                    className={`form-input-clean code-font font-bold ${
-                      sponsorError 
-                        ? 'input-border-red' 
-                        : (getMemberByReferralCode(sponsorId) ? 'input-border-emerald text-emerald-400' : 'text-primary-blue')
-                    }`}
-                  />
-                  {/* Real-time Verified Sponsor Indicator */}
-                  {(() => {
-                    const clean = (sponsorId || '').trim().toUpperCase();
-                    if (!clean) {
-                      return (
-                        <div className="sponsor-direct-hint mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37, 99, 235, 0.06)', border: '1px solid rgba(37, 99, 235, 0.2)', borderRadius: '8px', padding: '8px 12px' }}>
-                          <ShieldCheck size={16} style={{ color: '#2563EB', flexShrink: 0 }} />
-                          <span style={{ fontSize: '0.8rem', color: '#1E40AF', lineHeight: 1.4 }}>
-                            <strong>Direct Enrollment:</strong> No sponsor code? You will be registered directly under <strong>CyberShield Head Office Root (CS123456)</strong> with full partner distribution rights.
-                          </span>
-                        </div>
-                      );
-                    }
-
-                    const check = validateReferralCode ? validateReferralCode(clean, email, mobile) : null;
-                    if (check && check.valid) {
-                      return (
-                        <div className="sponsor-verified-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '8px 12px' }}>
-                          <ShieldCheck size={16} style={{ color: '#10B981', flexShrink: 0 }} />
-                          <span style={{ fontSize: '0.8rem', color: '#065F46' }}>
-                            Verified Active Sponsor: <strong style={{ color: '#0F172A' }}>{check.member?.name}</strong> <span className="code-font" style={{ color: '#2563EB', fontWeight: 'bold' }}>({check.member?.referral_code})</span>
-                          </span>
-                        </div>
-                      );
-                    }
-
-                    if (check && check.reason === 'inactive') {
-                      return (
-                        <div className="sponsor-warning-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '8px 12px' }}>
-                          <AlertCircle size={16} className="text-amber shrink-0" />
-                          <span style={{ fontSize: '0.8rem', color: '#B45309' }}>
-                            Partner "{check.member?.name}" is pending plan activation and cannot sponsor new members yet.
-                          </span>
-                        </div>
-                      );
-                    }
-
-                    if (check && check.reason === 'self_referral') {
-                      return (
-                        <div className="sponsor-error-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '8px 12px' }}>
-                          <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
-                          <span style={{ fontSize: '0.8rem', color: '#991B1B' }}>
-                            You cannot use your own referral code to sponsor yourself.
-                          </span>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="sponsor-error-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '8px 12px' }}>
-                        <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
-                        <span style={{ fontSize: '0.8rem', color: '#991B1B' }}>
-                          {sponsorError || check?.message || `Sponsor code "${clean}" is not recognized.`}
+                {/* 2-Column Sponsor Section & Live Status Indicator */}
+                <div className="auth-sponsor-grid">
+                  <div className="form-group-clean mb-0">
+                    <div className="flex-between items-center mb-1">
+                      <label className="form-label-clean mb-0">
+                        Sponsor Referral Code
+                      </label>
+                      {activeReferral ? (
+                        <span className="badge badge-green font-2xs font-bold">
+                          ✓ Auto-filled
                         </span>
-                      </div>
-                    );
-                  })()}
+                      ) : (sponsorId && sponsorId.trim()) ? (
+                        <span className="badge badge-blue font-2xs font-bold">
+                          Specified
+                        </span>
+                      ) : (
+                        <span className="badge font-2xs" style={{ background: '#F1F5F9', color: '#64748B' }}>
+                          Optional (Head Office)
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={sponsorId}
+                      onChange={(e) => {
+                        setSponsorId(e.target.value.toUpperCase().trim());
+                        setSponsorError('');
+                      }}
+                      placeholder="Enter Sponsor Code or leave empty"
+                      className={`form-input-clean code-font font-bold ${
+                        sponsorError 
+                          ? 'input-border-red' 
+                          : (getMemberByReferralCode(sponsorId) ? 'input-border-emerald text-emerald-400' : 'text-primary-blue')
+                      }`}
+                    />
+                  </div>
+
+                  <div className="sponsor-indicator-col">
+                    {(() => {
+                      const clean = (sponsorId || '').trim().toUpperCase();
+                      if (!clean) {
+                        return (
+                          <div className="sponsor-direct-hint" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37, 99, 235, 0.06)', border: '1px solid rgba(37, 99, 235, 0.2)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
+                            <ShieldCheck size={16} style={{ color: '#2563EB', flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.78rem', color: '#1E40AF', lineHeight: 1.35 }}>
+                              <strong>Direct Enrollment:</strong> Registered under <strong>Head Office Root (CS123456)</strong> with full partner rights.
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      const check = validateReferralCode ? validateReferralCode(clean, email, mobile) : null;
+                      if (check && check.valid) {
+                        return (
+                          <div className="sponsor-verified-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
+                            <ShieldCheck size={16} style={{ color: '#10B981', flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.78rem', color: '#065F46', lineHeight: 1.35 }}>
+                              Active Sponsor: <strong style={{ color: '#0F172A' }}>{check.member?.name}</strong> <span className="code-font" style={{ color: '#2563EB', fontWeight: 'bold' }}>({check.member?.referral_code})</span>
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (check && check.reason === 'inactive') {
+                        return (
+                          <div className="sponsor-warning-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
+                            <AlertCircle size={16} className="text-amber shrink-0" />
+                            <span style={{ fontSize: '0.78rem', color: '#B45309', lineHeight: 1.35 }}>
+                              Partner "{check.member?.name}" is pending plan activation.
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (check && check.reason === 'self_referral') {
+                        return (
+                          <div className="sponsor-error-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
+                            <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.78rem', color: '#991B1B', lineHeight: 1.35 }}>
+                              Cannot use your own referral code.
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="sponsor-error-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
+                          <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
+                          <span style={{ fontSize: '0.78rem', color: '#991B1B', lineHeight: 1.35 }}>
+                            {sponsorError || check?.message || `Sponsor code "${clean}" not recognized.`}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 {/* Statutory Agreement Checkbox */}
-                <label className="auth-checkbox-row">
+                <label className="auth-checkbox-row" style={{ margin: '8px 0 10px 0' }}>
                   <input
                     type="checkbox"
                     required
@@ -460,14 +467,15 @@ export default function AuthModal() {
                 <button 
                   type="submit" 
                   disabled={isSendingOtp}
-                  className="btn btn-primary full-width btn-lg mt-3 flex-center gap-2"
+                  className="btn btn-primary full-width btn-lg flex-center gap-2"
+                  style={{ marginTop: '4px' }}
                 >
                   <Mail size={16} />
                   <span>{isSendingOtp ? 'Sending Brevo OTP...' : 'Send Verification OTP & Continue'}</span>
                   <ArrowRight size={16} />
                 </button>
 
-                <div className="auth-switch-row">
+                <div className="auth-switch-row" style={{ marginTop: '10px' }}>
                   <span>Already have an account?</span>
                   <button
                     type="button"
