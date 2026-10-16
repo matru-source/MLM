@@ -257,43 +257,67 @@ export async function dbApproveActivation(activationId) {
       WHERE buyer_member_id = ${act.member_id} OR payment_ref = ${act.payment_ref};
     `;
 
-    // 5. Look up sponsor to credit ₹1,000 commission
-    const sponsorRows = await sql`
-      SELECT id, wallet_balance, total_earnings 
-      FROM members 
-      WHERE referral_code = ${act.sponsor_code} OR id = ${act.sponsor_code}
-      LIMIT 1;
-    `;
+    // 5. Multi-Tier 6-Level Commission Distribution across uplines
+    const tierRates = [
+      { level: 1, rate: 1000, desc: 'Retail Partner Commission (Level 1) - ₹2,500 Direct Activation from ' },
+      { level: 2, rate: 300, desc: 'Team Network Commission (Level 2) - 2nd Tier Activation from ' },
+      { level: 3, rate: 150, desc: 'Matrix Growth Bonus (Level 3) - 3rd Tier Activation from ' },
+      { level: 4, rate: 50, desc: 'Leadership Override (Level 4) - 4th Tier Activation from ' },
+      { level: 5, rate: 25, desc: 'Infinity Pool Bonus (Level 5) - 5th Tier Activation from ' },
+      { level: 6, rate: 25, desc: 'Network Executive Commission (Level 6) - 6th Tier Activation from ' }
+    ];
 
-    if (sponsorRows.length > 0) {
-      const sponsor = sponsorRows[0];
-      const newBal = Number(sponsor.wallet_balance || 0) + 1000;
-      const newEarnings = Number(sponsor.total_earnings || 0) + 1000;
+    let currentSponsorCode = act.sponsor_code;
+    const visitedUplines = new Set();
 
-      // Credit sponsor wallet
+    for (let i = 0; i < tierRates.length; i++) {
+      if (!currentSponsorCode) break;
+
+      const uplineRows = await sql`
+        SELECT id, name, referral_code, sponsor_code, sponsor_member_id, wallet_balance, total_earnings 
+        FROM members 
+        WHERE referral_code = ${currentSponsorCode} OR id = ${currentSponsorCode}
+        LIMIT 1;
+      `;
+
+      if (uplineRows.length === 0) break;
+      const upline = uplineRows[0];
+
+      // Prevent loops
+      if (visitedUplines.has(upline.id)) break;
+      visitedUplines.add(upline.id);
+
+      const tier = tierRates[i];
+      const newBal = Number(upline.wallet_balance || 0) + tier.rate;
+      const newEarnings = Number(upline.total_earnings || 0) + tier.rate;
+
+      // Credit upline wallet in Neon DB
       await sql`
         UPDATE members
         SET 
           wallet_balance = ${newBal},
           total_earnings = ${newEarnings}
-        WHERE id = ${sponsor.id};
+        WHERE id = ${upline.id};
       `;
 
-      // Record transaction
-      const txId = `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      // Record transaction in Neon DB
+      const txId = `tx_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`;
       await sql`
         INSERT INTO transactions (
           id, member_id, description, amount, type, status, created_at
         ) VALUES (
           ${txId},
-          ${sponsor.id},
-          ${'Retail Partner Commission (Level 1) - ₹2,500 Joining Activation from ' + act.member_name},
-          1000,
+          ${upline.id},
+          ${tier.desc + act.member_name},
+          ${tier.rate},
           'credit',
           'Available',
           NOW()
         );
       `;
+
+      // Move to next upline in the hierarchy tree
+      currentSponsorCode = upline.sponsor_member_id || upline.sponsor_code;
     }
 
     return { ok: true };

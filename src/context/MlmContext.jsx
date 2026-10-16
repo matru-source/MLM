@@ -98,45 +98,7 @@ export function MlmProvider({ children }) {
     }
   };
 
-  const initialPendingActivations = [
-    {
-      id: 'act_cs_01',
-      member_id: 'mem_rahul',
-      member_name: 'Rahul Sharma',
-      member_email: 'rahul.s@example.com',
-      member_phone: '+91 98111 22334',
-      sponsor_code: 'CS123456',
-      amount_paid: 2500,
-      gst_paid: 450,
-      total_paid: 2950,
-      payment_method: 'UPI (PhonePe)',
-      payment_ref: 'CS20261011',
-      utr_number: 'UTR-CS-492019482',
-      status: 'pending',
-      requested_at: '14 Oct 2026, 05:45 PM',
-      account1_mlm: {
-        partner_id: 'mem_rahul',
-        full_name: 'Rahul Sharma',
-        email: 'rahul.s@example.com',
-        phone: '+91 98111 22334',
-        sponsor_code: 'CS123456',
-        referral_code: 'CS-RAHU01',
-        commission_wallet_id: 'WAL-CS-892144',
-        membership_plan: 'CyberShield Partner Membership (₹2,500)',
-        joining_fee_paid: 2500,
-        total_order_amount: 2950,
-        status: 'pending_admin_verification'
-      },
-      account2_software: {
-        license_id: 'LIC-7749102',
-        software_suite: 'CyberShield Pro Enterprise Security Suite',
-        license_key: 'CS-PRO-8K92-MN34-X781',
-        client_portal_username: 'rahul.s@example.com',
-        endpoint_protection_seats: 5,
-        activation_status: 'ready_for_admin_activation'
-      }
-    }
-  ];
+  const initialPendingActivations = [];
 
   const [members, setMembers] = useState(() => getStored('members', initialMembers));
   const [orders, setOrders] = useState(() => getStored('orders', initialOrders));
@@ -177,7 +139,7 @@ export function MlmProvider({ children }) {
 
         if (!active) return;
 
-        if (mRes.ok && mRes.data && mRes.data.length > 0) {
+        if (mRes.ok && mRes.data) {
           setMembers(mRes.data);
           const current = mRes.data.find(m => m.member_id === currentMemberId);
           if (current) {
@@ -186,16 +148,16 @@ export function MlmProvider({ children }) {
           }
           setIsDbConnected(true);
         }
-        if (aRes.ok && aRes.data && aRes.data.length > 0) {
+        if (aRes.ok && aRes.data) {
           setPendingActivations(aRes.data);
         }
-        if (pRes.ok && pRes.data && pRes.data.length > 0) {
+        if (pRes.ok && pRes.data) {
           setPayoutRequests(pRes.data);
         }
-        if (oRes.ok && oRes.data && oRes.data.length > 0) {
+        if (oRes.ok && oRes.data) {
           setOrders(oRes.data);
         }
-        if (tRes.ok && tRes.data && tRes.data.length > 0) {
+        if (tRes.ok && tRes.data) {
           setTransactions(tRes.data);
         }
       } catch (err) {
@@ -801,6 +763,32 @@ export function MlmProvider({ children }) {
     addToast('info', 'Platform Reset', 'Reset to fresh production state (₹0 Balance, Visitor Mode).');
   };
 
+  // Derive dynamic monthly earnings from live transactions
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dynamicEarningsMonthly = months.map(month => {
+    const monthTx = transactions.filter(t => t.type === 'credit' && t.date && t.date.includes(month));
+    const total = monthTx.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    return { month, amount: total };
+  });
+
+  // Derive dynamic recent activity from live transactions and activations
+  const dynamicRecentActivity = [
+    ...transactions.slice(0, 5).map(t => ({
+      id: t.id,
+      type: t.amount > 0 ? 'earning' : 'payout',
+      title: t.description,
+      time: t.date || 'Just now',
+      icon: t.amount > 0 ? 'Coins' : 'ArrowUpRight'
+    })),
+    ...pendingActivations.slice(0, 3).map(a => ({
+      id: a.id,
+      type: 'user',
+      title: `Partner Activation: ${a.member_name} (${a.status})`,
+      time: a.requested_at || 'Just now',
+      icon: 'UserPlus'
+    }))
+  ];
+
   return (
     <MlmContext.Provider value={{
       isAdminMode,
@@ -824,8 +812,8 @@ export function MlmProvider({ children }) {
       availableBalance,
       totalEarnings,
       teamMembersCount,
-      earningsMonthly: initialEarningsMonthly,
-      recentActivity: initialRecentActivity,
+      earningsMonthly: dynamicEarningsMonthly,
+      recentActivity: dynamicRecentActivity,
       commissionRules,
       isCheckoutOpen,
       setIsCheckoutOpen,

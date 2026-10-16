@@ -562,7 +562,7 @@ export default function AdminPortalView() {
                   {orders.map((o) => (
                     <tr key={o.order_id}>
                       <td className="code-font font-bold text-primary-blue">#{o.order_id}</td>
-                      <td>Matru Prasad Panda</td>
+                      <td>{o.buyer_name || (members.find(m => m.member_id === o.buyer_member_id)?.name) || 'Authorized Partner'}</td>
                       <td>{o.product_name}</td>
                       <td className="font-bold">₹{o.total_amount?.toLocaleString('en-IN') || '2,950'}</td>
                       <td>{o.payment_method}</td>
@@ -607,13 +607,17 @@ export default function AdminPortalView() {
                     <tr key={m.member_id}>
                       <td className="font-bold">{m.name}</td>
                       <td className="text-muted">{m.email}</td>
-                      <td className="code-font">{m.kyc?.pan || 'ABCDE1234F'}</td>
-                      <td>{m.kyc?.bank_name || 'HDFC Bank'} ({m.kyc?.bank_account_number || '••••8172'})</td>
-                      <td>XXXX-XXXX-9012</td>
-                      <td><span className="badge badge-green">Verified ✓</span></td>
+                      <td className="code-font">{m.kyc?.pan || 'Pending Verification'}</td>
+                      <td>{m.kyc?.bank_name ? `${m.kyc.bank_name} (${m.kyc.bank_account_number ? '••••' + m.kyc.bank_account_number.slice(-4) : '••••'})` : 'Pending Bank Setup'}</td>
+                      <td>{m.kyc?.aadhaar || 'Pending Upload'}</td>
+                      <td>
+                        <span className={`badge ${m.seller_status === 'active' ? 'badge-green' : 'badge-amber'}`}>
+                          {m.seller_status === 'active' ? 'Verified ✓' : 'Pending Verification'}
+                        </span>
+                      </td>
                       <td>
                         <button 
-                          onClick={() => addToast('success', 'Verified', `${m.name} partner KYC is active.`)}
+                          onClick={() => addToast('success', 'Verified', `${m.name} partner KYC status inspected.`)}
                           className="btn btn-secondary btn-sm"
                         >
                           Details

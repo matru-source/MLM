@@ -253,102 +253,130 @@ export default function MemberDashboardView() {
             )}
 
             {/* 4 Top KPI Cards */}
-            <div className="dash-kpi-grid">
-              {/* Card 1: Total Earnings */}
-              <div className="dash-kpi-card card-white">
-                <div className="kpi-icon-row">
-                  <div className="kpi-icon-box bg-purple-dim">
-                    <Coins size={20} className="text-purple" />
-                  </div>
-                  <span className="badge badge-green font-xs">+12%</span>
-                </div>
-                <div className="kpi-value text-primary">₹{totalEarnings.toLocaleString('en-IN')}</div>
-                <div className="kpi-label">Total Earnings</div>
-              </div>
+            {(() => {
+              const directActiveCount = (members || []).filter(m => 
+                (m.sponsor_member_id === currentMember?.member_id || 
+                 m.sponsor_code === currentMember?.referral_code ||
+                 m.sponsor_member_id === currentMember?.referral_code) && 
+                m.seller_status === 'active'
+              ).length;
+              const isAccountActive = currentMember?.seller_status === 'active';
+              const maxMonthlyEarning = Math.max(...earningsMonthly.map(e => e.amount), 1000);
 
-              {/* Card 2: Team Members */}
-              <div className="dash-kpi-card card-white">
-                <div className="kpi-icon-row">
-                  <div className="kpi-icon-box bg-blue-dim">
-                    <Users size={20} className="text-primary-blue" />
-                  </div>
-                </div>
-                <div className="kpi-value text-primary">{teamMembersCount}</div>
-                <div className="kpi-label">Team Members</div>
-              </div>
-
-              {/* Card 3: Direct Retail Sales */}
-              <div className="dash-kpi-card card-white">
-                <div className="kpi-icon-row">
-                  <div className="kpi-icon-box bg-green-dim">
-                    <ShoppingBag size={20} className="text-success" />
-                  </div>
-                  <span className="badge badge-green font-xs">Verified</span>
-                </div>
-                <div className="kpi-value text-primary">18</div>
-                <div className="kpi-label">Direct Retail Sales</div>
-              </div>
-
-              {/* Card 4: Active Subscriber */}
-              <div className="dash-kpi-card card-white">
-                <div className="kpi-icon-row">
-                  <div className="kpi-icon-box bg-amber-dim">
-                    <Award size={20} className="text-amber" />
-                  </div>
-                  <span className="badge badge-blue font-xs">CyberShield Pro</span>
-                </div>
-                <div className="kpi-value text-success">Active</div>
-                <div className="kpi-label">Subscriber Status</div>
-              </div>
-            </div>
-
-            {/* Middle Grid: Earnings Overview Chart + Recent Activity */}
-            <div className="dash-middle-grid">
-              {/* Left: Earnings Overview Bar Chart */}
-              <div className="dash-chart-card card-white">
-                <div className="card-head-between">
-                  <div>
-                    <h3 className="chart-card-title">Earnings Overview</h3>
-                    <p className="chart-card-sub">Monthly commission growth (Jan - Dec)</p>
-                  </div>
-                  <span className="badge badge-blue">Last 12 Months</span>
-                </div>
-
-                {/* Bar Chart Bars */}
-                <div className="chart-bars-container">
-                  {earningsMonthly.map((item, idx) => (
-                    <div key={idx} className="chart-bar-col">
-                      <div className="bar-track">
-                        <div 
-                          className="bar-fill" 
-                          style={{ height: `${(item.amount / 350) * 100}%` }}
-                          title={`₹${item.amount * 100}`}
-                        />
+              return (
+                <>
+                  <div className="dash-kpi-grid">
+                    {/* Card 1: Total Earnings */}
+                    <div className="dash-kpi-card card-white">
+                      <div className="kpi-icon-row">
+                        <div className="kpi-icon-box bg-purple-dim">
+                          <Coins size={20} className="text-purple" />
+                        </div>
+                        <span className="badge badge-green font-xs">Verified</span>
                       </div>
-                      <span className="bar-month-label">{item.month}</span>
+                      <div className="kpi-value text-primary">₹{totalEarnings.toLocaleString('en-IN')}</div>
+                      <div className="kpi-label">Total Earnings</div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Right: Recent Activity Feed */}
-              <div className="dash-activity-card card-white">
-                <h3 className="chart-card-title">Recent Activity</h3>
-                <div className="activity-list">
-                  {recentActivity.map((act) => (
-                    <div key={act.id} className="activity-item">
-                      <div className="activity-dot bg-blue-dim">
-                        <CheckCircle2 size={16} className="text-primary-blue" />
+                    {/* Card 2: Team Members */}
+                    <div className="dash-kpi-card card-white">
+                      <div className="kpi-icon-row">
+                        <div className="kpi-icon-box bg-blue-dim">
+                          <Users size={20} className="text-primary-blue" />
+                        </div>
                       </div>
-                      <div className="activity-info">
-                        <div className="activity-title">{act.title}</div>
-                        <div className="activity-time">{act.time}</div>
+                      <div className="kpi-value text-primary">{teamMembersCount}</div>
+                      <div className="kpi-label">Team Members</div>
+                    </div>
+
+                    {/* Card 3: Direct Retail Sales */}
+                    <div className="dash-kpi-card card-white">
+                      <div className="kpi-icon-row">
+                        <div className="kpi-icon-box bg-green-dim">
+                          <ShoppingBag size={20} className="text-success" />
+                        </div>
+                        <span className="badge badge-green font-xs">Direct Active</span>
+                      </div>
+                      <div className="kpi-value text-primary">{directActiveCount}</div>
+                      <div className="kpi-label">Direct Retail Sales</div>
+                    </div>
+
+                    {/* Card 4: Active Subscriber */}
+                    <div className="dash-kpi-card card-white">
+                      <div className="kpi-icon-row">
+                        <div className="kpi-icon-box bg-amber-dim">
+                          <Award size={20} className="text-amber" />
+                        </div>
+                        <span className="badge badge-blue font-xs">CyberShield Pro</span>
+                      </div>
+                      <div className={`kpi-value ${isAccountActive ? 'text-success' : 'text-amber'}`}>
+                        {isAccountActive ? 'Active' : currentMember?.seller_status === 'pending_approval' ? 'Pending Approval' : 'Unpaid'}
+                      </div>
+                      <div className="kpi-label">Subscriber Status</div>
+                    </div>
+                  </div>
+
+                  {/* Middle Grid: Earnings Overview Chart + Recent Activity */}
+                  <div className="dash-middle-grid">
+                    {/* Left: Earnings Overview Bar Chart */}
+                    <div className="dash-chart-card card-white">
+                      <div className="card-head-between">
+                        <div>
+                          <h3 className="chart-card-title">Earnings Overview</h3>
+                          <p className="chart-card-sub">Monthly commission growth (Jan - Dec)</p>
+                        </div>
+                        <span className="badge badge-blue">Last 12 Months</span>
+                      </div>
+
+                      {/* Bar Chart Bars */}
+                      <div className="chart-bars-container">
+                        {earningsMonthly.map((item, idx) => (
+                          <div key={idx} className="chart-bar-col">
+                            <div className="bar-track">
+                              <div 
+                                className="bar-fill" 
+                                style={{ height: `${item.amount > 0 ? Math.min(100, (item.amount / maxMonthlyEarning) * 100) : 4}%` }}
+                                title={`₹${item.amount.toLocaleString('en-IN')}`}
+                              />
+                            </div>
+                            <span className="bar-month-label">{item.month}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {totalEarnings === 0 && (
+                        <div className="text-center text-muted text-xs mt-3">
+                          Zero commission earnings. Commission bars will populate upon partner sales.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Recent Activity Feed */}
+                    <div className="dash-activity-card card-white">
+                      <h3 className="chart-card-title">Recent Activity</h3>
+                      <div className="activity-list">
+                        {recentActivity.length === 0 ? (
+                          <div className="text-center text-muted text-xs p-6">
+                            No recent activity yet. Live notifications will appear here as your team members register and purchase plans.
+                          </div>
+                        ) : (
+                          recentActivity.map((act) => (
+                            <div key={act.id} className="activity-item">
+                              <div className="activity-dot bg-blue-dim">
+                                <CheckCircle2 size={16} className="text-primary-blue" />
+                              </div>
+                              <div className="activity-info">
+                                <div className="activity-title">{act.title}</div>
+                                <div className="activity-time">{act.time}</div>
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Quick Referral Link Banner */}
             <div className="referral-share-card card-white">
@@ -392,65 +420,72 @@ export default function MemberDashboardView() {
           </div>
         )}
 
-        {/* SUBVIEW 2: MY NETWORK (Unilevel Tree + Real-Time Calculation Column) */}
+        {/* SUBVIEW 2: MY NETWORK (Dynamic 6-Tier Unilevel Tree + Real-Time Calculation Column) */}
         {activeTab === 'network' && (() => {
-          // Base verified active referrals (Matru's verified active partners)
-          const baseActiveReferrals = [
-            { id: 'mem_rahul', name: 'Rahul Sharma', email: 'rahul.s@example.com', initials: 'RS', rank: 'Active Partner', date: '12 Feb 2026', commission: 1000, status: 'Active' },
-            { id: 'mem_priya', name: 'Priya Patel', email: 'priya.p@example.com', initials: 'PP', rank: 'Active Partner', date: '18 Feb 2026', commission: 1000, status: 'Active' },
-            { id: 'mem_amit', name: 'Amit Kumar', email: 'amit.k@example.com', initials: 'AK', rank: 'Active Partner', date: '01 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'mem_ananya', name: 'Ananya Roy', email: 'ananya@example.com', initials: 'AR', rank: 'Active Partner', date: '05 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_5', name: 'Vikram Singh', email: 'vikram.s@example.com', initials: 'VS', rank: 'Customer Partner', date: '14 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_6', name: 'Neha Gupta', email: 'neha.g@example.com', initials: 'NG', rank: 'Active Partner', date: '22 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_7', name: 'Rohan Mishra', email: 'rohan.m@example.com', initials: 'RM', rank: 'Customer Partner', date: '28 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_8', name: 'Sneha Joshi', email: 'sneha.j@example.com', initials: 'SJ', rank: 'Active Partner', date: '04 Apr 2026', commission: 1000, status: 'Active' },
+          // Compute real 6-level network hierarchy dynamically from active members in Neon DB
+          const activeMembers = (members || []).filter(m => m.seller_status === 'active');
+          const rootId = currentMember?.member_id;
+          const rootRefCode = currentMember?.referral_code;
+
+          const rates = [
+            { level: 1, rate: 1000, label: 'Direct Referrals (Level 1)' },
+            { level: 2, rate: 300, label: '2nd Generation' },
+            { level: 3, rate: 150, label: '3rd Generation' },
+            { level: 4, rate: 50, label: '4th Generation' },
+            { level: 5, rate: 25, label: '5th Generation' },
+            { level: 6, rate: 25, label: '6th Generation' }
           ];
 
-          // Newly approved members who match current sponsor AND have seller_status === 'active'
-          const dynamicApprovedReferrals = (members || [])
-            .filter(m => 
-              (m.sponsor_member_id === currentMember?.member_id || 
-               m.sponsor_member_id === currentMember?.referral_code || 
-               m.sponsor_code === currentMember?.referral_code) &&
-              m.seller_status === 'active' &&
-              !baseActiveReferrals.some(b => b.id === m.member_id || b.email === m.email) &&
-              m.member_id !== currentMember?.member_id
-            )
-            .map(m => ({
-              id: m.member_id,
-              name: m.name,
-              email: m.email,
-              initials: m.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
-              rank: m.rank || 'Active Partner',
-              date: new Date(m.joined_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-              commission: 1000,
-              status: 'Active'
-            }));
+          const networkLevelData = [];
+          let currentUplines = [currentMember];
+          const visited = new Set([rootId, rootRefCode]);
 
-          // STRICT FILTER: Only ACTIVE approved partners are counted or shown in hierarchy
-          const isFreshUser = currentMember?.member_id !== 'mem_matru';
-          const directReferralsList = isFreshUser 
-            ? dynamicApprovedReferrals 
-            : [...baseActiveReferrals, ...dynamicApprovedReferrals];
+          for (let lvl = 1; lvl <= 6; lvl++) {
+            const uplineIds = new Set(currentUplines.map(u => u.member_id || u.id).filter(Boolean));
+            const uplineCodes = new Set(currentUplines.map(u => u.referral_code).filter(Boolean));
+
+            // Find all active members whose sponsor is in this tier
+            const tierDownlines = activeMembers.filter(m => {
+              const id = m.member_id || m.id;
+              if (visited.has(id)) return false;
+              return uplineIds.has(m.sponsor_member_id) || 
+                     uplineCodes.has(m.sponsor_code) ||
+                     uplineCodes.has(m.sponsor_member_id);
+            });
+
+            tierDownlines.forEach(d => visited.add(d.member_id || d.id));
+
+            const rateInfo = rates[lvl - 1];
+            networkLevelData.push({
+              level: lvl,
+              rate: rateInfo.rate,
+              label: rateInfo.label,
+              count: tierDownlines.length,
+              members: tierDownlines.map(m => ({
+                id: m.member_id || m.id,
+                name: m.name,
+                email: m.email,
+                initials: m.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+                rank: m.rank || 'Active Partner',
+                date: new Date(m.joined_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                commission: rateInfo.rate,
+                status: 'Active'
+              }))
+            });
+
+            currentUplines = tierDownlines;
+          }
+
+          const directReferralsList = networkLevelData[0].members;
 
           // Any members who registered via this sponsor but have NOT completed payment or are awaiting Admin approval
           const pendingOrUnpaidReferrals = (members || []).filter(m => 
-            (m.sponsor_member_id === currentMember?.member_id || 
-             m.sponsor_member_id === currentMember?.referral_code || 
-             m.sponsor_code === currentMember?.referral_code) &&
+            (m.sponsor_member_id === rootId || 
+             m.sponsor_member_id === rootRefCode || 
+             m.sponsor_code === rootRefCode) &&
             m.seller_status !== 'active' &&
-            m.member_id !== currentMember?.member_id
+            m.member_id !== rootId
           );
-
-          // 6 Levels Network Calculation Data: Starts strictly at 0 for fresh accounts
-          const networkLevelData = [
-            { level: 1, count: directReferralsList.length, rate: 1000, label: 'Direct Referrals (Level 1)' },
-            { level: 2, count: isFreshUser ? 0 : 14, rate: 300, label: '2nd Generation' },
-            { level: 3, count: isFreshUser ? 0 : 28, rate: 150, label: '3rd Generation' },
-            { level: 4, count: isFreshUser ? 0 : 45, rate: 50, label: '4th Generation' },
-            { level: 5, count: isFreshUser ? 0 : 60, rate: 25, label: '5th Generation' },
-            { level: 6, count: isFreshUser ? 0 : 120, rate: 25, label: '6th Generation' }
-          ];
 
           const totalNetworkEarnings = networkLevelData.reduce((acc, curr) => acc + (curr.count * curr.rate), 0);
           const totalNetworkMembers = networkLevelData.reduce((acc, curr) => acc + curr.count, 0);
@@ -1150,7 +1185,7 @@ export default function MemberDashboardView() {
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Commission Wallet:</span>
-                      <span className="spec-v code-font">{currentMember.accounts?.account1_mlm?.commission_wallet_id || 'WAL-CS-482910'}</span>
+                      <span className="spec-v code-font">{currentMember.accounts?.account1_mlm?.commission_wallet_id || `WAL-${currentMember.referral_code || currentMember.member_id}`}</span>
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Tier Hierarchy:</span>
@@ -1168,7 +1203,7 @@ export default function MemberDashboardView() {
                     <div className="spec-item-compact">
                       <span className="spec-k">Software License Key:</span>
                       <span className="spec-v code-font font-bold text-success">
-                        {currentMember.software_license?.license_key || currentMember.accounts?.account2_software?.license_key || 'CS-PRO-78K2-91QA-M892'}
+                        {currentMember.software_license?.license_key || currentMember.accounts?.account2_software?.license_key || (currentMember.seller_status === 'active' ? `CS-PRO-${currentMember.referral_code || 'ACTIVE'}` : 'Awaiting Admin Verification')}
                       </span>
                     </div>
                     <div className="spec-item-compact">
