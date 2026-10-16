@@ -33,12 +33,12 @@ export default function AuthModal() {
     addToast
   } = useMlm();
   
-  // Registration Form Fields
+  // Registration Form Fields - Blank defaults with clean placeholders
   const [isSeller, setIsSeller] = useState(true);
-  const [fullName, setFullName] = useState('Matru Prasad Panda');
-  const [email, setEmail] = useState('matru@gmail.com');
-  const [mobile, setMobile] = useState('+91 9876543210');
-  const [password, setPassword] = useState('••••••••••••');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [password, setPassword] = useState('');
   // Mandatory Sponsor Code: Auto-fills from URL referral, otherwise requires user to enter valid sponsor
   const [sponsorId, setSponsorId] = useState(() => activeReferral || '');
   const [sponsorError, setSponsorError] = useState('');
@@ -343,7 +343,7 @@ export default function AuthModal() {
                     required
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value)}
-                    placeholder="+91 9876543210"
+                    placeholder="10-digit mobile number"
                     className="form-input-clean"
                   />
                 </div>
@@ -570,7 +570,7 @@ export default function AuthModal() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="matru@gmail.com"
+                  placeholder="name@example.com"
                   className="form-input-clean"
                 />
               </div>

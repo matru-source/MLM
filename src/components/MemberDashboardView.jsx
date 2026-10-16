@@ -419,7 +419,10 @@ export default function MemberDashboardView() {
             }));
 
           // STRICT FILTER: Only ACTIVE approved partners are counted or shown in hierarchy
-          const directReferralsList = [...baseActiveReferrals, ...dynamicApprovedReferrals];
+          const isFreshUser = currentMember?.member_id !== 'mem_matru';
+          const directReferralsList = isFreshUser 
+            ? dynamicApprovedReferrals 
+            : [...baseActiveReferrals, ...dynamicApprovedReferrals];
 
           // Any members who registered via this sponsor but have NOT completed payment or are awaiting Admin approval
           const pendingOrUnpaidReferrals = (members || []).filter(m => 
@@ -430,14 +433,14 @@ export default function MemberDashboardView() {
             m.member_id !== currentMember?.member_id
           );
 
-          // 6 Levels Network Calculation Data: Level 1 strictly matches active approved count
+          // 6 Levels Network Calculation Data: Starts strictly at 0 for fresh accounts
           const networkLevelData = [
             { level: 1, count: directReferralsList.length, rate: 1000, label: 'Direct Referrals (Level 1)' },
-            { level: 2, count: 14, rate: 300, label: '2nd Generation' },
-            { level: 3, count: 28, rate: 150, label: '3rd Generation' },
-            { level: 4, count: 45, rate: 50, label: '4th Generation' },
-            { level: 5, count: 60, rate: 25, label: '5th Generation' },
-            { level: 6, count: 120, rate: 25, label: '6th Generation' }
+            { level: 2, count: isFreshUser ? 0 : 14, rate: 300, label: '2nd Generation' },
+            { level: 3, count: isFreshUser ? 0 : 28, rate: 150, label: '3rd Generation' },
+            { level: 4, count: isFreshUser ? 0 : 45, rate: 50, label: '4th Generation' },
+            { level: 5, count: isFreshUser ? 0 : 60, rate: 25, label: '5th Generation' },
+            { level: 6, count: isFreshUser ? 0 : 120, rate: 25, label: '6th Generation' }
           ];
 
           const totalNetworkEarnings = networkLevelData.reduce((acc, curr) => acc + (curr.count * curr.rate), 0);

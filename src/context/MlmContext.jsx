@@ -64,7 +64,7 @@ export function MlmProvider({ children }) {
   const [currentMemberId, setCurrentMemberId] = useState('mem_matru');
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const stored = localStorage.getItem('cybershield_isLoggedIn');
-    return stored !== null ? stored === 'true' : true;
+    return stored !== null ? stored === 'true' : false;
   });
 
   // Modals state
@@ -128,9 +128,9 @@ export function MlmProvider({ children }) {
   const [transactions, setTransactions] = useState(() => getStored('txs', initialTransactions));
   const [payoutRequests, setPayoutRequests] = useState(() => getStored('payouts', initialPayoutRequests));
   const [pendingActivations, setPendingActivations] = useState(() => getStored('activations', initialPendingActivations));
-  const [availableBalance, setAvailableBalance] = useState(() => getStored('balance', 4320));
-  const [totalEarnings, setTotalEarnings] = useState(() => getStored('earnings', 25680));
-  const [teamMembersCount, setTeamMembersCount] = useState(() => getStored('teamCount', 86));
+  const [availableBalance, setAvailableBalance] = useState(() => getStored('balance', 0));
+  const [totalEarnings, setTotalEarnings] = useState(() => getStored('earnings', 0));
+  const [teamMembersCount, setTeamMembersCount] = useState(() => getStored('teamCount', 0));
   const [commissionRules, setCommissionRules] = useState(initialCommissionRules);
   const [toasts, setToasts] = useState([]);
 
@@ -551,6 +551,9 @@ export function MlmProvider({ children }) {
 
     setMembers(prev => [...prev, newMember]);
     setCurrentMemberId(newMemberId);
+    setAvailableBalance(0);
+    setTotalEarnings(0);
+    setTeamMembersCount(0);
     setIsLoggedIn(true);
     localStorage.setItem('cybershield_isLoggedIn', 'true');
     setIsAuthModalOpen(false);
@@ -662,14 +665,14 @@ export function MlmProvider({ children }) {
     setTransactions(initialTransactions);
     setPayoutRequests(initialPayoutRequests);
     setPendingActivations(initialPendingActivations);
-    setAvailableBalance(4320);
-    setTotalEarnings(25680);
-    setTeamMembersCount(86);
+    setAvailableBalance(0);
+    setTotalEarnings(0);
+    setTeamMembersCount(0);
     setCurrentMemberId('mem_matru');
-    setIsLoggedIn(true);
-    localStorage.setItem('cybershield_isLoggedIn', 'true');
+    setIsLoggedIn(false);
+    localStorage.setItem('cybershield_isLoggedIn', 'false');
     setCurrentPage('home');
-    addToast('info', 'Demo Reset', 'Reset to initial CyberShield Network state.');
+    addToast('info', 'Platform Reset', 'Reset to fresh production state (₹0 Balance, Visitor Mode).');
   };
 
   return (
