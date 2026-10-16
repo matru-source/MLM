@@ -702,3 +702,26 @@ export async function dbUpdateKyc(memberId, kycData) {
   }
 }
 
+/**
+ * 15. Fetch ZEX Cloud Account Link Status
+ */
+export async function dbFetchZexLinkStatus(memberId) {
+  if (!sql) return { ok: false, linked: false };
+  try {
+    const rows = await sql`
+      SELECT partner_id, external_member_id, zex_user_id, status, linked_at
+      FROM zex_account_links
+      WHERE external_member_id = ${memberId}
+      LIMIT 1;
+    `;
+    if (rows.length === 0) {
+      return { ok: true, linked: false };
+    }
+    return { ok: true, linked: true, data: rows[0] };
+  } catch (err) {
+    console.warn('[Neon DB] dbFetchZexLinkStatus error:', err);
+    return { ok: false, linked: false, error: err.message };
+  }
+}
+
+

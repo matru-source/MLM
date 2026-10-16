@@ -1,0 +1,606 @@
+openapi: 3.1.0
+info:
+  title: ZEX sales portal integration API
+  version: 1.0.0
+  description: |
+    Version 1 partner integration. Disabled by default; this contract does not
+    identify a deployed service. The portal owns members, tree and commissions.
+    ZEX owns authentication, verified subscription state and provider payment facts.
+    Connect before purchase. Only sale.confirmed with commission_eligible=true
+    can create an acquisition commission. Amounts are exact integer INR paise.
+    Default portal callback: https://cybernetworking.vercel.app/api/integrations/zex/callback
+    Default portal webhook: https://cybernetworking.vercel.app/api/integrations/zex/webhook
+    These URLs remain configurable; their presence does not enable the integration.
+servers:
+  - url: https://api.example.invalid
+    description: Replace with the API origin agreed with the ZEX owner.
+security:
+  - PartnerKey: []
+tags:
+  - name: Partner connection
+  - name: Partner recovery
+  - name: ZEX browser connection
+paths:
+  /api/v1/integrations/mlm/connect-sessions:
+    post:
+      tags: [Partner connection]
+      operationId: createConnectSession
+      summary: Start or exactly retry a session-bound connection attempt
+      description: |
+        Portal backend only. Identify the member from its authenticated portal
+        session. Store the request owner, state hash and both idempotency keys.
+        callback_url must exactly equal the configured callback. The connection
+        capability is returned only in connect_url's request fragment. Ten-minute
+        expiry applies to both browser authorization and server completion.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [external_member_id, state, callback_url]
+              properties:
+                external_member_id:
+                  $ref: '#/components/schemas/ExternalMemberId'
+                state:
+                  type: string
+                  minLength: 16
+                  maxLength: 512
+                  pattern: '^[!-~]{16,512}$'
+                  description: Random callback state bound to the initiating portal session.
+                callback_url:
+                  type: string
+                  format: uri
+                  description: Exact registered HTTPS callback without query or fragment. The confirmed default is https://cybernetworking.vercel.app/api/integrations/zex/callback; configuration can override it.
+                  example: https://cybernetworking.vercel.app/api/integrations/zex/callback
+      responses:
+        '200':
+          description: Original connection attempt or exact idempotent replay.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectSession'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/integrations/mlm/connect-sessions/{request_id}:
+    get:
+      tags: [Partner connection]
+      operationId: getConnectSession
+      summary: Recover the status of a known request
+      description: Does not return request tokens, callback state or candidate identity.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Current request status and original expiry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectSession'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/integrations/mlm/connect-sessions/{request_id}/complete:
+    post:
+      tags: [Partner connection]
+      operationId: completeConnectSession
+      summary: Complete a connection after validating the portal callback session and state
+      description: |
+        Portal backend only. First check callback state, request ID and current
+        portal-session ownership against durable local state. Exchange the code
+        with the original completion idempotency key. A permanent exact link is
+        created atomically; conflicting mappings are rejected. Reuse the same
+        code/key pair after a lost response. Do not treat the browser callback
+        or prior authorize response as proof that a link exists.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  $ref: '#/components/schemas/OpaqueCapability'
+      responses:
+        '200':
+          description: Confirmed exact member to account mapping.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Link'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/integrations/mlm/members/{external_member_id}:
+    get:
+      tags: [Partner recovery]
+      operationId: getMemberStatus
+      summary: Get the configured partner member's current connection and subscription state
+      description: |
+        Current state is not historical payment proof and must never synthesize
+        a commission. No direct user database or contact lookup is exposed.
+      parameters:
+        - name: external_member_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ExternalMemberId'
+      responses:
+        '200':
+          description: Member connection and current safe subscription snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberStatus'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/integrations/mlm/events:
+    get:
+      tags: [Partner recovery]
+      operationId: listPartnerEvents
+      summary: Recover committed events after the portal's durable feed cursor
+      description: |
+        Partner sequences are allocated in commit order. They can have gaps due
+        to privacy filtering. Insert each page into the durable portal inbox and
+        save next_cursor in the same transaction. Never advance this checkpoint
+        from a webhook's highest sequence. Replay enters the same processing path
+        as webhooks and deduplicates by partner_id and event_id.
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Events in ascending sequence, with the next durable receipt checkpoint.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events, next_cursor, has_more]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  next_cursor:
+                    type: integer
+                    format: int64
+                    minimum: 0
+                    description: Last returned event sequence, or input cursor for an empty page.
+                  has_more:
+                    type: boolean
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/integrations/mlm/connect/preview:
+    post:
+      tags: [ZEX browser connection]
+      operationId: previewConnectRequest
+      summary: Preview a bearer request before ZEX authentication
+      security: []
+      requestBody:
+        $ref: '#/components/requestBodies/RequestToken'
+      responses:
+        '200':
+          description: Noncredential portal display data and request expiry.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [partner_name, external_member_id, expires_at]
+                properties:
+                  partner_name:
+                    type: string
+                  external_member_id:
+                    $ref: '#/components/schemas/ExternalMemberId'
+                  expires_at:
+                    type: string
+                    format: date-time
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/integrations/mlm/connect/authorize:
+    post:
+      tags: [ZEX browser connection]
+      operationId: authorizeConnectRequest
+      summary: Authorize the current ZEX account with explicit sharing consent
+      description: |
+        Existing ZEX consumer JWT is required. This chooses a candidate and returns
+        a fixed portal callback containing code, state and request_id. It does not
+        create the permanent mapping. Same-account retries return the same code
+        while the request remains available. Never send the partner key here.
+      security:
+        - ConsumerBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_token, consent]
+              properties:
+                request_token:
+                  $ref: '#/components/schemas/OpaqueCapability'
+                consent:
+                  type: boolean
+                  const: true
+      responses:
+        '200':
+          $ref: '#/components/responses/Redirect'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/integrations/mlm/connect/cancel:
+    post:
+      tags: [ZEX browser connection]
+      operationId: cancelConnectRequest
+      summary: Cancel an uncompleted request before or after ZEX login
+      description: Returns the fixed callback with error=access_denied, state and request_id.
+      security: []
+      requestBody:
+        $ref: '#/components/requestBodies/RequestToken'
+      responses:
+        '200':
+          $ref: '#/components/responses/Redirect'
+        default:
+          $ref: '#/components/responses/Error'
+webhooks:
+  zexMlmEvent:
+    post:
+      operationId: receiveZexMlmEvent
+      summary: ZEX delivers an immutable event to the configured portal webhook
+      description: |
+        Confirmed default receiver is https://cybernetworking.vercel.app/api/integrations/zex/webhook;
+        configuration can override it. Verify HMAC-SHA256 over timestamp + '.' + exact raw
+        body bytes with the separate webhook secret. Signature format is
+        v1=<lowercase hex digest>. Enforce a five-minute delivery timestamp window,
+        matching header/body event ID and expected partner. Retries keep event_id
+        and use a fresh timestamp/signature. Acknowledge only after durable inbox
+        insertion. Delivery timeout is four seconds; non-2xx/network failures retry
+        without a fixed attempt limit, with exponential backoff from ten seconds
+        capped at one hour. The recovery feed works independently of delivery.
+        ZEX does not follow redirects. Do not assume webhook delivery order.
+      security: []
+      parameters:
+        - name: X-Zex-Webhook-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Zex-Webhook-Timestamp
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[1-9][0-9]*$'
+          description: Delivery time in Unix seconds; distinct from event occurrence time.
+        - name: X-Zex-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^v1=[a-f0-9]{64}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '204':
+          description: Event or its exact duplicate is durably accepted.
+        '401':
+          description: Signature, timestamp, header or partner verification failed.
+        '503':
+          description: Temporary durable storage failure; ZEX must retry.
+components:
+  securitySchemes:
+    PartnerKey:
+      type: apiKey
+      in: header
+      name: X-Zex-Partner-Key
+      description: Dedicated portal backend credential; never expose in browser code.
+    ConsumerBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Existing ZEX consumer token, used only by ZEX's hosted Connect page.
+  parameters:
+    RequestId:
+      name: request_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[!-~]{1,128}$'
+      description: Persist one key per operation and attempt; reuse only with identical input.
+  requestBodies:
+    RequestToken:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [request_token]
+            properties:
+              request_token:
+                $ref: '#/components/schemas/OpaqueCapability'
+  responses:
+    Redirect:
+      description: Fixed registered portal callback; contains no ZEX login token.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [redirect_url]
+            properties:
+              redirect_url:
+                type: string
+                format: uri
+    Error:
+      description: |
+        Structured failure. 400 MLM_REQUEST_INVALID; 401 MLM_UNAUTHORIZED or
+        consumer UNAUTHORIZED; 403 MLM_ACCOUNT_UNAVAILABLE; 409 MLM_REQUEST_USED,
+        MLM_LINK_CONFLICT or MLM_IDEMPOTENCY_CONFLICT; 410 MLM_REQUEST_EXPIRED;
+        disabled routes return 404. Rate limits can return 429 and transient faults
+        return 5xx. Use error.code for logic, not display text.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: object
+                required: [code, message]
+                properties:
+                  code:
+                    type: string
+                  message:
+                    type: string
+          example:
+            error:
+              code: MLM_REQUEST_EXPIRED
+              message: This connection request has expired
+  schemas:
+    ExternalMemberId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: '^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$'
+      description: Immutable opaque portal member identifier; avoid contact information.
+      example: MEMBER-42
+    OpaqueCapability:
+      type: string
+      minLength: 43
+      maxLength: 43
+      pattern: '^[A-Za-z0-9_-]{43}$'
+      description: Canonical base64url capability; do not log, persist in browser localStorage or put in query strings.
+    ConnectSession:
+      type: object
+      required: [request_id, external_member_id, status, expires_at]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        external_member_id:
+          $ref: '#/components/schemas/ExternalMemberId'
+        status:
+          type: string
+          enum: [pending, authorized, completed, cancelled, expired]
+        expires_at:
+          type: string
+          format: date-time
+        connect_url:
+          type: string
+          format: uri
+          description: Only create/exact replay returns this for a pending or authorized request; token is in its fragment.
+    Link:
+      type: object
+      required: [partner_id, external_member_id, zex_user_id, linked_at]
+      properties:
+        partner_id:
+          type: string
+        external_member_id:
+          $ref: '#/components/schemas/ExternalMemberId'
+        zex_user_id:
+          type: string
+          format: uuid
+        linked_at:
+          type: string
+          format: date-time
+    MemberStatus:
+      type: object
+      required: [external_member_id, status, connected, subscriptions]
+      properties:
+        external_member_id:
+          $ref: '#/components/schemas/ExternalMemberId'
+        status:
+          type: string
+          enum: [linked, unlinked]
+        connected:
+          type: boolean
+        link:
+          $ref: '#/components/schemas/Link'
+        subscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionSnapshot'
+    SubscriptionSnapshot:
+      type: object
+      required: [subscription_id, product_code, source, status, current_period_start, current_period_end, auto_renew, cancel_at_period_end]
+      properties:
+        subscription_id:
+          type: string
+          format: uuid
+        product_code:
+          type: string
+        source:
+          type: string
+          enum: [play, phonepe]
+        status:
+          type: string
+          description: Subscription access state; never payment proof or commission eligibility.
+          example: active
+        current_period_start:
+          type: [string, 'null']
+          format: date-time
+        current_period_end:
+          type: [string, 'null']
+          format: date-time
+        auto_renew:
+          type: boolean
+        cancel_at_period_end:
+          type: boolean
+    EventEnvelope:
+      type: object
+      required: [event_id, sequence, type, version, occurred_at, partner_id, external_member_id, data]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Partner commit sequence; gaps are allowed.
+        type:
+          type: string
+          enum: [subscription.updated, sale.confirmed, sale.adjusted]
+        version:
+          type: integer
+          const: 1
+        occurred_at:
+          type: string
+          format: date-time
+        partner_id:
+          type: string
+        external_member_id:
+          $ref: '#/components/schemas/ExternalMemberId'
+        data:
+          type: object
+    Event:
+      oneOf:
+        - $ref: '#/components/schemas/SubscriptionUpdatedEvent'
+        - $ref: '#/components/schemas/SaleConfirmedEvent'
+        - $ref: '#/components/schemas/SaleAdjustedEvent'
+      discriminator:
+        propertyName: type
+        mapping:
+          subscription.updated: '#/components/schemas/SubscriptionUpdatedEvent'
+          sale.confirmed: '#/components/schemas/SaleConfirmedEvent'
+          sale.adjusted: '#/components/schemas/SaleAdjustedEvent'
+    SubscriptionUpdatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              const: subscription.updated
+            data:
+              $ref: '#/components/schemas/SubscriptionSnapshot'
+    SaleConfirmedEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              const: sale.confirmed
+            data:
+              type: object
+              required: [sale_id, subscription_id, product_code, source, amount_minor, currency, paid_at, sale_kind, commission_eligible, eligibility_reason]
+              properties:
+                sale_id:
+                  type: string
+                  format: uuid
+                subscription_id:
+                  type: string
+                  format: uuid
+                product_code:
+                  type: string
+                source:
+                  type: string
+                  enum: [play, phonepe]
+                amount_minor:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: Actual verified customer charge in INR paise, including separately declared provider fee when present; not catalog price or merchant settlement.
+                currency:
+                  type: string
+                  const: INR
+                paid_at:
+                  type: string
+                  format: date-time
+                sale_kind:
+                  type: string
+                  enum: [acquisition, renewal, other]
+                  description: Acquisition when eligible; renewal only with an earlier recorded paid fact for the same subscription; other for remaining observations.
+                commission_eligible:
+                  type: boolean
+                  description: Only true can create a v1 acquisition commission; at most one per partner and ZEX user.
+                eligibility_reason:
+                  type: string
+                  enum: [eligible_first_acquisition, existing_subscription_history, initial_payment_not_verified, acquisition_already_recorded, subscription_not_active]
+                  description: |
+                    The decisive eligibility reason for this paid observation.
+                    Play v1 requires a pre-purchase link, original source order,
+                    creation/processing within one minute of subscription start,
+                    and no replacement or out-of-app resubscription. Verified
+                    charges lacking that evidence still report eligibility false.
+    SaleAdjustedEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            type:
+              const: sale.adjusted
+            data:
+              type: object
+              required: [sale_id, adjustment_id, reason, amount_minor, currency, adjusted_at]
+              properties:
+                sale_id:
+                  type: string
+                  format: uuid
+                  description: Original sale to which the adjustment belongs.
+                adjustment_id:
+                  type: string
+                  format: uuid
+                  description: Deduplicate every monetary adjustment by this stable ID.
+                reason:
+                  type: string
+                  enum: [refund, chargeback]
+                amount_minor:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: Positive verified adjustment amount in INR paise, not an already-negated commission.
+                currency:
+                  type: string
+                  const: INR
+                adjusted_at:
+                  type: [string, 'null']
+                  format: date-time
+                  description: Provider time when available; do not replace null with an inferred financial time.

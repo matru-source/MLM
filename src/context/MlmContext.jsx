@@ -24,7 +24,8 @@ import {
   dbFetchOrders,
   dbCreateOrder,
   dbFetchTransactions,
-  dbUpdateKyc
+  dbUpdateKyc,
+  dbFetchZexLinkStatus
 } from '../services/neonDbService';
 
 const MlmContext = createContext(null);
@@ -365,6 +366,98 @@ export function MlmProvider({ children }) {
 
   const dismissReferralBanner = () => {
     setReferralBanner(prev => ({ ...prev, visible: false }));
+  };
+
+  // --- ZEX Cloud Ecosystem Integration State ---
+  const [zexLinkStatus, setZexLinkStatus] = useState({
+    linked: false,
+    loading: true,
+    data: null
+  });
+
+  const refreshZexStatus = async (memberId = currentMemberId) => {
+    if (!memberId) return;
+    setZexLinkStatus(prev => ({ ...prev, loading: true }));
+    try {
+      const res = await dbFetchZexLinkStatus(memberId);
+      if (res.ok && res.linked) {
+        setZexLinkStatus({ linked: true, loading: false, data: res.data });
+      } else {
+        setZexLinkStatus({ linked: false, loading: false, data: null });
+      }
+    } catch (e) {
+      setZexLinkStatus({ linked: false, loading: false, data: null });
+    }
+  };
+
+  // Sync ZEX link status on member change
+  useEffect(() => {
+    if (currentMemberId) {
+      refreshZexStatus(currentMemberId);
+    }
+  }, [currentMemberId]);
+
+  // Handle browser return callback from ZEX connect (?connection=connected | cancelled | failed)
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      let conn = searchParams.get('connection');
+      let reason = searchParams.get('reason');
+
+      if (!conn && window.location.hash.includes('?')) {
+        const hashQuery = window.location.hash.split('?')[1];
+        const hashParams = new URLSearchParams(hashQuery);
+        conn = hashParams.get('connection');
+        reason = hashParams.get('reason');
+      }
+
+      if (conn) {
+        if (conn === 'connected') {
+          addToast('success', 'ZEX Cloud Connected!', 'Your ZEX account has been successfully linked. Real-time commissions are now active!');
+          setCurrentPage('dashboard');
+          if (currentMemberId) refreshZexStatus(currentMemberId);
+        } else if (conn === 'cancelled') {
+          addToast('warning', 'Connection Cancelled', 'ZEX account connection was cancelled by user.');
+        } else if (conn === 'failed' || conn === 'error') {
+          addToast('error', 'Connection Failed', reason ? `Failed: ${reason}` : 'ZEX authentication could not be completed.');
+        }
+
+        // Clean up URL parameters cleanly
+        const cleanHash = window.location.hash.split('?')[0];
+        const cleanUrl = window.location.pathname + (cleanHash ? cleanHash : '');
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    } catch (e) {
+      console.warn('[ZEX URL Check] Warning:', e);
+    }
+  }, [currentMemberId]);
+
+  // Initiate Session-bound ZEX Connect Handshake
+  const initiateZexConnect = async (memberId = currentMemberId) => {
+    const targetMember = memberId || currentMemberId;
+    if (!targetMember) {
+      addToast('error', 'Error', 'No active partner member logged in.');
+      return { ok: false, error: 'No member logged in' };
+    }
+
+    try {
+      const res = await fetch('/api/integrations/zex/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: targetMember })
+      });
+      const data = await res.json();
+      if (data.ok && data.connect_url) {
+        // Redirect browser to ZEX connect page
+        window.location.href = data.connect_url;
+        return { ok: true, connect_url: data.connect_url };
+      }
+      throw new Error(data.error || 'Failed to initiate connect attempt');
+    } catch (err) {
+      console.error('[initiateZexConnect] Error:', err);
+      addToast('error', 'Connect Error', err.message);
+      return { ok: false, error: err.message };
+    }
   };
 
   // Calculate pending withdrawals total for current member
@@ -998,6 +1091,9 @@ export function MlmProvider({ children }) {
       requestPayout,
       loginUserByEmail,
       isDbConnected,
+      zexLinkStatus,
+      refreshZexStatus,
+      initiateZexConnect,
       resetAllData
     }}>
       {children}

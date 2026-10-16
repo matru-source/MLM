@@ -30,7 +30,10 @@ import {
   Copy,
   Check,
   Shield,
-  ExternalLink
+  ExternalLink,
+  Link2,
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 
 export default function MemberDashboardView() {
@@ -51,11 +54,15 @@ export default function MemberDashboardView() {
     requestWithdrawal,
     isDbConnected,
     logout,
-    addToast
+    addToast,
+    zexLinkStatus = { linked: false, loading: false },
+    refreshZexStatus,
+    initiateZexConnect
   } = useMlm();
 
   // Active subview inside dashboard: 'overview', 'network', 'wallet', 'subscriptions', 'kyc'
   const [activeTab, setActiveTab] = useState('overview');
+  const [connectingZex, setConnectingZex] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [walletTab, setWalletTab] = useState('history'); // 'history' | 'requests'
@@ -415,6 +422,111 @@ export default function MemberDashboardView() {
               </div>
               <div className="ref-badge-callout">
                 <span className="badge badge-green">Sponsor Code: {currentMember?.referral_code || 'CS123456'}</span>
+              </div>
+            </div>
+
+            {/* ZEX Cloud Platform Integration Card */}
+            <div className="zex-integration-card card-white mt-4">
+              <div className="card-head-between">
+                <div className="flex-align gap-3">
+                  <div className="kpi-icon-box bg-purple-dim">
+                    <Zap size={22} className="text-purple" />
+                  </div>
+                  <div>
+                    <div className="flex-align gap-2">
+                      <h3 className="chart-card-title m-0">ZEX Cloud Platform Integration</h3>
+                      <span className="badge badge-purple font-xs">Official API</span>
+                    </div>
+                    <p className="chart-card-sub m-0 mt-1">
+                      Session-bound cryptographic link for real-time 6-tier unilevel commission distribution
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex-align gap-2">
+                  {zexLinkStatus?.linked ? (
+                    <span className="badge badge-green flex-align gap-1 font-xs">
+                      <CheckCircle2 size={13} />
+                      <span>Connected</span>
+                    </span>
+                  ) : (
+                    <span className="badge badge-amber flex-align gap-1 font-xs">
+                      <AlertCircle size={13} />
+                      <span>Not Linked</span>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    title="Refresh connection status"
+                    onClick={() => refreshZexStatus(currentMember?.member_id)}
+                    className="btn btn-secondary btn-sm p-1"
+                    style={{ minWidth: '32px', height: '32px' }}
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="zex-card-content mt-3">
+                {zexLinkStatus?.linked ? (
+                  <div className="zex-linked-details">
+                    <div className="zex-stats-grid">
+                      <div className="zex-stat-box">
+                        <div className="text-xs text-muted mb-1">Linked ZEX User ID</div>
+                        <div className="code-font font-sm text-primary-blue font-bold">
+                          {zexLinkStatus.data?.zex_user_id || 'zex_usr_active'}
+                        </div>
+                      </div>
+                      <div className="zex-stat-box">
+                        <div className="text-xs text-muted mb-1">Partner Identifier</div>
+                        <div className="code-font font-sm text-primary">
+                          {zexLinkStatus.data?.partner_id || 'cybernetworking'}
+                        </div>
+                      </div>
+                      <div className="zex-stat-box">
+                        <div className="text-xs text-muted mb-1">External Member ID</div>
+                        <div className="code-font font-sm text-primary">
+                          {currentMember?.member_id}
+                        </div>
+                      </div>
+                      <div className="zex-stat-box">
+                        <div className="text-xs text-muted mb-1">Real-Time Commission Hook</div>
+                        <div className="text-success font-sm font-bold flex-align gap-1">
+                          <CheckCircle2 size={14} />
+                          <span>Active (6-Tier Payouts)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="zex-live-stream-note mt-3 p-2 bg-card-alt border-rounded text-xs text-muted flex-between">
+                      <span>⚡ Webhook stream active at <code className="code-font">/api/integrations/zex/webhook</code>. Qualifying subscription sales trigger instant credits across upline tiers (₹1000 / ₹300 / ₹150 / ₹50 / ₹25 / ₹25).</span>
+                      <span className="text-success font-bold">100% Synced</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="zex-unlinked-cta flex-between flex-wrap gap-3 p-3 bg-card-alt border-rounded">
+                    <div style={{ maxWidth: '640px' }}>
+                      <h4 className="font-sm font-bold text-primary mb-1">Connect Your ZEX Platform Account</h4>
+                      <p className="text-xs text-muted m-0">
+                        Link your ZEX account to automatically synchronize multi-tier referral commissions, purchase tracking, and verified partner payouts directly into your Neon PostgreSQL wallet.
+                      </p>
+                    </div>
+                    <div className="flex-align gap-2">
+                      <button
+                        type="button"
+                        disabled={connectingZex}
+                        onClick={async () => {
+                          setConnectingZex(true);
+                          await initiateZexConnect(currentMember?.member_id);
+                          setConnectingZex(false);
+                        }}
+                        className="btn btn-primary btn-sm flex-center gap-1"
+                      >
+                        <Link2 size={14} />
+                        <span>{connectingZex ? 'Connecting...' : 'Connect ZEX Account'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
