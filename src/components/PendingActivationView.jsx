@@ -28,8 +28,11 @@ export default function PendingActivationView() {
     (a.member_email && a.member_email === currentMember?.email)
   );
 
-  const hasSubmittedPayment = currentMember?.seller_status === 'pending_approval' || Boolean(activationRecord);
+  const isRejected = currentMember?.seller_status === 'rejected' || activationRecord?.status === 'rejected';
+  const isPending = (currentMember?.seller_status === 'pending_approval' || (activationRecord && activationRecord.status === 'pending')) && !isRejected;
+  const hasSubmittedPayment = isPending;
   const utrNumber = activationRecord?.utr_number;
+  const rejectionReason = activationRecord?.rejection_reason || 'Payment credit could not be matched with our bank statement. Please verify your UTR and re-submit.';
 
   return (
     <div className="pending-activation-page">
@@ -37,7 +40,9 @@ export default function PendingActivationView() {
         {/* Top Header Card */}
         <div className="pending-card pending-header-card">
           <div className="pending-header-icon-box">
-            {hasSubmittedPayment ? (
+            {isRejected ? (
+              <AlertCircle size={36} className="text-rose" />
+            ) : hasSubmittedPayment ? (
               <Clock size={36} className="text-amber animate-pulse" />
             ) : (
               <CreditCard size={36} className="text-primary-blue" />
@@ -48,13 +53,25 @@ export default function PendingActivationView() {
           <div className="pending-header-info">
             <div className="pending-status-pill">
               <span className="pending-dot-pulse" />
-              <span>{hasSubmittedPayment ? 'STEP 2 OF 2 • AWAITING ADMIN APPROVAL' : 'STEP 1 OF 2 • PLAN PAYMENT REQUIRED'}</span>
+              <span>
+                {isRejected 
+                  ? 'ACTION REQUIRED • PAYMENT VERIFICATION REJECTED' 
+                  : hasSubmittedPayment 
+                    ? 'STEP 2 OF 2 • AWAITING ADMIN APPROVAL' 
+                    : 'STEP 1 OF 2 • PLAN PAYMENT REQUIRED'}
+              </span>
             </div>
             <h2 className="pending-main-title">
-              {hasSubmittedPayment ? 'Payment Submitted • Awaiting Verification' : 'Complete Joining Plan Purchase'}
+              {isRejected 
+                ? 'Payment Verification Rejected' 
+                : hasSubmittedPayment 
+                  ? 'Payment Submitted • Awaiting Verification' 
+                  : 'Complete Joining Plan Purchase'}
             </h2>
             <p className="pending-main-sub">
-              {hasSubmittedPayment ? (
+              {isRejected ? (
+                <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>. Your previous payment submission was rejected: <span className="text-rose font-semibold">{rejectionReason}</span>. Please click below to re-submit your valid UTR reference.</>
+              ) : hasSubmittedPayment ? (
                 <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>! Your joining application and payment {utrNumber ? `(UTR: ${utrNumber})` : ''} have been submitted to CyberShield Administration for verification.</>
               ) : (
                 <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>! Your partner profile has been created. Please complete the ₹2,500 (+ 18% GST) plan purchase to unlock your license and distributor link.</>
@@ -63,14 +80,14 @@ export default function PendingActivationView() {
           </div>
 
           <div className="pending-header-actions">
-            {!hasSubmittedPayment && (
+            {(!hasSubmittedPayment || isRejected) && (
               <button
                 onClick={() => openCheckout('Joining')}
                 className="btn btn-primary btn-sm flex-center gap-1"
                 style={{ fontWeight: 700 }}
               >
                 <Zap size={14} />
-                <span>Pay ₹2,950 Now</span>
+                <span>{isRejected ? 'Re-Submit Payment (₹2,950)' : 'Pay ₹2,950 Now'}</span>
               </button>
             )}
             <button
@@ -91,8 +108,34 @@ export default function PendingActivationView() {
           </div>
         </div>
 
-        {/* Action Callout for Unpaid Users */}
-        {!hasSubmittedPayment ? (
+        {/* Action Callout for Rejected Users */}
+        {isRejected ? (
+          <div className="locked-feature-banner" style={{ background: '#FFF1F2', border: '1.5px solid #FECDD3' }}>
+            <div className="locked-icon-badge" style={{ background: '#FFE4E6', color: '#E11D48' }}>
+              <AlertCircle size={22} />
+            </div>
+            <div className="locked-text-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
+              <div>
+                <h4 className="locked-banner-title" style={{ color: '#BE123C' }}>
+                  ⚠️ Rejection Notice: {rejectionReason}
+                </h4>
+                <p className="locked-banner-desc" style={{ color: '#9F1239' }}>
+                  If you made the payment, please double-check your bank UTR / transaction ID and re-submit it. If you have not paid yet, please complete payment to activate both accounts.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => openCheckout('Joining')}
+                className="btn btn-primary btn-md flex-center gap-2"
+                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: 700 }}
+              >
+                <Zap size={16} />
+                <span>Re-Submit Payment Reference</span>
+              </button>
+            </div>
+          </div>
+        ) : !hasSubmittedPayment ? (
+          /* Action Callout for Unpaid Users */
           <div className="locked-feature-banner" style={{ background: '#EFF6FF', border: '1.5px solid #93C5FD' }}>
             <div className="locked-icon-badge" style={{ background: '#DBEAFE', color: '#1D4ED8' }}>
               <CreditCard size={22} />
