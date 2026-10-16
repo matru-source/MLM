@@ -4672,5 +4672,37 @@
   }
 }
 
+.sponsor-required-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  color: #F59E0B;
+}
+
+.sponsor-error-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #F87171;
+}
+
+.input-border-red {
+  border-color: #EF4444 !important;
+  box-shadow: 0 0 0 1px #EF4444 !important;
+}
+
+.input-border-emerald {
+  border-color: #10B981 !important;
+  box-shadow: 0 0 0 1px #10B981 !important;
+}
+
 
 

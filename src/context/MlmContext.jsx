@@ -512,7 +512,7 @@ export function MlmProvider({ children }) {
   };
 
   // Register New User (Step 2 of Brevo Email OTP verification)
-  const registerUser = ({ fullName, email, mobile, password, sponsorId, isSeller }) => {
+  const registerUser = ({ fullName, email, mobile, password, sponsorId, sponsorMemberId, sponsorName, isSeller }) => {
     const newMemberId = generateId('mem');
     const newMember = {
       member_id: newMemberId,
@@ -522,7 +522,9 @@ export function MlmProvider({ children }) {
       avatar: '/matru-avatar.jpg',
       rank: isSeller ? 'Partner (Pending Plan Purchase)' : 'Customer',
       cs_customer_id: `CS${Math.floor(10000000 + Math.random() * 90000000)}`,
-      sponsor_member_id: sponsorId || 'CS123456',
+      sponsor_member_id: sponsorMemberId || sponsorId || 'CS123456',
+      sponsor_code: sponsorId || 'CS123456',
+      sponsor_name: sponsorName || 'Authorized Partner',
       customer_status: 'registered',
       seller_status: 'pending_payment',
       referral_code: `CS${Math.floor(100000 + Math.random() * 900000)}`,
@@ -552,7 +554,6 @@ export function MlmProvider({ children }) {
     setIsLoggedIn(true);
     localStorage.setItem('cybershield_isLoggedIn', 'true');
     setIsAuthModalOpen(false);
-    setTeamMembersCount(prev => prev + 1);
 
     addToast('success', 'Email Verified & Account Created!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
   };
@@ -596,6 +597,9 @@ export function MlmProvider({ children }) {
       }
       return o;
     }));
+
+    // Increment official active team members count upon approval
+    setTeamMembersCount(prev => prev + 1);
 
     // Credit direct retail partner commission (₹1,000) to current sponsor wallet
     setAvailableBalance(prev => prev + 1000);

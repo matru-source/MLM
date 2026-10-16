@@ -39,13 +39,16 @@ export default function AuthModal() {
   const [email, setEmail] = useState('matru@gmail.com');
   const [mobile, setMobile] = useState('+91 9876543210');
   const [password, setPassword] = useState('••••••••••••');
-  const [sponsorId, setSponsorId] = useState(() => activeReferral || 'CS123456');
+  // Mandatory Sponsor Code: Auto-fills from URL referral, otherwise requires user to enter valid sponsor
+  const [sponsorId, setSponsorId] = useState(() => activeReferral || '');
+  const [sponsorError, setSponsorError] = useState('');
   const [agreed, setAgreed] = useState(true);
 
   // Sync sponsorId when activeReferral is captured or modal opens
   useEffect(() => {
     if (activeReferral) {
       setSponsorId(activeReferral);
+      setSponsorError('');
     }
   }, [activeReferral, isAuthModalOpen]);
 
@@ -99,6 +102,22 @@ export default function AuthModal() {
       return;
     }
 
+    // Strictly enforce mandatory sponsor code validation
+    const cleanSponsor = (sponsorId || '').trim().toUpperCase();
+    if (!cleanSponsor) {
+      setSponsorError('Sponsor Referral Code is strictly mandatory to register.');
+      addToast('error', 'Sponsor Required', 'Please enter a valid Sponsor Referral Code to join the network.');
+      return;
+    }
+
+    const verifiedSponsor = getMemberByReferralCode ? getMemberByReferralCode(cleanSponsor) : null;
+    if (!verifiedSponsor) {
+      setSponsorError(`"${cleanSponsor}" is not an authorized partner code. Please verify with your sponsor.`);
+      addToast('error', 'Invalid Sponsor', `No authorized partner found with sponsor code "${cleanSponsor}".`);
+      return;
+    }
+
+    setSponsorError('');
     setIsSendingOtp(true);
     setOtpErrorMessage('');
 
@@ -160,13 +179,18 @@ export default function AuthModal() {
       return;
     }
 
+    const cleanSponsor = (sponsorId || '').trim().toUpperCase();
+    const verifiedSponsor = getMemberByReferralCode ? getMemberByReferralCode(cleanSponsor) : null;
+
     // OTP Verified! Register user and advance to plan purchase
     registerUser({
       fullName,
       email,
       mobile,
       password,
-      sponsorId: sponsorId || 'CS123456',
+      sponsorId: cleanSponsor,
+      sponsorMemberId: verifiedSponsor?.member_id || cleanSponsor,
+      sponsorName: verifiedSponsor?.name || 'Authorized Partner',
       isSeller
     });
 
@@ -338,10 +362,16 @@ export default function AuthModal() {
 
                 <div className="form-group-clean">
                   <div className="flex-between items-center mb-1">
-                    <label className="form-label-clean mb-0">Sponsor Referral Code</label>
-                    {activeReferral && (
-                      <span className="badge badge-blue font-2xs font-bold">
-                        ✓ Linked via Referral
+                    <label className="form-label-clean mb-0">
+                      Sponsor Referral Code <span style={{ color: '#EF4444' }} className="font-bold">*</span>
+                    </label>
+                    {activeReferral ? (
+                      <span className="badge badge-green font-2xs font-bold">
+                        ✓ Auto-filled from Referral
+                      </span>
+                    ) : (
+                      <span className="badge badge-amber font-2xs font-bold">
+                        Mandatory
                       </span>
                     )}
                   </div>
@@ -349,13 +379,42 @@ export default function AuthModal() {
                     type="text"
                     required
                     value={sponsorId}
-                    onChange={(e) => setSponsorId(e.target.value.toUpperCase().trim())}
+                    onChange={(e) => {
+                      setSponsorId(e.target.value.toUpperCase().trim());
+                      setSponsorError('');
+                    }}
                     placeholder="Enter Sponsor Code (e.g. CS123456)"
-                    className="form-input-clean code-font text-primary-blue font-bold"
+                    className={`form-input-clean code-font font-bold ${
+                      sponsorError 
+                        ? 'input-border-red' 
+                        : (getMemberByReferralCode(sponsorId) ? 'input-border-emerald text-emerald-400' : 'text-primary-blue')
+                    }`}
                   />
                   {/* Real-time Verified Sponsor Indicator */}
                   {(() => {
-                    const sponsor = getMemberByReferralCode ? getMemberByReferralCode(sponsorId) : null;
+                    const clean = (sponsorId || '').trim().toUpperCase();
+                    if (!clean) {
+                      return (
+                        <div className="sponsor-required-hint mt-1">
+                          <AlertCircle size={13} className="text-amber shrink-0" />
+                          <span className="text-xs">
+                            Sponsor code is strictly mandatory.{' '}
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setSponsorId('CS123456');
+                                setSponsorError('');
+                              }}
+                              className="text-cyan underline font-bold"
+                            >
+                              Use Head Office (CS123456)
+                            </button>
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    const sponsor = getMemberByReferralCode ? getMemberByReferralCode(clean) : null;
                     if (sponsor) {
                       return (
                         <div className="sponsor-verified-pill mt-1">
@@ -366,16 +425,15 @@ export default function AuthModal() {
                         </div>
                       );
                     }
-                    if (sponsorId && sponsorId.length >= 4) {
-                      return (
-                        <div className="sponsor-custom-pill mt-1">
-                          <span className="text-muted text-xs">
-                            Sponsor Code: <strong className="code-font text-primary">{sponsorId}</strong> (Will be linked upon activation)
-                          </span>
-                        </div>
-                      );
-                    }
-                    return null;
+
+                    return (
+                      <div className="sponsor-error-pill mt-1">
+                        <AlertCircle size={14} className="text-red-400 shrink-0" />
+                        <span className="text-xs">
+                          {sponsorError || `Sponsor code "${clean}" is not recognized.`}
+                        </span>
+                      </div>
+                    );
                   })()}
                 </div>
 
