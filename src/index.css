@@ -70,7 +70,7 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-card-alt);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #CBD5E1;
@@ -78,6 +78,11 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
 }
 
 /* Button Utilities */
@@ -206,8 +211,30 @@ body {
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
+
+/* Elegant scrollbar that respects rounded corners */
+.modal-box::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-box::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 16px 0; /* Keeps scrollbar away from top and bottom rounded corners */
+}
+
+.modal-box::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 999px;
+}
+
+.modal-box::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 @keyframes modalPop {

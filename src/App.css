@@ -1927,7 +1927,7 @@
 }
 
 .auth-modal-header {
-  padding: 24px 28px 16px 28px;
+  padding: 22px 28px 12px 28px;
   position: relative;
 }
 
@@ -1943,7 +1943,7 @@
 }
 
 .auth-form-body {
-  padding: 0 28px 28px 28px;
+  padding: 0 28px 24px 28px;
 }
 
 .customer-seller-toggle {
@@ -1952,11 +1952,11 @@
   background: var(--bg-card-alt);
   padding: 4px;
   border-radius: var(--radius-md);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .toggle-role-btn {
-  padding: 8px;
+  padding: 7px;
   border: none;
   background: transparent;
   font-family: var(--font-sans);
@@ -1976,8 +1976,8 @@
 .form-group-clean {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: 4px;
+  margin-bottom: 11px;
 }
 
 .form-label-clean {
@@ -1990,7 +1990,7 @@
   background: #FFFFFF;
   border: 1.5px solid var(--border-light);
   border-radius: var(--radius-md);
-  padding: 10px 14px;
+  padding: 9px 12px;
   font-size: 0.9rem;
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -2010,7 +2010,7 @@
   font-size: 0.8rem;
   color: var(--text-secondary);
   line-height: 1.4;
-  margin: 14px 0;
+  margin: 10px 0 12px 0;
   cursor: pointer;
 }
 

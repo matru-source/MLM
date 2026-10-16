@@ -304,24 +304,6 @@ export default function AuthModal() {
             authStep === 'form' ? (
               /* STEP 1: Registration Form */
               <form onSubmit={handleInitiateRegister}>
-                {/* Customer vs Seller toggle */}
-                <div className="customer-seller-toggle">
-                  <button
-                    type="button"
-                    onClick={() => setIsSeller(false)}
-                    className={`toggle-role-btn ${!isSeller ? 'active' : ''}`}
-                  >
-                    Customer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsSeller(true)}
-                    className={`toggle-role-btn ${isSeller ? 'active' : ''}`}
-                  >
-                    Partner (Seller + User)
-                  </button>
-                </div>
-
                 {/* Input Fields */}
                 <div className="form-group-clean">
                   <label className="form-label-clean">Full Name</label>
