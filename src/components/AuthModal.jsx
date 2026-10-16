@@ -32,6 +32,7 @@ export default function AuthModal() {
     getMemberByReferralCode,
     validateReferralCode,
     loginUserByEmail,
+    members,
     addToast
   } = useMlm();
   
@@ -107,10 +108,18 @@ export default function AuthModal() {
       return;
     }
 
-    // 2. Email Format Validation
+    // 2. Email Format & Duplicate Account Validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email.trim())) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
       addToast('error', 'Invalid Email', 'Please enter a valid email address (e.g., name@example.com) to receive OTP.');
+      return;
+    }
+
+    const isAlreadyRegistered = (members || []).some(m => m.email && m.email.toLowerCase() === cleanEmail);
+    if (isAlreadyRegistered) {
+      addToast('warning', 'Account Already Exists', `An account with ${cleanEmail} is already registered. Switching to Log In.`);
+      setAuthMode('login');
       return;
     }
 
