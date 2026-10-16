@@ -23,7 +23,8 @@ import {
   dbRejectPayout,
   dbFetchOrders,
   dbCreateOrder,
-  dbFetchTransactions
+  dbFetchTransactions,
+  dbUpdateKyc
 } from '../services/neonDbService';
 
 const MlmContext = createContext(null);
@@ -182,7 +183,7 @@ export function MlmProvider({ children }) {
 
   const currentMember = members.find(m => m.member_id === currentMemberId) || members[0];
 
-  // Lookup member details by referral code, customer ID, or member ID
+  // Comprehensive Member Lookup
   const getMemberByReferralCode = (code) => {
     if (!code) return null;
     const clean = code.trim().toUpperCase();
@@ -191,6 +192,86 @@ export function MlmProvider({ children }) {
       (m.member_id && m.member_id.toUpperCase() === clean) ||
       (m.cs_customer_id && m.cs_customer_id.toUpperCase() === clean)
     ) || null;
+  };
+
+  /**
+   * Strict Multi-Factor Referral Code & Sponsor Verification:
+   * 1. Empty / Missing -> Invalid (Mandatory)
+   * 2. Non-existent -> Invalid (Not registered in network)
+   * 3. Inactive / Unpaid -> Invalid (Pending plan activation / admin approval)
+   * 4. Self-Referral -> Invalid (Cannot refer own email or mobile)
+   * 5. Active Licensed Partner -> Valid
+   */
+  const validateReferralCode = (code, userEmail = null, userPhone = null) => {
+    if (!code || !code.trim()) {
+      return {
+        valid: false,
+        reason: 'empty',
+        message: 'Sponsor Referral Code is strictly mandatory to join.'
+      };
+    }
+
+    const clean = code.trim().toUpperCase();
+    const found = members.find(m => 
+      (m.referral_code && m.referral_code.toUpperCase() === clean) ||
+      (m.member_id && m.member_id.toUpperCase() === clean) ||
+      (m.cs_customer_id && m.cs_customer_id.toUpperCase() === clean)
+    );
+
+    if (!found) {
+      return {
+        valid: false,
+        reason: 'not_found',
+        message: `Sponsor code "${clean}" does not exist in our authorized partner network.`
+      };
+    }
+
+    // Check if sponsor is active (paid & admin approved)
+    const isActive = found.seller_status === 'active' || 
+                     found.rank === 'Senior Partner' || 
+                     found.rank === 'Active Partner' || 
+                     found.member_id === 'mem_matru' || 
+                     found.referral_code === 'CS123456';
+
+    if (!isActive) {
+      return {
+        valid: false,
+        reason: 'inactive',
+        member: found,
+        message: `Partner "${found.name}" (${clean}) is pending plan activation and cannot sponsor new members yet.`
+      };
+    }
+
+    // Check Self-Referral by Email
+    if (userEmail && found.email && found.email.trim().toLowerCase() === userEmail.trim().toLowerCase()) {
+      return {
+        valid: false,
+        reason: 'self_referral',
+        member: found,
+        message: 'You cannot use your own email/code to sponsor yourself.'
+      };
+    }
+
+    // Check Self-Referral by Phone
+    if (userPhone && found.phone) {
+      const p1 = userPhone.replace(/\D/g, '');
+      const p2 = found.phone.replace(/\D/g, '');
+      if (p1 && p2 && p1.length >= 10 && p1.slice(-10) === p2.slice(-10)) {
+        return {
+          valid: false,
+          reason: 'self_referral',
+          member: found,
+          message: 'You cannot use your own phone number to sponsor yourself.'
+        };
+      }
+    }
+
+    return {
+      valid: true,
+      reason: 'valid',
+      member: found,
+      message: `Verified Active Sponsor: ${found.name} (${found.referral_code})`
+    };
   };
 
   // Active referral code tracked from URL or storage
@@ -212,10 +293,13 @@ export function MlmProvider({ children }) {
   // 120-Second Referral Floating Banner State
   const [referralBanner, setReferralBanner] = useState({
     visible: false,
+    isValid: true,
     sponsorCode: '',
     sponsorName: '',
     sponsorAvatar: null,
-    secondsRemaining: 120
+    secondsRemaining: 120,
+    statusMessage: '',
+    errorReason: ''
   });
 
   // On mount and when members list is ready, inspect URL for ?ref=
@@ -225,26 +309,36 @@ export function MlmProvider({ children }) {
       const urlRef = params.get('ref') || params.get('sponsor') || params.get('r');
       if (urlRef) {
         const cleanCode = urlRef.trim().toUpperCase();
-        setActiveReferral(cleanCode);
-        sessionStorage.setItem('cybershield_referred_code', cleanCode);
+        const check = validateReferralCode(cleanCode);
 
-        // Lookup sponsor real name
-        const found = members.find(m => 
-          (m.referral_code && m.referral_code.toUpperCase() === cleanCode) ||
-          (m.member_id && m.member_id.toUpperCase() === cleanCode) ||
-          (m.cs_customer_id && m.cs_customer_id.toUpperCase() === cleanCode)
-        );
-
-        const realName = found ? found.name : `Authorized Partner (${cleanCode})`;
-        const avatar = found ? found.avatar : null;
-
-        setReferralBanner({
-          visible: true,
-          sponsorCode: cleanCode,
-          sponsorName: realName,
-          sponsorAvatar: avatar,
-          secondsRemaining: 120
-        });
+        if (check.valid) {
+          setActiveReferral(cleanCode);
+          sessionStorage.setItem('cybershield_referred_code', cleanCode);
+          setReferralBanner({
+            visible: true,
+            isValid: true,
+            sponsorCode: check.member?.referral_code || cleanCode,
+            sponsorName: check.member?.name || 'Authorized Partner',
+            sponsorAvatar: check.member?.avatar || null,
+            secondsRemaining: 120,
+            statusMessage: 'Verified Active Partner',
+            errorReason: ''
+          });
+        } else {
+          // If referral is invalid or inactive, alert user transparently
+          setActiveReferral('');
+          sessionStorage.removeItem('cybershield_referred_code');
+          setReferralBanner({
+            visible: true,
+            isValid: false,
+            sponsorCode: cleanCode,
+            sponsorName: check.reason === 'inactive' ? (check.member?.name || 'Partner') : 'Unrecognized Code',
+            sponsorAvatar: null,
+            secondsRemaining: 120,
+            statusMessage: check.message,
+            errorReason: check.reason
+          });
+        }
       }
     } catch (e) {
       console.error('Error reading referral query param:', e);
@@ -398,6 +492,20 @@ export function MlmProvider({ children }) {
     setCurrentPage('dashboard');
   };
 
+  // Helper to query wallet metrics dynamically
+  const getMemberWallet = (memberId = null) => {
+    const mem = memberId ? (members.find(m => m.member_id === memberId) || currentMember) : currentMember;
+    const available = Number(mem?.wallet_balance || 0);
+    const pending = payoutRequests
+      .filter(p => p.member_id === mem?.member_id && p.status === 'pending')
+      .reduce((acc, p) => acc + Number(p.amount || 0), 0);
+    return {
+      available,
+      pending,
+      totalEarned: Number(mem?.total_earnings || 0)
+    };
+  };
+
   // 1. User Requests Withdrawal (Status becomes Pending; money is NOT deducted until Admin pays)
   const requestWithdrawal = (amount) => {
     const numAmount = Number(amount);
@@ -407,6 +515,12 @@ export function MlmProvider({ children }) {
     }
     if (numAmount < 500) {
       addToast('error', 'Minimum Limit', 'Minimum withdrawal amount is ₹500.');
+      return false;
+    }
+
+    // Require linked bank account before requesting withdrawal
+    if (!currentMember?.kyc?.bank_account_number || !currentMember?.kyc?.bank_ifsc) {
+      addToast('error', 'Bank Details Required', 'Please link your Bank Account & IFSC under Profile > KYC before requesting a payout.');
       return false;
     }
 
@@ -426,10 +540,10 @@ export function MlmProvider({ children }) {
       status: 'pending', // 'pending' | 'paid' | 'rejected'
       request_date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       bank_details: {
-        bank_name: currentMember.kyc?.bank_name || 'HDFC Bank',
-        account_number: currentMember.kyc?.bank_account_number || '501004928172',
-        ifsc: currentMember.kyc?.bank_ifsc || 'HDFC0001234',
-        account_holder: currentMember.kyc?.legal_name || currentMember.name
+        bank_name: currentMember.kyc.bank_name || 'Commercial Bank',
+        account_number: currentMember.kyc.bank_account_number,
+        ifsc: currentMember.kyc.bank_ifsc,
+        account_holder: currentMember.kyc.legal_name || currentMember.name
       },
       admin_payment: {
         paid_at: null,
@@ -451,7 +565,7 @@ export function MlmProvider({ children }) {
       id: generateId('tx'),
       payoutId: newPayoutId,
       date: 'Just Now',
-      description: `Bank Withdrawal Request to ${currentMember.kyc?.bank_name || 'HDFC Bank'} (Pending Admin Verification)`,
+      description: `Bank Withdrawal Request to ${currentMember.kyc.bank_name || 'Bank'} (••••${currentMember.kyc.bank_account_number.slice(-4)}) - Pending Verification`,
       amount: -numAmount,
       type: 'debit',
       status: 'Pending'
@@ -459,6 +573,11 @@ export function MlmProvider({ children }) {
 
     addToast('success', 'Withdrawal Request Submitted!', `₹${numAmount.toLocaleString('en-IN')} (Net ₹${netPayable.toLocaleString('en-IN')}) sent to Finance Admin. Status is Pending until manual bank disbursement.`);
     return true;
+  };
+
+  const requestPayout = (memberIdOrAmount, amount) => {
+    const finalAmount = typeof amount === 'number' ? amount : memberIdOrAmount;
+    return requestWithdrawal(finalAmount);
   };
 
   // 2. Admin Manually Pays & Attaches Screenshot -> Money is deducted from user's balance
@@ -579,19 +698,19 @@ export function MlmProvider({ children }) {
       email_verified: true,
       kyc: {
         legal_name: fullName,
-        pan: 'ABCDE1234F',
-        aadhaar: 'XXXX-XXXX-9012',
-        bank_name: 'HDFC Bank',
-        bank_account_number: '501004928172',
-        bank_ifsc: 'HDFC0001234',
-        verification_status: 'verified',
+        pan: '',
+        aadhaar: '',
+        bank_name: '',
+        bank_account_number: '',
+        bank_ifsc: '',
+        verification_status: 'unverified',
         agreement_accepted: true,
         agreement_version: 'v2026.1',
         documents: {
-          aadhaar: 'Uploaded',
-          pan: 'Uploaded',
-          addressProof: 'Uploaded',
-          bankAccount: 'Uploaded'
+          aadhaar: 'Not Uploaded',
+          pan: 'Not Uploaded',
+          addressProof: 'Not Uploaded',
+          bankAccount: 'Not Uploaded'
         }
       }
     };
@@ -609,6 +728,39 @@ export function MlmProvider({ children }) {
     dbRegisterMember(newMember).catch(err => console.warn('[Neon DB] dbRegisterMember error:', err));
 
     addToast('success', 'Email Verified & Account Created!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
+  };
+
+  // Submit / Update Member KYC & Payout Bank Details
+  const submitKyc = (memberId, kycDetails) => {
+    const updatedKyc = {
+      legal_name: kycDetails.legal_name || currentMember?.name,
+      pan: (kycDetails.pan || '').toUpperCase().trim(),
+      bank_name: kycDetails.bank_name || '',
+      bank_account_number: (kycDetails.bank_account_number || '').trim(),
+      bank_ifsc: (kycDetails.bank_ifsc || '').toUpperCase().trim(),
+      verification_status: 'verified',
+      agreement_accepted: true,
+      agreement_version: 'v2026.1',
+      documents: {
+        aadhaar: 'Uploaded',
+        pan: 'Uploaded',
+        addressProof: 'Uploaded',
+        bankAccount: 'Uploaded'
+      }
+    };
+
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === memberId) {
+        return { ...m, kyc: updatedKyc };
+      }
+      return m;
+    }));
+
+    // Persist to live Neon PostgreSQL
+    dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
+
+    addToast('success', 'KYC & Bank Details Saved!', 'Your settlement details are securely verified for commission payouts.');
+    return true;
   };
 
   // 1. Admin Approves Partner Activation & Software License
@@ -706,27 +858,29 @@ export function MlmProvider({ children }) {
   // Login as existing member by email or ID
   const loginUserByEmail = ({ email, password }) => {
     const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      return { ok: false, error: 'Please enter your registered email address.' };
+    }
     const found = members.find(m => 
       (m.email && m.email.toLowerCase() === cleanEmail) ||
       (m.member_id && m.member_id.toLowerCase() === cleanEmail) ||
       (m.cs_customer_id && m.cs_customer_id.toLowerCase() === cleanEmail)
     );
-    if (found) {
-      setCurrentMemberId(found.member_id);
-      setAvailableBalance(Number(found.wallet_balance || 0));
-      setTotalEarnings(Number(found.total_earnings || 0));
-      setIsLoggedIn(true);
-      localStorage.setItem('cybershield_isLoggedIn', 'true');
-      setCurrentPage('dashboard');
-      addToast('success', 'Welcome Back!', `Logged in as ${found.name}.`);
-      return true;
-    } else {
-      setIsLoggedIn(true);
-      localStorage.setItem('cybershield_isLoggedIn', 'true');
-      setCurrentPage('dashboard');
-      addToast('success', 'Logged In', 'Welcome to your partner dashboard.');
-      return true;
+    if (!found) {
+      return { 
+        ok: false, 
+        error: `No partner account found with email "${cleanEmail}". Please check your email or click "Create Account".` 
+      };
     }
+
+    setCurrentMemberId(found.member_id);
+    setAvailableBalance(Number(found.wallet_balance || 0));
+    setTotalEarnings(Number(found.total_earnings || 0));
+    setIsLoggedIn(true);
+    localStorage.setItem('cybershield_isLoggedIn', 'true');
+    setCurrentPage('dashboard');
+    addToast('success', 'Welcome Back!', `Logged in as ${found.name}.`);
+    return { ok: true, member: found };
   };
 
   // Logout / Switch to Visitor mode
@@ -838,6 +992,10 @@ export function MlmProvider({ children }) {
       activeReferral,
       setActiveReferral,
       getMemberByReferralCode,
+      validateReferralCode,
+      submitKyc,
+      getMemberWallet,
+      requestPayout,
       loginUserByEmail,
       isDbConnected,
       resetAllData

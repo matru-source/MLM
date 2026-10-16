@@ -401,9 +401,9 @@ export async function dbFetchPayoutRequests() {
       status: r.status,
       request_date: r.request_date,
       bank_details: r.bank_details || {
-        bank_name: r.bank_name || 'HDFC Bank',
-        account_number: r.bank_account || '501004928172',
-        ifsc: r.bank_ifsc || 'HDFC0001234',
+        bank_name: r.bank_name || 'N/A',
+        account_number: r.bank_account || '',
+        ifsc: r.bank_ifsc || '',
         account_holder: r.member_name
       },
       admin_payment: r.admin_payment || {
@@ -442,7 +442,7 @@ export async function dbCreatePayoutRequest(payout) {
         ${payout.amount},
         ${payout.tds_amount},
         ${payout.net_payable},
-        ${payout.bank_details?.bank_name || 'HDFC Bank'},
+        ${payout.bank_details?.bank_name || 'Bank'},
         ${payout.bank_details?.account_number || ''},
         ${payout.bank_details?.ifsc || ''},
         ${JSON.stringify(payout.bank_details || {})},
@@ -682,3 +682,23 @@ export async function dbFetchTransactions(memberId = null) {
     return { ok: false, error: err.message };
   }
 }
+
+/**
+ * 14. Update KYC & Bank Details in Neon PostgreSQL
+ */
+export async function dbUpdateKyc(memberId, kycData) {
+  if (!sql) return { ok: false, error: 'Database connection not configured' };
+  try {
+    const rows = await sql`
+      UPDATE members
+      SET kyc_data = ${JSON.stringify(kycData)}
+      WHERE id = ${memberId}
+      RETURNING id, name, kyc_data;
+    `;
+    return { ok: true, data: rows[0] };
+  } catch (err) {
+    console.error('[Neon DB] dbUpdateKyc error:', err);
+    return { ok: false, error: err.message };
+  }
+}
+

@@ -30,6 +30,7 @@ export default function AuthModal() {
     openCheckout,
     activeReferral,
     getMemberByReferralCode,
+    validateReferralCode,
     loginUserByEmail,
     addToast
   } = useMlm();
@@ -44,6 +45,7 @@ export default function AuthModal() {
   const [sponsorId, setSponsorId] = useState(() => activeReferral || '');
   const [sponsorError, setSponsorError] = useState('');
   const [agreed, setAgreed] = useState(true);
+  const [loginErrorMessage, setLoginErrorMessage] = useState('');
 
   // Sync sponsorId when activeReferral is captured or modal opens
   useEffect(() => {
@@ -98,23 +100,39 @@ export default function AuthModal() {
   // Handle Step 1: Send OTP via Brevo API
   const handleInitiateRegister = async (e) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) {
-      addToast('error', 'Invalid Email', 'Please enter a valid email address to receive OTP.');
+
+    // 1. Full Name Validation
+    if (!fullName || fullName.trim().length < 2) {
+      addToast('error', 'Full Name Required', 'Please enter your full legal name (minimum 2 characters).');
       return;
     }
 
-    // Strictly enforce mandatory sponsor code validation
+    // 2. Email Format Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email.trim())) {
+      addToast('error', 'Invalid Email', 'Please enter a valid email address (e.g., name@example.com) to receive OTP.');
+      return;
+    }
+
+    // 3. 10-Digit Mobile Number Validation
+    const cleanMobile = (mobile || '').replace(/\D/g, '');
+    if (cleanMobile.length !== 10) {
+      addToast('error', 'Invalid Mobile Number', 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    // 4. Password Strength Validation
+    if (!password || password.length < 6) {
+      addToast('error', 'Password Too Short', 'Password must be at least 6 characters long.');
+      return;
+    }
+
+    // 5. Strict Multi-Factor Sponsor Referral Code Validation
     const cleanSponsor = (sponsorId || '').trim().toUpperCase();
-    if (!cleanSponsor) {
-      setSponsorError('Sponsor Referral Code is strictly mandatory to register.');
-      addToast('error', 'Sponsor Required', 'Please enter a valid Sponsor Referral Code to join the network.');
-      return;
-    }
-
-    const verifiedSponsor = getMemberByReferralCode ? getMemberByReferralCode(cleanSponsor) : null;
-    if (!verifiedSponsor) {
-      setSponsorError(`"${cleanSponsor}" is not an authorized partner code. Please verify with your sponsor.`);
-      addToast('error', 'Invalid Sponsor', `No authorized partner found with sponsor code "${cleanSponsor}".`);
+    const sponsorCheck = validateReferralCode(cleanSponsor, email, mobile);
+    if (!sponsorCheck.valid) {
+      setSponsorError(sponsorCheck.message);
+      addToast('error', 'Sponsor Verification Failed', sponsorCheck.message);
       return;
     }
 
@@ -181,13 +199,14 @@ export default function AuthModal() {
     }
 
     const cleanSponsor = (sponsorId || '').trim().toUpperCase();
-    const verifiedSponsor = getMemberByReferralCode ? getMemberByReferralCode(cleanSponsor) : null;
+    const sponsorCheck = validateReferralCode(cleanSponsor, email, mobile);
+    const verifiedSponsor = sponsorCheck.valid ? sponsorCheck.member : null;
 
     // OTP Verified! Register user and advance to plan purchase
     registerUser({
-      fullName,
-      email,
-      mobile,
+      fullName: fullName.trim(),
+      email: email.trim(),
+      mobile: (mobile || '').replace(/\D/g, ''),
       password,
       sponsorId: cleanSponsor,
       sponsorMemberId: verifiedSponsor?.member_id || cleanSponsor,
@@ -207,8 +226,26 @@ export default function AuthModal() {
   // Handle Login submission
   const handleLoginSubmit = (e) => {
     e.preventDefault();
+    setLoginErrorMessage('');
+
+    if (!email || !email.includes('@')) {
+      setLoginErrorMessage('Please enter a valid registered email address.');
+      return;
+    }
+
+    if (!password) {
+      setLoginErrorMessage('Please enter your account password.');
+      return;
+    }
+
     if (loginUserByEmail) {
-      loginUserByEmail({ email, password });
+      const result = loginUserByEmail({ email, password });
+      if (!result || !result.ok) {
+        const errorMsg = result?.error || 'Invalid credentials or account not found.';
+        setLoginErrorMessage(errorMsg);
+        addToast('error', 'Login Failed', errorMsg);
+        return;
+      }
     } else {
       setIsLoggedIn(true);
       addToast('success', 'Welcome Back!', 'Logged in as Partner.');
@@ -419,13 +456,35 @@ export default function AuthModal() {
                       );
                     }
 
-                    const sponsor = getMemberByReferralCode ? getMemberByReferralCode(clean) : null;
-                    if (sponsor) {
+                    const check = validateReferralCode ? validateReferralCode(clean, email, mobile) : null;
+                    if (check && check.valid) {
                       return (
                         <div className="sponsor-verified-pill mt-1">
                           <ShieldCheck size={14} className="text-emerald shrink-0" />
                           <span className="text-xs">
-                            Verified Sponsor: <strong className="text-white">{sponsor.name}</strong> <span className="code-font text-cyan">({sponsor.referral_code})</span>
+                            Verified Active Sponsor: <strong className="text-white">{check.member?.name}</strong> <span className="code-font text-cyan">({check.member?.referral_code})</span>
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    if (check && check.reason === 'inactive') {
+                      return (
+                        <div className="sponsor-warning-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', padding: '6px 10px' }}>
+                          <AlertCircle size={14} className="text-amber shrink-0" />
+                          <span className="text-xs text-amber">
+                            Partner "{check.member?.name}" is pending plan activation and cannot sponsor new members yet.
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    if (check && check.reason === 'self_referral') {
+                      return (
+                        <div className="sponsor-error-pill mt-1">
+                          <AlertCircle size={14} className="text-red-400 shrink-0" />
+                          <span className="text-xs">
+                            You cannot use your own referral code to sponsor yourself.
                           </span>
                         </div>
                       );
@@ -435,7 +494,7 @@ export default function AuthModal() {
                       <div className="sponsor-error-pill mt-1">
                         <AlertCircle size={14} className="text-red-400 shrink-0" />
                         <span className="text-xs">
-                          {sponsorError || `Sponsor code "${clean}" is not recognized.`}
+                          {sponsorError || check?.message || `Sponsor code "${clean}" is not recognized.`}
                         </span>
                       </div>
                     );
@@ -568,6 +627,12 @@ export default function AuthModal() {
           ) : (
             /* Login Mode */
             <form onSubmit={handleLoginSubmit}>
+              {loginErrorMessage && (
+                <div className="otp-error-banner mb-3" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 12px', borderRadius: '6px', color: '#EF4444', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={15} className="shrink-0" />
+                  <span>{loginErrorMessage}</span>
+                </div>
+              )}
               <div className="form-group-clean">
                 <label className="form-label-clean">Email Address</label>
                 <input

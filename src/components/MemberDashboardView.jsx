@@ -770,7 +770,16 @@ export default function MemberDashboardView() {
 
                 <button
                   type="button"
-                  onClick={() => addToast('info', 'Verified Bank Account', `Bank: ${currentMember?.kyc?.bank_name || 'HDFC Bank'} • A/C: ••••${currentMember?.kyc?.bank_account_number?.slice(-4) || '8172'} • IFSC: ${currentMember?.kyc?.bank_ifsc || 'HDFC0001234'} • Status: KYC Verified ✓`)}
+                  onClick={() => {
+                    const hasBank = currentMember?.kyc?.bank_account_number;
+                    addToast(
+                      hasBank ? 'info' : 'warning',
+                      hasBank ? 'Verified Bank Details' : 'Bank Not Linked',
+                      hasBank 
+                        ? `Bank: ${currentMember.kyc.bank_name || 'Bank'} • A/C: ••••${currentMember.kyc.bank_account_number.slice(-4)} • IFSC: ${currentMember.kyc.bank_ifsc}`
+                        : 'No settlement bank account linked. Please update your details in Profile > KYC.'
+                    );
+                  }}
                   className="btn btn-secondary"
                 >
                   View Bank Details
@@ -841,9 +850,9 @@ export default function MemberDashboardView() {
                                       paid_at: tx.date
                                     },
                                     bank_details: {
-                                      bank_name: currentMember?.kyc?.bank_name || 'HDFC Bank',
-                                      account_number: currentMember?.kyc?.bank_account_number || '••••8172',
-                                      ifsc: currentMember?.kyc?.bank_ifsc || 'HDFC0001234',
+                                      bank_name: currentMember?.kyc?.bank_name || 'Bank',
+                                      account_number: currentMember?.kyc?.bank_account_number || '',
+                                      ifsc: currentMember?.kyc?.bank_ifsc || '',
                                       account_holder: currentMember?.kyc?.legal_name || currentMember?.name
                                     }
                                   };
@@ -899,8 +908,8 @@ export default function MemberDashboardView() {
                             <td className="text-rose font-semibold">-₹{req.tds_amount.toLocaleString('en-IN')}</td>
                             <td className="text-success font-bold">₹{req.net_payable.toLocaleString('en-IN')}</td>
                             <td>
-                              <div>{req.bank_details?.bank_name || 'HDFC Bank'}</div>
-                              <div className="text-muted font-xs">A/C: ••••{req.bank_details?.account_number?.slice(-4) || '8172'}</div>
+                              <div>{req.bank_details?.bank_name || 'Bank'}</div>
+                              <div className="text-muted font-xs">A/C: ••••{req.bank_details?.account_number ? req.bank_details.account_number.slice(-4) : '----'}</div>
                             </td>
                             <td>
                               <span className={`badge ${req.status === 'paid' ? 'badge-green' : req.status === 'pending' ? 'badge-amber' : 'badge-neutral'}`}>
@@ -961,14 +970,20 @@ export default function MemberDashboardView() {
                         </div>
                         <div>
                           <div className="font-bold text-sm text-primary">
-                            {currentMember?.kyc?.bank_name || 'HDFC Bank'} ••••{currentMember?.kyc?.bank_account_number?.slice(-4) || '8172'}
+                            {currentMember?.kyc?.bank_account_number 
+                              ? `${currentMember.kyc.bank_name || 'Bank'} ••••${currentMember.kyc.bank_account_number.slice(-4)}`
+                              : 'Bank Account Not Linked'}
                           </div>
                           <div className="text-muted font-xs">
-                            IFSC: {currentMember?.kyc?.bank_ifsc || 'HDFC0001234'} • Beneficiary: {currentMember?.kyc?.legal_name || currentMember?.name}
+                            {currentMember?.kyc?.bank_account_number 
+                              ? `IFSC: ${currentMember.kyc.bank_ifsc} • Beneficiary: ${currentMember.kyc.legal_name || currentMember.name}`
+                              : 'Please link your settlement bank account in KYC before requesting a payout.'}
                           </div>
                         </div>
                       </div>
-                      <span className="badge badge-green font-xs">KYC Verified ✓</span>
+                      <span className={`badge ${currentMember?.kyc?.bank_account_number ? 'badge-green' : 'badge-amber'} font-xs`}>
+                        {currentMember?.kyc?.bank_account_number ? 'KYC Verified ✓' : 'Action Required'}
+                      </span>
                     </div>
 
                     {/* Available Balance Callout & Quick Chips */}
@@ -1375,14 +1390,16 @@ export default function MemberDashboardView() {
                       <FileText size={20} className="text-primary-blue" />
                       <div>
                         <div className="doc-title">Aadhaar Card</div>
-                        <div className="doc-sub">Identity & Address verification (••••9012)</div>
+                        <div className="doc-sub">Identity & Address verification (••••{currentMember?.kyc?.aadhaar ? currentMember.kyc.aadhaar.slice(-4) : '----'})</div>
                       </div>
                     </div>
                     <div className="doc-actions-pill">
-                      <span className="badge badge-green">Uploaded ✓</span>
+                      <span className={`badge ${currentMember?.kyc?.aadhaar ? 'badge-green' : 'badge-neutral'}`}>
+                        {currentMember?.kyc?.aadhaar ? 'Uploaded ✓' : 'Pending'}
+                      </span>
                       <button 
                         type="button" 
-                        onClick={() => addToast('info', 'Aadhaar Verified', 'Aadhaar verified via DigiLocker token.')}
+                        onClick={() => addToast('info', 'Aadhaar Status', currentMember?.kyc?.aadhaar ? 'Aadhaar verified via DigiLocker token.' : 'Please upload your Aadhaar in KYC.')}
                         className="btn-link-action"
                       >
                         View
@@ -1396,14 +1413,16 @@ export default function MemberDashboardView() {
                       <FileText size={20} className="text-primary-blue" />
                       <div>
                         <div className="doc-title">PAN Card</div>
-                        <div className="doc-sub">Tax ID for commission payouts (ABCDE1234F)</div>
+                        <div className="doc-sub">Tax ID for commission payouts ({currentMember?.kyc?.pan || 'Not Submitted'})</div>
                       </div>
                     </div>
                     <div className="doc-actions-pill">
-                      <span className="badge badge-green">Uploaded ✓</span>
+                      <span className={`badge ${currentMember?.kyc?.pan ? 'badge-green' : 'badge-neutral'}`}>
+                        {currentMember?.kyc?.pan ? 'Uploaded ✓' : 'Pending'}
+                      </span>
                       <button 
                         type="button" 
-                        onClick={() => addToast('info', 'PAN Verified', 'PAN validated with NSDL database.')}
+                        onClick={() => addToast('info', 'PAN Status', currentMember?.kyc?.pan ? `PAN ${currentMember.kyc.pan} validated with NSDL database.` : 'Please upload your PAN card.')}
                         className="btn-link-action"
                       >
                         View
@@ -1424,7 +1443,7 @@ export default function MemberDashboardView() {
                       <span className="badge badge-green">Uploaded ✓</span>
                       <button 
                         type="button" 
-                        onClick={() => addToast('info', 'Address Verified', 'Address matching Aadhaar record.')}
+                        onClick={() => addToast('info', 'Address Verified', 'Address matching partner record.')}
                         className="btn-link-action"
                       >
                         View
@@ -1438,14 +1457,20 @@ export default function MemberDashboardView() {
                       <FileText size={20} className="text-primary-blue" />
                       <div>
                         <div className="doc-title">Bank Account (Passbook / Cancelled Cheque)</div>
-                        <div className="doc-sub">HDFC Bank ••••8172 (Verified for instant payouts)</div>
+                        <div className="doc-sub">
+                          {currentMember?.kyc?.bank_account_number 
+                            ? `${currentMember.kyc.bank_name || 'Bank'} ••••${currentMember.kyc.bank_account_number.slice(-4)} (Verified for instant payouts)`
+                            : 'Bank Account Not Linked'}
+                        </div>
                       </div>
                     </div>
                     <div className="doc-actions-pill">
-                      <span className="badge badge-green">Uploaded ✓</span>
+                      <span className={`badge ${currentMember?.kyc?.bank_account_number ? 'badge-green' : 'badge-amber'}`}>
+                        {currentMember?.kyc?.bank_account_number ? 'Uploaded ✓' : 'Pending'}
+                      </span>
                       <button 
                         type="button" 
-                        onClick={() => addToast('info', 'Bank Verified', 'Penny-drop verification confirmed.')}
+                        onClick={() => addToast('info', 'Bank Status', currentMember?.kyc?.bank_account_number ? 'Penny-drop verification confirmed.' : 'Please link your bank account.')}
                         className="btn-link-action"
                       >
                         View
@@ -1465,8 +1490,10 @@ export default function MemberDashboardView() {
                 <div className="tax-details-grid">
                   <div className="tax-stat-box card-white p-4">
                     <span className="text-muted text-xs">Permanent Account Number (PAN)</span>
-                    <div className="font-bold text-lg code-font mt-1">ABCDE1234F</div>
-                    <span className="badge badge-green font-xs mt-2">Verified with ITD</span>
+                    <div className="font-bold text-lg code-font mt-1">{currentMember?.kyc?.pan || 'Not Submitted'}</div>
+                    <span className={`badge ${currentMember?.kyc?.pan ? 'badge-green' : 'badge-amber'} font-xs mt-2`}>
+                      {currentMember?.kyc?.pan ? 'Verified with ITD' : 'Pending Submission'}
+                    </span>
                   </div>
 
                   <div className="tax-stat-box card-white p-4">
@@ -1712,15 +1739,15 @@ export default function MemberDashboardView() {
                     <div className="receipt-details-list">
                       <div className="detail-line">
                         <span>Beneficiary Name:</span>
-                        <strong>{selectedReceiptModal.bank_details?.account_holder || 'Matru Prasad Panda'}</strong>
+                        <strong>{selectedReceiptModal.bank_details?.account_holder || selectedReceiptModal.member_name}</strong>
                       </div>
                       <div className="detail-line">
                         <span>Account Number:</span>
-                        <strong className="code-font">{selectedReceiptModal.bank_details?.account_number || '••••8172'}</strong>
+                        <strong className="code-font">{selectedReceiptModal.bank_details?.account_number ? '••••' + selectedReceiptModal.bank_details.account_number.slice(-4) : '••••----'}</strong>
                       </div>
                       <div className="detail-line">
                         <span>IFSC Code:</span>
-                        <strong className="code-font">{selectedReceiptModal.bank_details?.ifsc || 'HDFC0001234'}</strong>
+                        <strong className="code-font">{selectedReceiptModal.bank_details?.ifsc || 'N/A'}</strong>
                       </div>
                       <div className="detail-line">
                         <span>Amount Disbursed:</span>

@@ -124,10 +124,10 @@ export default function AdminPortalView() {
     ctx.fillStyle = '#0F172A';
     ctx.font = 'bold 13px sans-serif';
     ctx.fillText(selectedPayoutForManualPay.bank_details?.account_holder || selectedPayoutForManualPay.member_name, 220, 142);
-    ctx.fillText(selectedPayoutForManualPay.bank_details?.bank_name || 'HDFC Bank', 220, 170);
-    ctx.fillText(selectedPayoutForManualPay.bank_details?.account_number || '501004928172', 220, 198);
-    ctx.fillText(selectedPayoutForManualPay.bank_details?.ifsc || 'HDFC0001234', 220, 226);
-    ctx.fillText(manualUtr || 'UTR-CS-99821890', 220, 254);
+    ctx.fillText(selectedPayoutForManualPay.bank_details?.bank_name || 'Bank', 220, 170);
+    ctx.fillText(selectedPayoutForManualPay.bank_details?.account_number || 'N/A', 220, 198);
+    ctx.fillText(selectedPayoutForManualPay.bank_details?.ifsc || 'N/A', 220, 226);
+    ctx.fillText(manualUtr || 'UTR-CS-REF', 220, 254);
     ctx.fillText(paymentMode || 'IMPS', 220, 282);
 
     // Bottom Amount Highlight
@@ -691,7 +691,7 @@ export default function AdminPortalView() {
                   <div className="pay-field-box">
                     <span className="pay-field-lbl">Bank Name</span>
                     <span className="pay-field-val">
-                      {selectedPayoutForManualPay.bank_details?.bank_name || 'HDFC Bank'}
+                      {selectedPayoutForManualPay.bank_details?.bank_name || 'Commercial Bank'}
                     </span>
                   </div>
 
@@ -699,22 +699,24 @@ export default function AdminPortalView() {
                     <span className="pay-field-lbl">Full Bank Account Number</span>
                     <div className="copy-action-row">
                       <span className="pay-field-val code-font font-bold text-primary">
-                        {selectedPayoutForManualPay.bank_details?.account_number || '501004928172'}
+                        {selectedPayoutForManualPay.bank_details?.account_number || 'Not Provided'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedPayoutForManualPay.bank_details?.account_number || '501004928172');
-                          setIsCopiedAc(true);
-                          setTimeout(() => setIsCopiedAc(false), 2000);
-                          addToast('success', 'A/C Copied', 'Account number copied to clipboard.');
-                        }}
-                        className="copy-mini-btn"
-                        title="Copy Account Number"
-                      >
-                        {isCopiedAc ? <Check size={12} className="text-success" /> : <Copy size={12} />}
-                        <span>{isCopiedAc ? 'Copied' : 'Copy'}</span>
-                      </button>
+                      {selectedPayoutForManualPay.bank_details?.account_number && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedPayoutForManualPay.bank_details.account_number);
+                            setIsCopiedAc(true);
+                            setTimeout(() => setIsCopiedAc(false), 2000);
+                            addToast('success', 'A/C Copied', 'Account number copied to clipboard.');
+                          }}
+                          className="copy-mini-btn"
+                          title="Copy Account Number"
+                        >
+                          {isCopiedAc ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                          <span>{isCopiedAc ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -722,22 +724,24 @@ export default function AdminPortalView() {
                     <span className="pay-field-lbl">IFSC Code</span>
                     <div className="copy-action-row">
                       <span className="pay-field-val code-font font-bold">
-                        {selectedPayoutForManualPay.bank_details?.ifsc || 'HDFC0001234'}
+                        {selectedPayoutForManualPay.bank_details?.ifsc || 'Not Provided'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedPayoutForManualPay.bank_details?.ifsc || 'HDFC0001234');
-                          setIsCopiedIfsc(true);
-                          setTimeout(() => setIsCopiedIfsc(false), 2000);
-                          addToast('success', 'IFSC Copied', 'IFSC code copied to clipboard.');
-                        }}
-                        className="copy-mini-btn"
-                        title="Copy IFSC Code"
-                      >
-                        {isCopiedIfsc ? <Check size={12} className="text-success" /> : <Copy size={12} />}
-                        <span>{isCopiedIfsc ? 'Copied' : 'Copy'}</span>
-                      </button>
+                      {selectedPayoutForManualPay.bank_details?.ifsc && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedPayoutForManualPay.bank_details.ifsc);
+                            setIsCopiedIfsc(true);
+                            setTimeout(() => setIsCopiedIfsc(false), 2000);
+                            addToast('success', 'IFSC Copied', 'IFSC code copied to clipboard.');
+                          }}
+                          className="copy-mini-btn"
+                          title="Copy IFSC Code"
+                        >
+                          {isCopiedIfsc ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                          <span>{isCopiedIfsc ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

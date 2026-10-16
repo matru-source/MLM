@@ -1,20 +1,21 @@
 import React from 'react';
 import { useMlm } from '../context/MlmContext';
-import { ShieldCheck, Clock, X, ArrowRight, Sparkles } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Clock, X, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function ReferralBanner() {
   const { 
     referralBanner, 
     dismissReferralBanner, 
     setIsAuthModalOpen, 
-    setAuthMode 
+    setAuthMode,
+    setActiveReferral
   } = useMlm();
 
   if (!referralBanner || !referralBanner.visible) {
     return null;
   }
 
-  const { sponsorName, sponsorCode, secondsRemaining } = referralBanner;
+  const { sponsorName, sponsorCode, secondsRemaining, isValid, statusMessage, errorReason } = referralBanner;
 
   // Format seconds to MM:SS
   const minutes = Math.floor(secondsRemaining / 60);
@@ -26,6 +27,11 @@ export default function ReferralBanner() {
 
   const handleJoinUnderSponsor = () => {
     setAuthMode('register');
+    if (isValid) {
+      setActiveReferral(sponsorCode);
+    } else {
+      setActiveReferral('CS123456');
+    }
     setIsAuthModalOpen(true);
   };
 
@@ -35,25 +41,29 @@ export default function ReferralBanner() {
       role="region"
       aria-label="Referral Invitation"
     >
-      <div className="referral-banner-card">
+      <div className={`referral-banner-card ${isValid ? '' : 'referral-card-warning'}`}>
         {/* Top Accent Glow / Border */}
-        <div className="referral-banner-glow" />
+        <div className={`referral-banner-glow ${isValid ? '' : 'glow-amber'}`} />
 
         <div className="referral-banner-main">
           {/* Sponsor Avatar / Icon */}
           <div className="referral-avatar-wrapper">
-            <div className="referral-avatar-badge">
-              <ShieldCheck size={24} className="text-emerald" />
+            <div className={`referral-avatar-badge ${isValid ? '' : 'badge-amber-bg'}`}>
+              {isValid ? (
+                <ShieldCheck size={24} className="text-emerald" />
+              ) : (
+                <AlertCircle size={24} className="text-amber" />
+              )}
             </div>
-            <span className="referral-pulse-ring" />
+            <span className={`referral-pulse-ring ${isValid ? '' : 'pulse-amber'}`} />
           </div>
 
           {/* Referral Text Content */}
           <div className="referral-content">
             <div className="referral-tag-row">
-              <span className="referral-pill-badge">
+              <span className={`referral-pill-badge ${isValid ? '' : 'pill-amber'}`}>
                 <Sparkles size={11} className="mr-1" />
-                OFFICIAL INVITATION
+                {isValid ? 'OFFICIAL INVITATION' : 'REFERRAL NOTICE'}
               </span>
               <span className="referral-timer-pill" title="This referral notification will automatically close in 2 minutes">
                 <Clock size={12} className="mr-1" />
@@ -62,13 +72,27 @@ export default function ReferralBanner() {
             </div>
 
             <h4 className="referral-title">
-              You were referred by <strong className="referral-sponsor-name">{sponsorName}</strong>
+              {isValid ? (
+                <>You were referred by <strong className="referral-sponsor-name">{sponsorName}</strong></>
+              ) : errorReason === 'inactive' ? (
+                <>Partner <strong className="text-amber">{sponsorName}</strong> is Pending Activation</>
+              ) : (
+                <>Referral Code <span className="code-font text-amber">"{sponsorCode}"</span> is Invalid</>
+              )}
             </h4>
 
             <p className="referral-subtitle">
-              Sponsor Code: <span className="referral-code-highlight">{sponsorCode}</span>
-              <span className="referral-dot-sep">•</span>
-              <span className="referral-status-active">Verified Partner</span>
+              {isValid ? (
+                <>
+                  Sponsor Code: <span className="referral-code-highlight">{sponsorCode}</span>
+                  <span className="referral-dot-sep">•</span>
+                  <span className="referral-status-active">Verified Partner ✓</span>
+                </>
+              ) : (
+                <span className="text-amber">
+                  {statusMessage || 'Referral code not recognized. You may continue with Head Office (CS123456).'}
+                </span>
+              )}
             </p>
           </div>
 
@@ -76,10 +100,10 @@ export default function ReferralBanner() {
           <div className="referral-actions">
             <button
               onClick={handleJoinUnderSponsor}
-              className="btn btn-primary btn-sm referral-cta-btn"
-              title={`Create your partner account under ${sponsorName}`}
+              className={`btn btn-sm referral-cta-btn ${isValid ? 'btn-primary' : 'btn-warning-clean'}`}
+              title={isValid ? `Create your partner account under ${sponsorName}` : 'Register with Authorized Head Office (CS123456)'}
             >
-              <span>Join with {sponsorName ? sponsorName.split(' ')[0] : 'Sponsor'}</span>
+              <span>{isValid ? `Join with ${sponsorName ? sponsorName.split(' ')[0] : 'Sponsor'}` : 'Join with Head Office'}</span>
               <ArrowRight size={14} />
             </button>
 
@@ -97,7 +121,7 @@ export default function ReferralBanner() {
         {/* 120-Second Depleting Progress Bar */}
         <div className="referral-progress-track">
           <div 
-            className="referral-progress-fill" 
+            className={`referral-progress-fill ${isValid ? '' : 'fill-amber'}`}
             style={{ width: `${progressPercent}%` }} 
           />
         </div>
