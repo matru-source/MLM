@@ -132,15 +132,7 @@ function MainApp() {
                 <h4 className="footer-title">Support & Portals</h4>
                 <span>support@cybershield.network</span>
                 <span>+91 80 4900 1234</span>
-                {/* Discrete Admin Link as requested */}
-                <button
-                  onClick={navigateToAdmin}
-                  className="footer-admin-link"
-                  title="Open Admin Operations (Separated Link)"
-                >
-                  <Lock size={12} />
-                  <span>Admin Portal Access</span>
-                </button>
+                <span className="text-muted font-xs">Authorized Enterprise Network</span>
               </div>
             </div>
 

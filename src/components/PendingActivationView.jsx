@@ -1,34 +1,35 @@
 import React from 'react';
 import { useMlm } from '../context/MlmContext';
 import { 
-  ShieldAlert, 
   Clock, 
-  CheckCircle2, 
   Lock, 
   ArrowLeft, 
-  ExternalLink, 
-  ShieldCheck, 
   CreditCard, 
   Key, 
   Users,
   LogOut,
-  Sparkles
+  Zap,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 export default function PendingActivationView() {
   const { 
     currentMember, 
     setCurrentPage, 
-    navigateToAdmin, 
     logout,
+    openCheckout,
     pendingActivations = []
   } = useMlm();
 
-  // Find any activation record for this member
+  // Find strictly this member's activation record; NEVER fall back to another customer's record
   const activationRecord = pendingActivations.find(a => 
-    a.member_id === currentMember?.member_id || 
-    a.member_email === currentMember?.email
-  ) || pendingActivations[0];
+    (a.member_id && a.member_id === currentMember?.member_id) || 
+    (a.member_email && a.member_email === currentMember?.email)
+  );
+
+  const hasSubmittedPayment = currentMember?.seller_status === 'pending_approval' || Boolean(activationRecord);
+  const utrNumber = activationRecord?.utr_number;
 
   return (
     <div className="pending-activation-page">
@@ -36,30 +37,48 @@ export default function PendingActivationView() {
         {/* Top Header Card */}
         <div className="pending-card pending-header-card">
           <div className="pending-header-icon-box">
-            <Clock size={36} className="text-amber animate-pulse" />
+            {hasSubmittedPayment ? (
+              <Clock size={36} className="text-amber animate-pulse" />
+            ) : (
+              <CreditCard size={36} className="text-primary-blue" />
+            )}
             <span className="pending-header-glow" />
           </div>
 
           <div className="pending-header-info">
             <div className="pending-status-pill">
               <span className="pending-dot-pulse" />
-              <span>AWAITING ADMIN APPROVAL</span>
+              <span>{hasSubmittedPayment ? 'STEP 2 OF 2 • AWAITING ADMIN APPROVAL' : 'STEP 1 OF 2 • PLAN PAYMENT REQUIRED'}</span>
             </div>
             <h2 className="pending-main-title">
-              Account Activation in Progress
+              {hasSubmittedPayment ? 'Payment Submitted • Awaiting Verification' : 'Complete Joining Plan Purchase'}
             </h2>
             <p className="pending-main-sub">
-              Welcome, <strong>{currentMember?.name || 'Partner'}</strong>! Your joining application and ₹2,500 plan payment have been submitted to CyberShield Administration for verification.
+              {hasSubmittedPayment ? (
+                <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>! Your joining application and payment {utrNumber ? `(UTR: ${utrNumber})` : ''} have been submitted to CyberShield Administration for verification.</>
+              ) : (
+                <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>! Your partner profile has been created. Please complete the ₹2,500 (+ 18% GST) plan purchase to unlock your license and distributor link.</>
+              )}
             </p>
           </div>
 
           <div className="pending-header-actions">
+            {!hasSubmittedPayment && (
+              <button
+                onClick={() => openCheckout('Joining')}
+                className="btn btn-primary btn-sm flex-center gap-1"
+                style={{ fontWeight: 700 }}
+              >
+                <Zap size={14} />
+                <span>Pay ₹2,950 Now</span>
+              </button>
+            )}
             <button
               onClick={() => setCurrentPage('home')}
               className="btn btn-secondary btn-sm flex-center gap-1"
             >
               <ArrowLeft size={14} />
-              <span>Back to Home</span>
+              <span>Home</span>
             </button>
             <button
               onClick={logout}
@@ -72,20 +91,48 @@ export default function PendingActivationView() {
           </div>
         </div>
 
-        {/* Locked Profile & Referral Banner Alert */}
-        <div className="locked-feature-banner">
-          <div className="locked-icon-badge">
-            <Lock size={22} className="text-amber" />
+        {/* Action Callout for Unpaid Users */}
+        {!hasSubmittedPayment ? (
+          <div className="locked-feature-banner" style={{ background: '#EFF6FF', border: '1.5px solid #93C5FD' }}>
+            <div className="locked-icon-badge" style={{ background: '#DBEAFE', color: '#1D4ED8' }}>
+              <CreditCard size={22} />
+            </div>
+            <div className="locked-text-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
+              <div>
+                <h4 className="locked-banner-title" style={{ color: '#1E40AF' }}>
+                  💳 Action Required: Complete ₹2,500 Joining Plan Payment
+                </h4>
+                <p className="locked-banner-desc" style={{ color: '#1E3A8A' }}>
+                  Your account is registered but inactive. Complete your ₹2,500 (+ 18% GST) payment via UPI / QR to submit your activation request.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => openCheckout('Joining')}
+                className="btn btn-primary btn-md flex-center gap-2"
+                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: 700 }}
+              >
+                <Zap size={16} />
+                <span>Complete Payment Now (₹2,950)</span>
+              </button>
+            </div>
           </div>
-          <div className="locked-text-content">
-            <h4 className="locked-banner-title">
-              🔒 Member Profile & Personal Referral Link are Currently Locked
-            </h4>
-            <p className="locked-banner-desc">
-              Under Direct Selling guidelines, your personal member profile, distributor referral code, and team commission hierarchy will be <strong>unlocked automatically</strong> once CyberShield Administration approves your ₹2,500 joining activation.
-            </p>
+        ) : (
+          /* Locked Profile & Referral Banner Alert for Paid Users */
+          <div className="locked-feature-banner">
+            <div className="locked-icon-badge">
+              <Lock size={22} className="text-amber" />
+            </div>
+            <div className="locked-text-content">
+              <h4 className="locked-banner-title">
+                🔒 Member Profile & Personal Referral Link are Currently Locked
+              </h4>
+              <p className="locked-banner-desc">
+                Under Direct Selling compliance guidelines, your distributor referral code and 6-tier hierarchy will be <strong>unlocked automatically</strong> once CyberShield Administration verifies your bank credit.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 2 Provisioned Accounts Status Grid */}
         <div className="pending-accounts-grid">
@@ -95,9 +142,9 @@ export default function PendingActivationView() {
               <div className="pending-ac-icon bg-blue-dim">
                 <Users size={22} className="text-primary-blue" />
               </div>
-              <div className="pending-ac-status badge badge-amber">
+              <div className={`pending-ac-status badge ${hasSubmittedPayment ? 'badge-amber' : 'badge-rose'}`}>
                 <Clock size={12} className="mr-1" />
-                Pending Activation
+                {hasSubmittedPayment ? 'Pending Admin Approval' : 'Payment Required'}
               </div>
             </div>
 
@@ -117,7 +164,9 @@ export default function PendingActivationView() {
               </div>
               <div className="pending-spec-row">
                 <span className="spec-label">Joining Plan Fee:</span>
-                <span className="spec-val font-bold text-emerald">₹2,500 (+ 18% GST Paid)</span>
+                <span className={`spec-val font-bold ${hasSubmittedPayment ? 'text-amber' : 'text-rose'}`}>
+                  {hasSubmittedPayment ? '₹2,500 (+ 18% GST Submitted)' : '₹2,500 (+ 18% GST Unpaid)'}
+                </span>
               </div>
               <div className="pending-spec-row">
                 <span className="spec-label">Personal Referral Link:</span>
@@ -132,9 +181,9 @@ export default function PendingActivationView() {
               <div className="pending-ac-icon bg-emerald-dim">
                 <Key size={22} className="text-emerald" />
               </div>
-              <div className="pending-ac-status badge badge-amber">
+              <div className={`pending-ac-status badge ${hasSubmittedPayment ? 'badge-amber' : 'badge-rose'}`}>
                 <Clock size={12} className="mr-1" />
-                Queued for Generation
+                {hasSubmittedPayment ? 'Queued for Generation' : 'Pending Payment'}
               </div>
             </div>
 
@@ -162,29 +211,6 @@ export default function PendingActivationView() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Admin Testing Helper Callout */}
-        <div className="admin-approval-test-box">
-          <div className="test-box-left">
-            <Sparkles size={20} className="text-primary-blue" />
-            <div>
-              <div className="font-bold text-sm text-primary">Testing Admin Approval?</div>
-              <div className="text-muted text-xs">
-                Open the Admin Portal to review and click "Approve & Activate Both Accounts" to instantly unlock this profile and referral link.
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={navigateToAdmin}
-            className="btn btn-primary btn-sm flex-center gap-1"
-            title="Open Admin Portal to approve this partner"
-          >
-            <Lock size={13} />
-            <span>Open Admin Portal</span>
-            <ExternalLink size={13} />
-          </button>
         </div>
       </div>
     </div>

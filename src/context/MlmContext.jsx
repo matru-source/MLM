@@ -967,12 +967,19 @@ export function MlmProvider({ children }) {
     setTotalEarnings(0);
     setIsLoggedIn(true);
     localStorage.setItem('cybershield_isLoggedIn', 'true');
+    setCurrentPage('dashboard');
     setIsAuthModalOpen(false);
+    dismissReferralBanner();
 
     // Persist to live Neon PostgreSQL with cryptographically hashed password
     dbRegisterMember(newMember).catch(err => console.warn('[Neon DB] dbRegisterMember error:', err));
 
     addToast('success', 'Email Verified & Account Created!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
+    
+    // Automatically prompt checkout for ₹2,500 Joining Plan
+    setTimeout(() => {
+      openCheckout('Joining');
+    }, 300);
   };
 
   // Submit / Update Member KYC & Payout Bank Details

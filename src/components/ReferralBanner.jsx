@@ -8,10 +8,11 @@ export default function ReferralBanner() {
     dismissReferralBanner, 
     setIsAuthModalOpen, 
     setAuthMode,
-    setActiveReferral
+    setActiveReferral,
+    isLoggedIn
   } = useMlm();
 
-  if (!referralBanner || !referralBanner.visible) {
+  if (!referralBanner || !referralBanner.visible || isLoggedIn) {
     return null;
   }
 
