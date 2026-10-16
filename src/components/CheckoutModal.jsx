@@ -19,6 +19,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { downloadTaxInvoice } from '../utils/downloadHelpers';
 
 export default function CheckoutModal() {
   const { 
@@ -124,6 +125,7 @@ export default function CheckoutModal() {
 
   // Download official receipt
   const handleDownloadInvoice = () => {
+    downloadTaxInvoice({ order: paymentResult?.order, member: currentMember });
     const orderId = paymentResult?.order?.order_id || 'CS20261010';
     addToast('success', 'Tax Invoice Downloaded', `Official GST Tax Invoice #${orderId} generated & downloaded.`);
   };

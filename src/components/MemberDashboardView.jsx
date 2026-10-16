@@ -35,6 +35,7 @@ import {
   Zap,
   RefreshCw
 } from 'lucide-react';
+import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
 
 export default function MemberDashboardView() {
   const { 
@@ -1260,11 +1261,14 @@ export default function MemberDashboardView() {
 
                 <div className="sub-actions-row">
                   <button 
-                    onClick={() => addToast('info', 'Invoice Downloaded', `Invoice #${orderNum} generated.`)} 
+                    onClick={() => {
+                      downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
+                      addToast('info', 'Invoice Downloaded', `Invoice #${orderNum} downloaded.`);
+                    }} 
                     className="btn btn-secondary btn-sm"
                   >
                     <Download size={14} />
-                    <span>View Invoice</span>
+                    <span>View / Download Invoice</span>
                   </button>
                   <button 
                     onClick={() => addToast('info', 'Subscription Status', currentMember?.seller_status === 'active' ? 'Your license is actively protecting endpoints.' : 'Pending activation.')} 
@@ -1318,7 +1322,10 @@ export default function MemberDashboardView() {
 
                 <div className="mt-4">
                   <button 
-                    onClick={() => addToast('success', 'Invoice Downloaded', `CyberShield GST Tax Invoice #${orderNum} downloaded.`)} 
+                    onClick={() => {
+                      downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
+                      addToast('success', 'Invoice Downloaded', `CyberShield GST Tax Invoice #${orderNum} downloaded.`);
+                    }} 
                     className="btn btn-primary btn-sm"
                   >
                     <Download size={14} />
@@ -1687,7 +1694,11 @@ export default function MemberDashboardView() {
                         </div>
                       </div>
                       <button 
-                        onClick={() => addToast('success', 'Form 16A', 'Form 16A TDS Certificate downloaded.')}
+                        onClick={() => {
+                          const tds = payoutRequests.filter(p => p.status === 'paid').reduce((s, p) => s + p.tds_amount, 0) || 50;
+                          downloadForm16A({ member: currentMember, tdsAmount: tds });
+                          addToast('success', 'Form 16A Downloaded', 'Statutory TDS Certificate (Form 16A) downloaded.');
+                        }}
                         className="btn btn-secondary btn-sm"
                       >
                         <Download size={14} />
