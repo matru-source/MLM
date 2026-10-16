@@ -1155,7 +1155,7 @@ export default function MemberDashboardView() {
                         Available to Withdraw: <strong className="text-primary font-bold">₹{availableBalance.toLocaleString('en-IN')}</strong>
                       </span>
                       <div className="quick-amount-chips">
-                        {[500, 1000, 2000, availableBalance].filter(amt => amt <= availableBalance && amt >= 500).map(amt => (
+                        {Array.from(new Set([500, 1000, 2000, availableBalance])).filter(amt => amt <= availableBalance && amt >= 500).map(amt => (
                           <button
                             key={amt}
                             type="button"
@@ -1170,7 +1170,7 @@ export default function MemberDashboardView() {
 
                     {/* Input */}
                     <div className="form-group-clean">
-                      <label className="form-label-clean">Withdrawal Amount (INR)</label>
+                      <label className="form-label-clean font-xs">Withdrawal Amount (INR)</label>
                       <div className="currency-input-wrapper">
                         <span className="currency-symbol-tag">₹</span>
                         <input
@@ -1206,14 +1206,14 @@ export default function MemberDashboardView() {
                             <span className="text-rose font-semibold">-₹{calculatedTds.toLocaleString('en-IN')}</span>
                           </div>
                           {!hasPan && (
-                            <div style={{ fontSize: '11px', color: '#b45309', background: '#fef3c7', padding: '6px 10px', borderRadius: '6px', margin: '4px 0' }}>
+                            <div style={{ fontSize: '10.5px', color: '#b45309', background: '#fef3c7', padding: '5px 8px', borderRadius: '6px', margin: '2px 0' }}>
                               ⚠️ Statutory Notice: Indian law mandates 20% TDS under Section 206AA when no valid PAN is linked. Update your PAN in KYC to reduce TDS to 5%.
                             </div>
                           )}
                           <div className="tax-divider" />
                           <div className="tax-row net-row">
-                            <span className="font-bold text-primary">Net Bank Deposit (Estimated)</span>
-                            <span className="font-extrabold text-success text-base">
+                            <span className="font-bold text-primary font-xs">Net Bank Deposit (Estimated)</span>
+                            <span className="font-extrabold text-success font-sm">
                               ₹{netEstimated.toLocaleString('en-IN')}
                             </span>
                           </div>
@@ -1221,10 +1221,10 @@ export default function MemberDashboardView() {
                       );
                     })()}
 
-                    <div className="withdraw-notice-box">
-                      <AlertCircle size={15} className="text-amber flex-shrink-0" />
-                      <p className="font-xs text-muted mb-0">
-                        <strong>Pending Approval Process:</strong> When submitted, your request will appear in the Admin Finance Portal. The Admin will verify your bank details, perform a manual transfer, and attach a payment screenshot. Your available balance will be deducted only upon Admin confirmation.
+                    <div className="withdraw-notice-box" style={{ padding: '8px 12px' }}>
+                      <AlertCircle size={14} className="text-amber flex-shrink-0 mt-0.5" />
+                      <p className="font-2xs text-muted mb-0" style={{ lineHeight: '1.4' }}>
+                        <strong>Pending Approval:</strong> Admin will verify your bank details, perform transfer, and attach proof. Balance is deducted upon confirmation.
                       </p>
                     </div>
 

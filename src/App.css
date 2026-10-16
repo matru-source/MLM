@@ -2928,7 +2928,10 @@
    ========================================================================== */
 .withdraw-modal-clean {
   width: 100%;
-  max-width: 520px;
+  max-width: 580px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   background: #FFFFFF;
   border-radius: 16px;
   box-shadow: 0 20px 45px rgba(15, 23, 42, 0.22);
@@ -2940,15 +2943,18 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 22px 24px 16px 24px;
+  padding: 18px 24px 14px 24px;
   border-bottom: 1px solid #E2E8F0;
+  flex-shrink: 0;
 }
 
 .withdraw-modal-body {
-  padding: 20px 24px;
+  padding: 16px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .verified-bank-box {
@@ -3086,7 +3092,9 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #F1F5F9;
+  flex-shrink: 0;
 }
 
 /* ==========================================================================
