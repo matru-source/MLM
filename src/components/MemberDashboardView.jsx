@@ -388,45 +388,72 @@ export default function MemberDashboardView() {
               );
             })()}
 
-            {/* Quick Referral Link Banner */}
-            <div className="referral-share-card card-white">
-              <div className="ref-share-left">
-                <h4 className="ref-share-title">Your Personal Referral Link</h4>
-                <p className="ref-share-sub">Share this link to earn instant commissions on qualifying subscriptions:</p>
-                <div className="ref-copy-box">
-                  <input
-                    type="text"
-                    readOnly
-                    value={`${window.location.origin}/?ref=${currentMember?.referral_code || 'CS123456'}`}
-                    className="ref-input-clean code-font"
-                  />
-                  <div className="ref-actions-flex">
+            {/* Quick Referral Link Banner (Active Members Only) */}
+            {currentMember?.seller_status === 'active' ? (
+              <div className="referral-share-card card-white">
+                <div className="ref-share-left">
+                  <h4 className="ref-share-title">Your Personal Referral Link</h4>
+                  <p className="ref-share-sub">Share this link to earn instant commissions on qualifying subscriptions:</p>
+                  <div className="ref-copy-box">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${window.location.origin}/?ref=${currentMember?.referral_code || 'CS123456'}`}
+                      className="ref-input-clean code-font"
+                    />
+                    <div className="ref-actions-flex">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/?ref=${currentMember?.referral_code || 'CS123456'}`);
+                          addToast('success', 'Copied!', 'Referral link copied to clipboard.');
+                        }}
+                        className="btn btn-primary btn-sm flex-center gap-1"
+                      >
+                        <Copy size={14} />
+                        <span>Copy Link</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="btn btn-outline-blue btn-sm flex-center gap-1 share-trigger-btn"
+                      >
+                        <Share2 size={14} />
+                        <span>Share</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="ref-badge-callout">
+                  <span className="badge badge-green">Sponsor Code: {currentMember?.referral_code || 'CS123456'}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="referral-share-card card-white" style={{ border: '1.5px dashed #F59E0B', background: '#FFFBEB' }}>
+                <div className="ref-share-left">
+                  <div className="flex-align gap-2 mb-1">
+                    <Lock size={18} className="text-amber" />
+                    <h4 className="ref-share-title m-0" style={{ color: '#B45309' }}>Referral Link Locked (Pending Plan Activation)</h4>
+                  </div>
+                  <p className="ref-share-sub" style={{ color: '#92400E' }}>
+                    Your distributor referral link will be unlocked once your ₹2,500 Joining Plan is completed and verified by Admin.
+                  </p>
+                  <div className="mt-3">
                     <button
                       type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/?ref=${currentMember?.referral_code || 'CS123456'}`);
-                        addToast('success', 'Copied!', 'Referral link copied to clipboard.');
-                      }}
+                      onClick={() => openCheckout('Joining')}
                       className="btn btn-primary btn-sm flex-center gap-1"
                     >
-                      <Copy size={14} />
-                      <span>Copy Link</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsShareModalOpen(true)}
-                      className="btn btn-outline-blue btn-sm flex-center gap-1 share-trigger-btn"
-                    >
-                      <Share2 size={14} />
-                      <span>Share</span>
+                      <Zap size={14} />
+                      <span>Complete Plan Activation (₹2,500)</span>
                     </button>
                   </div>
                 </div>
+                <div className="ref-badge-callout">
+                  <span className="badge badge-amber font-bold">Locked • Pending Activation</span>
+                </div>
               </div>
-              <div className="ref-badge-callout">
-                <span className="badge badge-green">Sponsor Code: {currentMember?.referral_code || 'CS123456'}</span>
-              </div>
-            </div>
+            )}
 
             {/* ZEX Cloud Platform Integration Card */}
             <div className="zex-integration-card card-white mt-4">
@@ -1234,13 +1261,17 @@ export default function MemberDashboardView() {
         {/* SUBVIEW 4: MY SUBSCRIPTIONS & ORDERS */}
         {activeTab === 'subscriptions' && (() => {
           // Strictly isolate to current member's orders; NEVER leak orders[0] from other customers
+          const isUserActive = currentMember?.seller_status === 'active';
           const myLatestOrder = orders.find(o => 
             (o.buyer_member_id && o.buyer_member_id === currentMember?.member_id) || 
             (o.buyer_email && o.buyer_email === currentMember?.email)
           );
-          const orderNum = myLatestOrder?.order_id || (currentMember?.cs_customer_id ? `CS${currentMember.cs_customer_id}` : (currentMember?.member_id ? `ORD-${currentMember.member_id.slice(-6).toUpperCase()}` : 'PENDING'));
-          const orderDate = myLatestOrder?.activation_date || new Date(currentMember?.joined_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-          const renewalDate = myLatestOrder?.next_renewal || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          const orderNum = myLatestOrder?.order_id || (isUserActive ? (currentMember?.cs_customer_id ? `CS${currentMember.cs_customer_id}` : (currentMember?.member_id ? `ORD-${currentMember.member_id.slice(-6).toUpperCase()}` : 'CS-ROOT')) : 'PENDING');
+          const orderDate = myLatestOrder?.activation_date || (isUserActive ? new Date(currentMember?.joined_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pending Payment');
+          const renewalDate = myLatestOrder?.next_renewal || (isUserActive ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pending Activation');
+          const amountPaid = myLatestOrder?.total_amount || (isUserActive ? 2950 : 0);
+          const paymentStatus = myLatestOrder?.payment_status ? (myLatestOrder.payment_status.charAt(0).toUpperCase() + myLatestOrder.payment_status.slice(1)) : (isUserActive ? 'Paid' : 'Unpaid');
+          const subscriptionStatus = isUserActive ? 'Active (Enterprise Cloud Protected)' : (myLatestOrder?.payment_status === 'pending_verification' ? 'Awaiting Admin Verification' : 'Pending Plan Purchase');
 
           return (
             <div className="dash-sub-view">
@@ -1248,8 +1279,8 @@ export default function MemberDashboardView() {
               <div className="active-sub-card card-white">
                 <div className="sub-card-header">
                   <div>
-                    <span className={`badge ${currentMember?.seller_status === 'active' ? 'badge-green' : 'badge-amber'} mb-2`}>
-                      {currentMember?.seller_status === 'active' ? 'Active' : 'Pending Activation'}
+                    <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'} mb-2`}>
+                      {isUserActive ? 'Active' : (myLatestOrder ? 'Pending Admin Verification' : 'Pending Plan Purchase')}
                     </span>
                     <h3 className="sub-title-bold">CyberShield Partner Joining Membership</h3>
                     <p className="text-muted text-sm">Official Authorized Member License • ₹2,500 Joining Plan</p>
@@ -1257,7 +1288,7 @@ export default function MemberDashboardView() {
                   <div className="sub-price-callout">
                     <span className="text-muted text-xs">Amount Paid</span>
                     <div className="text-primary-blue text-large font-bold">
-                      ₹{(myLatestOrder?.total_amount || 2950).toLocaleString('en-IN')}
+                      ₹{amountPaid.toLocaleString('en-IN')}
                     </div>
                   </div>
                 </div>
@@ -1273,25 +1304,35 @@ export default function MemberDashboardView() {
                   </div>
                   <div className="date-item">
                     <span className="text-muted text-xs">Official Activation</span>
-                    <span className="text-success font-semibold">
-                      {currentMember?.seller_status === 'active' ? 'CyberShield Defense Engine (Active)' : 'Pending Verification'}
+                    <span className={isUserActive ? 'text-success font-semibold' : 'text-amber font-semibold'}>
+                      {isUserActive ? 'CyberShield Defense Engine (Active)' : (myLatestOrder ? 'Pending Admin Bank Verification' : 'Pending Plan Purchase')}
                     </span>
                   </div>
                 </div>
 
                 <div className="sub-actions-row">
+                  {isUserActive ? (
+                    <button 
+                      onClick={() => {
+                        downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
+                        addToast('info', 'Invoice Downloaded', `Invoice #${orderNum} downloaded.`);
+                      }} 
+                      className="btn btn-secondary btn-sm"
+                    >
+                      <Download size={14} />
+                      <span>View / Download Invoice</span>
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => openCheckout('Joining')}
+                      className="btn btn-primary btn-sm flex-center gap-1"
+                    >
+                      <Zap size={14} />
+                      <span>Complete Plan Purchase (₹2,500)</span>
+                    </button>
+                  )}
                   <button 
-                    onClick={() => {
-                      downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
-                      addToast('info', 'Invoice Downloaded', `Invoice #${orderNum} downloaded.`);
-                    }} 
-                    className="btn btn-secondary btn-sm"
-                  >
-                    <Download size={14} />
-                    <span>View / Download Invoice</span>
-                  </button>
-                  <button 
-                    onClick={() => addToast('info', 'Subscription Status', currentMember?.seller_status === 'active' ? 'Your license is actively protecting endpoints.' : 'Pending activation.')} 
+                    onClick={() => addToast('info', 'Subscription Status', isUserActive ? 'Your license is actively protecting endpoints.' : 'Pending plan activation.')} 
                     className="btn btn-secondary btn-sm"
                   >
                     Manage
@@ -1320,37 +1361,47 @@ export default function MemberDashboardView() {
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Payment Method:</span>
-                    <span className="spec-val">{myLatestOrder?.payment_method || 'UPI (Google Pay / PhonePe)'}</span>
+                    <span className="spec-val">{myLatestOrder?.payment_method || (isUserActive ? 'UPI (Google Pay / PhonePe)' : 'Pending Selection')}</span>
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Amount Paid:</span>
-                    <span className="spec-val font-bold">₹{(myLatestOrder?.total_amount || 2950).toLocaleString('en-IN')} (₹2,500 + 18% GST)</span>
+                    <span className="spec-val font-bold">₹{amountPaid.toLocaleString('en-IN')} {isUserActive ? '(₹2,500 + 18% GST)' : (myLatestOrder ? '(Awaiting Admin Verification)' : '(Plan Not Purchased)')}</span>
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Payment Status:</span>
-                    <span className={`badge ${currentMember?.seller_status === 'active' ? 'badge-green' : 'badge-amber'}`}>
-                      {myLatestOrder?.payment_status ? (myLatestOrder.payment_status.charAt(0).toUpperCase() + myLatestOrder.payment_status.slice(1)) : (currentMember?.seller_status === 'active' ? 'Paid' : 'Pending')}
+                    <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'}`}>
+                      {paymentStatus}
                     </span>
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Subscription Status:</span>
-                    <span className={`badge ${currentMember?.seller_status === 'active' ? 'badge-green' : 'badge-amber'}`}>
-                      {currentMember?.seller_status === 'active' ? 'Active (Enterprise Cloud Protected)' : 'Pending'}
+                    <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'}`}>
+                      {subscriptionStatus}
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <button 
-                    onClick={() => {
-                      downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
-                      addToast('success', 'Invoice Downloaded', `CyberShield GST Tax Invoice #${orderNum} downloaded.`);
-                    }} 
-                    className="btn btn-primary btn-sm"
-                  >
-                    <Download size={14} />
-                    <span>Download Official Tax Invoice</span>
-                  </button>
+                  {isUserActive ? (
+                    <button 
+                      onClick={() => {
+                        downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
+                        addToast('success', 'Invoice Downloaded', `CyberShield GST Tax Invoice #${orderNum} downloaded.`);
+                      }} 
+                      className="btn btn-primary btn-sm"
+                    >
+                      <Download size={14} />
+                      <span>Download Official Tax Invoice</span>
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => openCheckout('Joining')} 
+                      className="btn btn-primary btn-sm flex-center gap-1"
+                    >
+                      <Zap size={14} />
+                      <span>Proceed to Plan Payment (₹2,500)</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1363,7 +1414,9 @@ export default function MemberDashboardView() {
                     Two independent enterprise accounts generated upon ₹2,500 joining fee completion.
                   </p>
                 </div>
-                <span className="badge badge-green font-xs">2 Accounts Active ✓</span>
+                <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'} font-xs`}>
+                  {isUserActive ? '2 Accounts Active ✓' : 'Awaiting Plan Activation'}
+                </span>
               </div>
 
               <div className="dual-accounts-container">
@@ -1379,15 +1432,19 @@ export default function MemberDashboardView() {
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Distributor Referral Code:</span>
-                      <span className="spec-v code-font font-bold text-primary-blue">{currentMember.referral_code}</span>
+                      <span className="spec-v code-font font-bold text-primary-blue">
+                        {isUserActive ? currentMember.referral_code : 'Locked (Pending Plan Activation)'}
+                      </span>
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Commission Wallet:</span>
-                      <span className="spec-v code-font">{currentMember.accounts?.account1_mlm?.commission_wallet_id || `WAL-${currentMember.referral_code || currentMember.member_id}`}</span>
+                      <span className="spec-v code-font">
+                        {isUserActive ? (currentMember.accounts?.account1_mlm?.commission_wallet_id || `WAL-${currentMember.referral_code || currentMember.member_id}`) : 'Pending Activation'}
+                      </span>
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Tier Hierarchy:</span>
-                      <span className="spec-v">6-Tier Matrix Operational</span>
+                      <span className="spec-v">{isUserActive ? '6-Tier Matrix Operational' : 'Inactive'}</span>
                     </div>
                   </div>
                 </div>
@@ -1400,13 +1457,15 @@ export default function MemberDashboardView() {
                   <div className="account-specs-compact">
                     <div className="spec-item-compact">
                       <span className="spec-k">Software License Key:</span>
-                      <span className="spec-v code-font font-bold text-success">
-                        {currentMember.software_license?.license_key || currentMember.accounts?.account2_software?.license_key || (currentMember.seller_status === 'active' ? `CS-PRO-${currentMember.referral_code || 'ACTIVE'}` : 'Awaiting Admin Verification')}
+                      <span className={`spec-v code-font font-bold ${isUserActive ? 'text-success' : 'text-amber'}`}>
+                        {isUserActive 
+                          ? (currentMember.software_license?.license_key || currentMember.accounts?.account2_software?.license_key || `CS-PRO-${currentMember.referral_code || 'ACTIVE'}`)
+                          : 'Awaiting Admin Verification'}
                       </span>
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Endpoint Device Seats:</span>
-                      <span className="spec-v font-bold">5 Protected Devices</span>
+                      <span className="spec-v font-bold">{isUserActive ? '5 Protected Devices' : '0 (Pending Activation)'}</span>
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Software Suite:</span>
