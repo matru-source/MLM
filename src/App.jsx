@@ -3,6 +3,7 @@ import { MlmProvider, useMlm } from './context/MlmContext';
 import Navbar from './components/Navbar';
 import PublicHome from './components/PublicHome';
 import MemberDashboardView from './components/MemberDashboardView';
+import PendingActivationView from './components/PendingActivationView';
 import AdminPortalView from './components/AdminPortalView';
 import CheckoutModal from './components/CheckoutModal';
 import AuthModal from './components/AuthModal';
@@ -16,7 +17,8 @@ function MainApp() {
     isAdminMode, 
     navigateToAdmin, 
     currentPage, 
-    setCurrentPage 
+    setCurrentPage,
+    currentMember 
   } = useMlm();
 
   // If URL is /admin or #admin, render dedicated Admin Portal
@@ -32,13 +34,29 @@ function MainApp() {
   // Normal User Web Experience
   const isDashboardView = ['dashboard', 'network', 'wallet', 'subscriptions', 'kyc', 'profile'].includes(currentPage);
 
-  // If on Member Dashboard, render standalone dashboard without duplicate public navbar
+  // If on Member Dashboard: Check if member is approved & active
   if (isDashboardView) {
+    const isMemberActive = currentMember?.seller_status === 'active';
+
+    // If pending admin approval or unpaid: Keep profile and referral locked, show PendingActivationView
+    if (!isMemberActive) {
+      return (
+        <div className="site-wrapper dashboard-mode">
+          <PendingActivationView />
+          <CheckoutModal />
+          <AuthModal />
+          <ReferralBanner />
+          <Toast />
+        </div>
+      );
+    }
+
     return (
       <div className="site-wrapper dashboard-mode">
         <MemberDashboardView />
         <CheckoutModal />
         <AuthModal />
+        <ReferralBanner />
         <Toast />
       </div>
     );

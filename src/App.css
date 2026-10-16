@@ -4704,5 +4704,283 @@
   box-shadow: 0 0 0 1px #10B981 !important;
 }
 
+/* ==========================================================================
+   Pending Admin Activation & Locked Profile Screen
+   ========================================================================== */
+.pending-activation-page {
+  min-height: 100vh;
+  background: var(--bg-body, #F8FAFC);
+  padding: 40px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.pending-activation-container {
+  max-width: 920px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pending-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-light, #E2E8F0);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+}
+
+.pending-header-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pending-header-icon-box {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.pending-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #D97706;
+  margin-bottom: 8px;
+  letter-spacing: 0.05em;
+}
+
+.pending-dot-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #D97706;
+  animation: pendingPulseDot 1.5s infinite;
+}
+
+@keyframes pendingPulseDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.3);
+  }
+}
+
+.pending-header-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pending-main-title {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+}
+
+.pending-main-sub {
+  font-size: 0.92rem;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.pending-header-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.locked-feature-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(245, 158, 11, 0.03) 100%);
+  border: 1.5px dashed rgba(245, 158, 11, 0.45);
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.locked-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.locked-banner-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #92400E;
+  margin: 0 0 4px 0;
+}
+
+.locked-banner-desc {
+  font-size: 0.86rem;
+  color: #78350F;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.pending-accounts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.pending-account-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-light, #E2E8F0);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.pending-ac-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pending-ac-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pending-ac-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+}
+
+.pending-ac-desc {
+  font-size: 0.82rem;
+  color: #64748B;
+  margin: 0 0 16px 0;
+  min-height: 38px;
+  line-height: 1.45;
+}
+
+.pending-ac-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border-light, #E2E8F0);
+  padding-top: 14px;
+}
+
+.pending-spec-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  gap: 10px;
+}
+
+.pending-spec-row .spec-label {
+  color: #64748B;
+}
+
+.admin-approval-test-box {
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-approval-test-box .test-box-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mobile-user-pending-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+/* Mobile Responsiveness for Pending Activation Screen */
+@media (max-width: 768px) {
+  .pending-activation-page {
+    padding: 20px 14px;
+  }
+
+  .pending-header-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .pending-header-actions {
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .pending-header-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .pending-accounts-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .admin-approval-test-box {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .admin-approval-test-box .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 
 

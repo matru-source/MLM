@@ -75,41 +75,63 @@ export default function Navbar() {
         {/* Desktop Action Buttons */}
         <div className="header-actions desktop-only-actions">
           {isLoggedIn ? (
-            <div className="user-logged-group">
-              <button
-                onClick={() => setCurrentPage('dashboard')}
-                className={`btn btn-primary btn-sm ${currentPage === 'dashboard' ? 'active-dash' : ''}`}
-              >
-                <LayoutDashboard size={15} />
-                <span>Dashboard</span>
-              </button>
+            currentMember?.seller_status === 'active' ? (
+              <div className="user-logged-group">
+                <button
+                  onClick={() => setCurrentPage('dashboard')}
+                  className={`btn btn-primary btn-sm ${currentPage === 'dashboard' ? 'active-dash' : ''}`}
+                >
+                  <LayoutDashboard size={15} />
+                  <span>Dashboard</span>
+                </button>
 
-              <div 
-                className="user-pill-mini"
-                onClick={() => setCurrentPage('profile')}
-                style={{ cursor: 'pointer' }}
-                title="View Partner Profile & KYC"
-              >
-                <img 
-                  src={currentMember?.avatar || '/matru-avatar.jpg'} 
-                  alt="Avatar" 
-                  className="user-avatar-mini"
-                />
-                <div className="user-mini-info">
-                  <span className="user-mini-name">{currentMember?.name?.split(' ')[0] || 'Partner'}</span>
-                  <span className="user-mini-rank">{currentMember?.rank || 'Partner'}</span>
+                <div 
+                  className="user-pill-mini"
+                  onClick={() => setCurrentPage('profile')}
+                  style={{ cursor: 'pointer' }}
+                  title="View Partner Profile & KYC"
+                >
+                  <img 
+                    src={currentMember?.avatar || '/matru-avatar.jpg'} 
+                    alt="Avatar" 
+                    className="user-avatar-mini"
+                  />
+                  <div className="user-mini-info">
+                    <span className="user-mini-name">{currentMember?.name?.split(' ')[0] || 'Partner'}</span>
+                    <span className="user-mini-rank">{currentMember?.rank || 'Partner'}</span>
+                  </div>
                 </div>
-              </div>
 
-              <button
-                onClick={logout}
-                className="btn btn-secondary btn-sm sign-out-btn"
-                title="Sign Out to Visitor Mode"
-              >
-                <LogOut size={14} />
-                <span>Sign Out</span>
-              </button>
-            </div>
+                <button
+                  onClick={logout}
+                  className="btn btn-secondary btn-sm sign-out-btn"
+                  title="Sign Out to Visitor Mode"
+                >
+                  <LogOut size={14} />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            ) : (
+              <div className="user-logged-group">
+                <button
+                  onClick={() => setCurrentPage('dashboard')}
+                  className="btn btn-outline-warning btn-sm flex-center gap-1"
+                  title="Awaiting Admin Approval"
+                >
+                  <Clock size={14} className="text-amber" />
+                  <span>Activation Pending</span>
+                </button>
+
+                <button
+                  onClick={logout}
+                  className="btn btn-secondary btn-sm sign-out-btn"
+                  title="Sign Out to Visitor Mode"
+                >
+                  <LogOut size={14} />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )
           ) : (
             <div className="auth-buttons-group">
               <button
@@ -197,38 +219,69 @@ export default function Navbar() {
 
             <div className="mobile-drawer-actions">
               {isLoggedIn ? (
-                <>
-                  <div className="mobile-user-profile-card" onClick={() => handleNavClick('profile')}>
-                    <img 
-                      src={currentMember?.avatar || '/matru-avatar.jpg'} 
-                      alt="Avatar" 
-                      className="user-avatar-mini"
-                    />
-                    <div>
-                      <div className="font-bold text-sm">{currentMember?.name}</div>
-                      <div className="text-muted font-xs">{currentMember?.rank} • {currentMember?.email}</div>
+                currentMember?.seller_status === 'active' ? (
+                  <>
+                    <div className="mobile-user-profile-card" onClick={() => handleNavClick('profile')}>
+                      <img 
+                        src={currentMember?.avatar || '/matru-avatar.jpg'} 
+                        alt="Avatar" 
+                        className="user-avatar-mini"
+                      />
+                      <div>
+                        <div className="font-bold text-sm">{currentMember?.name}</div>
+                        <div className="text-muted font-xs">{currentMember?.rank} • {currentMember?.email}</div>
+                      </div>
                     </div>
-                  </div>
 
-                  <button
-                    onClick={() => handleNavClick('dashboard')}
-                    className="btn btn-primary full-width"
-                  >
-                    <LayoutDashboard size={16} />
-                    <span>Open Partner Dashboard</span>
-                  </button>
+                    <button
+                      onClick={() => handleNavClick('dashboard')}
+                      className="btn btn-primary full-width"
+                    >
+                      <LayoutDashboard size={16} />
+                      <span>Open Partner Dashboard</span>
+                    </button>
 
-                  <button
-                    onClick={() => {
-                      logout();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="btn btn-secondary full-width text-rose"
-                  >
-                    <LogOut size={16} />
-                    <span>Sign Out (Visitor Mode)</span>
-                  </button>
-                </>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="btn btn-secondary full-width text-rose"
+                    >
+                      <LogOut size={16} />
+                      <span>Sign Out (Visitor Mode)</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="mobile-user-pending-card">
+                      <Clock size={20} className="text-amber" />
+                      <div>
+                        <div className="font-bold text-sm text-white">Activation In Progress</div>
+                        <div className="text-amber font-xs">Profile & Referral locked awaiting Admin approval</div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleNavClick('dashboard')}
+                      className="btn btn-outline-warning full-width"
+                    >
+                      <Clock size={16} />
+                      <span>View Activation Status</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="btn btn-secondary full-width text-rose"
+                    >
+                      <LogOut size={16} />
+                      <span>Sign Out (Visitor Mode)</span>
+                    </button>
+                  </>
+                )
               ) : (
                 <div className="mobile-auth-grid">
                   <button
