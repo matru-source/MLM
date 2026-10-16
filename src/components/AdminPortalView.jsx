@@ -32,6 +32,7 @@ import {
 export default function AdminPortalView() {
   const { 
     navigateToUserSite, 
+    logoutAdmin,
     orders, 
     members, 
     transactions, 
@@ -252,13 +253,23 @@ export default function AdminPortalView() {
           </div>
         </div>
 
-        <button
-          onClick={navigateToUserSite}
-          className="btn btn-secondary btn-sm admin-exit-btn"
-        >
-          <ArrowLeft size={16} />
-          <span>Exit to User Website</span>
-        </button>
+        <div className="flex-center gap-2">
+          <button
+            onClick={logoutAdmin}
+            className="btn btn-secondary btn-sm admin-exit-btn"
+            title="Lock executive console and require passphrase"
+          >
+            <Lock size={15} />
+            <span>Lock Console</span>
+          </button>
+          <button
+            onClick={navigateToUserSite}
+            className="btn btn-secondary btn-sm admin-exit-btn"
+          >
+            <ArrowLeft size={16} />
+            <span>Exit to User Website</span>
+          </button>
+        </div>
       </header>
 
       {/* Admin Body Content */}

@@ -13,6 +13,7 @@ import { provisionDualAccounts } from '../services/accountProvisioningService';
 import {
   dbFetchMembers,
   dbRegisterMember,
+  dbUpdateMemberPassword,
   dbFetchActivations,
   dbCreateActivation,
   dbApproveActivation,
@@ -27,6 +28,7 @@ import {
   dbUpdateKyc,
   dbFetchZexLinkStatus
 } from '../services/neonDbService';
+import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
 
 const MlmContext = createContext(null);
 
@@ -74,6 +76,52 @@ export function MlmProvider({ children }) {
       window.location.hash = '';
     }
     setIsAdminMode(false);
+  };
+
+  // Dedicated Admin Executive Authentication Gate
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
+    try {
+      return sessionStorage.getItem('cybershield_admin_auth') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const loginAdmin = ({ username, password }) => {
+    const cleanUser = (username || '').trim().toLowerCase();
+    const authorizedAdmins = [
+      'admin@cybershield.network', 
+      'matruprasadpanda497@gmail.com', 
+      'admin', 
+      'matru'
+    ];
+    // Master executive passphrases
+    const validPassphrases = ['CyberShield#Admin2026!', 'Admin@2026#CS'];
+
+    const isUserValid = authorizedAdmins.includes(cleanUser);
+    const isPassValid = validPassphrases.includes(password);
+
+    if (isUserValid && isPassValid) {
+      setIsAdminAuthenticated(true);
+      try {
+        sessionStorage.setItem('cybershield_admin_auth', 'true');
+      } catch (e) {}
+      return { ok: true };
+    }
+
+    return { 
+      ok: false, 
+      error: 'Invalid administrator credentials. Access to executive console denied.' 
+    };
+  };
+
+  const logoutAdmin = () => {
+    setIsAdminAuthenticated(false);
+    try {
+      sessionStorage.removeItem('cybershield_admin_auth');
+    } catch (e) {}
+    navigateToUserSite();
+    addToast('info', 'Admin Console Locked', 'Executive session terminated.');
   };
 
   // User navigation state: 'home', 'plans', 'compensation', 'dashboard', 'network', 'wallet', 'subscriptions', 'profile'
@@ -820,13 +868,15 @@ export function MlmProvider({ children }) {
   };
 
   // Register New User (Step 2 of Brevo Email OTP verification)
-  const registerUser = ({ fullName, email, mobile, password, sponsorId, sponsorMemberId, sponsorName, isSeller }) => {
+  const registerUser = async ({ fullName, email, mobile, password, sponsorId, sponsorMemberId, sponsorName, isSeller }) => {
     const newMemberId = generateId('mem');
+    const passwordHash = password ? await hashPassword(password) : '';
     const newMember = {
       member_id: newMemberId,
       name: fullName,
       email: email,
       phone: mobile,
+      password: passwordHash, // Cryptographically hashed with salt (SHA-256)
       avatar: '/matru-avatar.jpg',
       rank: isSeller ? 'Partner (Pending Plan Purchase)' : 'Customer',
       cs_customer_id: `CS${Math.floor(10000000 + Math.random() * 90000000)}`,
@@ -866,7 +916,7 @@ export function MlmProvider({ children }) {
     localStorage.setItem('cybershield_isLoggedIn', 'true');
     setIsAuthModalOpen(false);
 
-    // Persist to live Neon PostgreSQL
+    // Persist to live Neon PostgreSQL with cryptographically hashed password
     dbRegisterMember(newMember).catch(err => console.warn('[Neon DB] dbRegisterMember error:', err));
 
     addToast('success', 'Email Verified & Account Created!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
@@ -997,12 +1047,16 @@ export function MlmProvider({ children }) {
     return true;
   };
 
-  // Login as existing member by email or ID
-  const loginUserByEmail = ({ email, password }) => {
+  // Login as existing member by email or ID with Cryptographic Password Verification
+  const loginUserByEmail = async ({ email, password }) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     if (!cleanEmail) {
       return { ok: false, error: 'Please enter your registered email address.' };
     }
+    if (!password) {
+      return { ok: false, error: 'Please enter your account password.' };
+    }
+
     const found = members.find(m => 
       (m.email && m.email.toLowerCase() === cleanEmail) ||
       (m.member_id && m.member_id.toLowerCase() === cleanEmail) ||
@@ -1013,6 +1067,29 @@ export function MlmProvider({ children }) {
         ok: false, 
         error: `No partner account found with email "${cleanEmail}". Please check your email or click "Create Account".` 
       };
+    }
+
+    // Secure Password Verification
+    if (found.password) {
+      const isValid = await verifyPassword(password, found.password);
+      if (!isValid) {
+        return {
+          ok: false,
+          error: 'Incorrect password. Please verify your credentials and try again.'
+        };
+      }
+    } else {
+      // Legacy member migration: If account was created before password hashing was enforced,
+      // require at least 6 characters and securely set/upgrade their password hash now.
+      if (password.length < 6) {
+        return {
+          ok: false,
+          error: 'Account requires establishing a secure password of at least 6 characters.'
+        };
+      }
+      const newHash = await hashPassword(password);
+      found.password = newHash;
+      dbUpdateMemberPassword(found.member_id, newHash).catch(err => console.warn('[Neon DB] dbUpdateMemberPassword error:', err));
     }
 
     setCurrentMemberId(found.member_id);
@@ -1103,6 +1180,9 @@ export function MlmProvider({ children }) {
   return (
     <MlmContext.Provider value={{
       isAdminMode,
+      isAdminAuthenticated,
+      loginAdmin,
+      logoutAdmin,
       navigateToAdmin,
       navigateToUserSite,
       currentPage,

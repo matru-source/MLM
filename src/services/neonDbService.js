@@ -6,18 +6,10 @@ import { neon } from '@neondatabase/serverless';
  * with base64 encoded fallback to prevent GitHub Secret Scanning push rejection.
  */
 function getDatabaseUrl() {
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    if (import.meta.env.VITE_DATABASE_URL) return import.meta.env.VITE_DATABASE_URL;
-    if (import.meta.env.DATABASE_URL) return import.meta.env.DATABASE_URL;
-  }
   if (typeof process !== 'undefined' && process.env?.DATABASE_URL) {
     return process.env.DATABASE_URL;
   }
-  try {
-    return atob('cG9zdGdyZXNxbDovL25lb25kYl9vd25lcjpucGdfckVnVEZDTHdEcTM2QGVwLWF1dHVtbi1tb2RlLWExdGp5bnNiLXBvb2xlci5hcC1zb3V0aGVhc3QtMS5hd3MubmVvbi50ZWNoL25lb25kYj9zc2xtb2RlPXJlcXVpcmUmY2hhbm5lbF9iaW5kaW5nPXJlcXVpcmU=');
-  } catch (e) {
-    return '';
-  }
+  return '';
 }
 
 const dbUrl = getDatabaseUrl();
@@ -110,6 +102,24 @@ export async function dbRegisterMember(member) {
     return { ok: true, data: rows[0] };
   } catch (err) {
     console.error('[Neon DB] dbRegisterMember error:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * 2b. Securely Update Member Password Hash in Neon PostgreSQL
+ */
+export async function dbUpdateMemberPassword(memberId, passwordHash) {
+  if (!sql) return { ok: false, error: 'Database connection not configured' };
+  try {
+    await sql`
+      UPDATE members 
+      SET password = ${passwordHash}
+      WHERE id = ${memberId};
+    `;
+    return { ok: true };
+  } catch (err) {
+    console.warn('[Neon DB] dbUpdateMemberPassword error:', err);
     return { ok: false, error: err.message };
   }
 }

@@ -5,6 +5,7 @@ import PublicHome from './components/PublicHome';
 import MemberDashboardView from './components/MemberDashboardView';
 import PendingActivationView from './components/PendingActivationView';
 import AdminPortalView from './components/AdminPortalView';
+import AdminLoginModal from './components/AdminLoginModal';
 import CheckoutModal from './components/CheckoutModal';
 import AuthModal from './components/AuthModal';
 import ReferralBanner from './components/ReferralBanner';
@@ -15,6 +16,7 @@ import './App.css';
 function MainApp() {
   const { 
     isAdminMode, 
+    isAdminAuthenticated,
     navigateToAdmin, 
     currentPage, 
     setCurrentPage,
@@ -22,8 +24,16 @@ function MainApp() {
     isLoggedIn
   } = useMlm();
 
-  // If URL is /admin or #admin, render dedicated Admin Portal
+  // If URL is /admin or #admin, require executive authentication before unlocking Admin Portal
   if (isAdminMode) {
+    if (!isAdminAuthenticated) {
+      return (
+        <>
+          <AdminLoginModal />
+          <Toast />
+        </>
+      );
+    }
     return (
       <>
         <AdminPortalView />

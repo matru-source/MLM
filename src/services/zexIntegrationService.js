@@ -3,9 +3,7 @@ import { generateRandomState, hashState, callbackStateMatches } from '../lib/zex
 import { randomUUID } from 'node:crypto';
 
 function getSql() {
-  const dbUrl = process.env.DATABASE_URL || 
-                process.env.VITE_DATABASE_URL || 
-                (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_DATABASE_URL : null);
+  const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) throw new Error('Database connection not configured');
   return neon(dbUrl);
 }

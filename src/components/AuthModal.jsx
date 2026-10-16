@@ -10,7 +10,9 @@ import {
   RotateCcw, 
   AlertCircle,
   Settings,
-  Lock
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   sendEmailOtp, 
@@ -42,6 +44,7 @@ export default function AuthModal() {
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   // Mandatory Sponsor Code: Auto-fills from URL referral, otherwise requires user to enter valid sponsor
   const [sponsorId, setSponsorId] = useState(() => activeReferral || '');
   const [sponsorError, setSponsorError] = useState('');
@@ -194,7 +197,7 @@ export default function AuthModal() {
   };
 
   // Handle Step 2: Verify OTP and Register
-  const handleVerifyOtpAndRegister = (e) => {
+  const handleVerifyOtpAndRegister = async (e) => {
     e.preventDefault();
     if (otpInput.trim().length !== 6) {
       setOtpErrorMessage('Please enter the complete 6-digit verification code.');
@@ -212,7 +215,7 @@ export default function AuthModal() {
     const verifiedSponsor = sponsorCheck.valid ? sponsorCheck.member : null;
 
     // OTP Verified! Register user and advance to plan purchase
-    registerUser({
+    await registerUser({
       fullName: fullName.trim(),
       email: email.trim(),
       mobile: (mobile || '').replace(/\D/g, ''),
@@ -232,8 +235,8 @@ export default function AuthModal() {
     }, 400);
   };
 
-  // Handle Login submission
-  const handleLoginSubmit = (e) => {
+  // Handle Login submission with Cryptographic Password Verification
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setLoginErrorMessage('');
 
@@ -248,7 +251,7 @@ export default function AuthModal() {
     }
 
     if (loginUserByEmail) {
-      const result = loginUserByEmail({ email, password });
+      const result = await loginUserByEmail({ email, password });
       if (!result || !result.ok) {
         const errorMsg = result?.error || 'Invalid credentials or account not found.';
         setLoginErrorMessage(errorMsg);
@@ -343,14 +346,24 @@ export default function AuthModal() {
 
                 <div className="form-group-clean">
                   <label className="form-label-clean">Create Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create a secure password"
-                    className="form-input-clean"
-                  />
+                  <div className="relative-input-wrapper">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Create a secure password (min 6 chars)"
+                      className="form-input-clean pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="input-eye-btn"
+                      aria-label="Toggle password visibility"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="form-group-clean">
@@ -591,14 +604,24 @@ export default function AuthModal() {
 
               <div className="form-group-clean">
                 <label className="form-label-clean">Password</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  className="form-input-clean"
-                />
+                <div className="relative-input-wrapper">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    className="form-input-clean pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="input-eye-btn"
+                    aria-label="Toggle password visibility"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <button type="submit" className="btn btn-primary full-width btn-lg mt-3 flex-center gap-2">

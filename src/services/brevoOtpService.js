@@ -7,15 +7,10 @@ const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 const STORAGE_KEY_API_KEY = 'cybershield_brevo_api_key';
 const STORAGE_KEY_SENDER = 'cybershield_brevo_sender_email';
 
-export const DEFAULT_BREVO_API_KEY = [
-  'xkeysib',
-  'dd33eaf971b87fe9c47207ffbd40162ab62ba051aef7b9c470a868f2d80aa1de',
-  '4Ox39uAx9VJx2FQA'
-].join('-');
 export const DEFAULT_BREVO_SENDER = 'matruprasadpanda497@gmail.com';
 
 export function getBrevoApiKey() {
-  return localStorage.getItem(STORAGE_KEY_API_KEY) || import.meta.env.VITE_BREVO_API_KEY || DEFAULT_BREVO_API_KEY;
+  return localStorage.getItem(STORAGE_KEY_API_KEY) || '';
 }
 
 export function setBrevoApiKey(key) {
@@ -27,7 +22,7 @@ export function setBrevoApiKey(key) {
 }
 
 export function getBrevoSenderEmail() {
-  return localStorage.getItem(STORAGE_KEY_SENDER) || import.meta.env.VITE_BREVO_SENDER_EMAIL || DEFAULT_BREVO_SENDER;
+  return localStorage.getItem(STORAGE_KEY_SENDER) || DEFAULT_BREVO_SENDER;
 }
 
 export function setBrevoSenderEmail(email) {
@@ -61,10 +56,35 @@ export async function sendEmailOtp({ email, fullName }) {
   };
   sessionStorage.setItem(`cybershield_otp_${email.trim().toLowerCase()}`, JSON.stringify(verificationSession));
 
+  // 1. Primary Method: Dispatch via secure backend serverless API route (/api/auth/send-otp)
+  // This keeps the Brevo API key strictly in server environment variables without client exposure.
+  try {
+    const serverlessRes = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), fullName, otp: otpCode })
+    });
+    if (serverlessRes.ok) {
+      const serverlessData = await serverlessRes.json();
+      if (serverlessData.success || serverlessData.ok) {
+        return {
+          success: true,
+          mode: serverlessData.mode || 'serverless_brevo',
+          messageId: serverlessData.messageId,
+          otp: otpCode,
+          message: serverlessData.message || `Real verification OTP email dispatched to ${email} via secure serverless gateway!`
+        };
+      }
+    }
+  } catch (backendErr) {
+    // Backend endpoint not active in static client dev environment; continue to client-side fallback
+    console.debug('[Brevo Client] Backend serverless unavailable, falling back to client config:', backendErr?.message);
+  }
+
   const apiKey = getBrevoApiKey();
   const senderEmail = getBrevoSenderEmail();
 
-  // If live Brevo API key is provided, send real transactional email via Brevo API
+  // If live Brevo API key is configured in client settings, send via Brevo REST API
   if (apiKey) {
     try {
       const emailPayload = {
