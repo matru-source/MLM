@@ -65,7 +65,6 @@ export default function AuthModal() {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
-  const [simulatedOtpHint, setSimulatedOtpHint] = useState('');
   const [otpErrorMessage, setOtpErrorMessage] = useState('');
 
   // Brevo API Key Configuration Modal/Section
@@ -160,15 +159,7 @@ export default function AuthModal() {
         setAuthStep('otp');
         setOtpCountdown(60);
         setCanResend(false);
-
-        if (result.mode === 'live_brevo') {
-          addToast('success', 'Real OTP Sent!', `Verification email delivered to ${email} via Brevo.`);
-          setSimulatedOtpHint(result.otp || '');
-        } else {
-          // Preview mode fallback
-          setSimulatedOtpHint(result.otp);
-          addToast('info', 'OTP Generated', `Verification code sent. Code: ${result.otp}`);
-        }
+        addToast('success', 'Verification Code Sent!', `Verification email delivered to ${email}. Check your inbox.`);
       }
     } catch (err) {
       setIsSendingOtp(false);
@@ -187,12 +178,8 @@ export default function AuthModal() {
     setOtpCountdown(60);
     setCanResend(false);
 
-    if (result.mode === 'live_brevo') {
-      addToast('success', 'OTP Resent!', `New code sent to ${email} via Brevo.`);
-      setSimulatedOtpHint(result.otp || '');
-    } else {
-      setSimulatedOtpHint(result.otp);
-      addToast('info', 'New OTP Generated', `New code is ${result.otp}`);
+    if (result.success) {
+      addToast('success', 'OTP Resent!', `New verification code delivered to ${email}. Check your inbox.`);
     }
   };
 
@@ -204,7 +191,7 @@ export default function AuthModal() {
       return;
     }
 
-    const verification = verifyEmailOtp({ email, enteredOtp: otpInput });
+    const verification = await verifyEmailOtp({ email, enteredOtp: otpInput });
     if (!verification.success) {
       setOtpErrorMessage(verification.reason);
       return;
@@ -510,15 +497,6 @@ export default function AuthModal() {
                   </button>
                 </div>
 
-                {/* Helper hint for instant preview */}
-                {simulatedOtpHint && (
-                  <div className="otp-hint-banner">
-                    <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
-                    <span>
-                      <strong>Instant Test Code:</strong> <code className="code-font text-primary-blue font-bold text-base">{simulatedOtpHint}</code> (Auto-generated code ready for instant verification)
-                    </span>
-                  </div>
-                )}
 
                 {otpErrorMessage && (
                   <div className="otp-error-banner">

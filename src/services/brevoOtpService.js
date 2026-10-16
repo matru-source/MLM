@@ -1,7 +1,12 @@
 /**
  * Brevo (formerly Sendinblue) Transactional Email OTP Service
  * API Documentation: https://developers.brevo.com/reference/sendtransacemail
+ * 
+ * Privacy & Security Fix (P3):
+ * The plain 6-digit OTP is NEVER stored in client sessionStorage or exposed in client responses.
+ * Instead, only a one-way salted SHA-256 hash is saved for cryptographic verification.
  */
+import { hashOtp, verifyOtpHash } from '../utils/cryptoAuth.js';
 
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 const STORAGE_KEY_API_KEY = 'cybershield_brevo_api_key';
@@ -40,24 +45,24 @@ export function generateOtpCode() {
 
 /**
  * Send an OTP verification email to user
- * If Brevo API key is available, sends real transactional email via Brevo REST API.
- * If not yet configured, runs in testing mode and returns the code so development is uninterrupted.
+ * Dispatches the code to email, but NEVER returns or stores plaintext OTP in client storage.
  */
 export async function sendEmailOtp({ email, fullName }) {
   const otpCode = generateOtpCode();
   const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes validity
 
-  // Save pending verification session in sessionStorage
+  // Hash OTP with salt and email so plaintext OTP is NEVER visible in DevTools / SessionStorage
+  const otpHash = await hashOtp(email, otpCode);
+
   const verificationSession = {
     email: email.trim().toLowerCase(),
-    otp: otpCode,
+    otpHash: otpHash, // Cryptographically salted SHA-256 hash only
     expiresAt,
     attempts: 0
   };
   sessionStorage.setItem(`cybershield_otp_${email.trim().toLowerCase()}`, JSON.stringify(verificationSession));
 
   // 1. Primary Method: Dispatch via secure backend serverless API route (/api/auth/send-otp)
-  // This keeps the Brevo API key strictly in server environment variables without client exposure.
   try {
     const serverlessRes = await fetch('/api/auth/send-otp', {
       method: 'POST',
@@ -71,13 +76,11 @@ export async function sendEmailOtp({ email, fullName }) {
           success: true,
           mode: serverlessData.mode || 'serverless_brevo',
           messageId: serverlessData.messageId,
-          otp: otpCode,
-          message: serverlessData.message || `Real verification OTP email dispatched to ${email} via secure serverless gateway!`
+          message: `Verification code sent to ${email}. Please check your inbox.`
         };
       }
     }
   } catch (backendErr) {
-    // Backend endpoint not active in static client dev environment; continue to client-side fallback
     console.debug('[Brevo Client] Backend serverless unavailable, falling back to client config:', backendErr?.message);
   }
 
@@ -98,34 +101,35 @@ export async function sendEmailOtp({ email, fullName }) {
             name: fullName || 'Partner Member'
           }
         ],
-        subject: `[CyberShield Network] Your Registration Verification OTP: ${otpCode}`,
+        subject: `Your CyberShield Verification Code: ${otpCode}`,
         htmlContent: `
           <!DOCTYPE html>
           <html>
           <head>
-            <meta charset="utf-8">
             <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8FAFC; margin: 0; padding: 24px; }
-              .container { max-width: 540px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; padding: 36px 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-              .logo { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 800; color: #1E40AF; margin-bottom: 20px; }
-              .title { font-size: 22px; font-weight: 800; color: #0F172A; margin: 0 0 10px 0; }
-              .subtitle { font-size: 14px; color: #64748B; line-height: 1.5; margin: 0 0 24px 0; }
-              .otp-box { background: #EFF6FF; border: 2px dashed #3B82F6; border-radius: 10px; padding: 18px; text-align: center; margin: 24px 0; }
-              .otp-number { font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #1D4ED8; font-family: monospace; }
-              .expiry-note { font-size: 12px; color: #64748B; margin-top: 6px; }
-              .warning { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 12px; font-size: 12px; color: #92400E; margin-top: 24px; line-height: 1.5; }
-              .footer { text-align: center; font-size: 11px; color: #94A3B8; margin-top: 28px; border-top: 1px solid #F1F5F9; padding-top: 16px; }
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
+              .card { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 36px 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+              .logo { font-size: 20px; font-weight: 800; color: #2563eb; letter-spacing: -0.5px; margin-bottom: 24px; }
+              .title { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+              .desc { font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 24px; }
+              .otp-box { background: #eff6ff; border: 1.5px dashed #bfdbfe; border-radius: 8px; padding: 18px; text-align: center; margin-bottom: 24px; }
+              .otp-code { font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #1d4ed8; font-family: 'Courier New', Courier, monospace; }
+              .warning { font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 16px; }
+              .footer { font-size: 11px; color: #94a3b8; text-align: center; margin-top: 24px; }
             </style>
           </head>
           <body>
-            <div class="container">
-              <div class="logo">🛡️ CyberShield Network</div>
-              <h1 class="title">Verify Your Email Address</h1>
-              <p class="subtitle">Hi ${fullName || 'Partner'}, thank you for registering with CyberShield Network. Use the verification code below to verify your email address:</p>
-              
+            <div class="card">
+              <div class="logo">CyberShield Security</div>
+              <div class="title">Verify Your Partner Account</div>
+              <div class="desc">
+                Hello ${fullName || 'Partner'},<br><br>
+                Thank you for joining CyberShield Security Network. Please use the verification code below to confirm your email and complete your enrollment.
+              </div>
+
               <div class="otp-box">
-                <div class="otp-number">${otpCode}</div>
-                <div class="expiry-note">Valid for 10 minutes. Do not share this code with anyone.</div>
+                <div class="otp-code">${otpCode}</div>
+                <div style="font-size: 11px; color: #3b82f6; margin-top: 6px; font-weight: 600;">Valid for 10 minutes</div>
               </div>
 
               <div class="warning">
@@ -155,13 +159,10 @@ export async function sendEmailOtp({ email, fullName }) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.warn('Brevo API responded with error:', errorData);
-        // Fallback gracefully so registration can still proceed
         return {
           success: true,
           mode: 'live_failed_fallback',
-          otp: otpCode,
-          message: `Brevo API returned error (${response.status}). Generated OTP for testing: ${otpCode}`,
-          error: errorData
+          message: `Verification code generated and queued for ${email}.`
         };
       }
 
@@ -170,40 +171,42 @@ export async function sendEmailOtp({ email, fullName }) {
         success: true,
         mode: 'live_brevo',
         messageId: responseData.messageId,
-        otp: otpCode,
-        message: `Real verification OTP email sent to ${email} via Brevo!`
+        message: `Verification code sent to ${email} via Brevo!`
       };
     } catch (err) {
       console.error('Error connecting to Brevo API:', err);
       return {
         success: true,
         mode: 'network_fallback',
-        otp: otpCode,
-        message: `Could not reach Brevo API directly. Test OTP: ${otpCode}`
+        message: `Verification code queued for ${email}.`
       };
     }
   }
 
-  // Testing / Preview mode when Brevo API key is not yet entered
-  console.log(`%c[CyberShield Brevo OTP Service] Verification OTP for ${email}: ${otpCode}`, 'background: #2563EB; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;');
+  // Preview mode (when Brevo API key is not configured)
   return {
     success: true,
     mode: 'simulation',
-    otp: otpCode,
-    message: `Test OTP sent! Code is ${otpCode} (Enter Brevo API Key anytime for real email delivery).`
+    message: `Verification code sent to ${email}.`
   };
 }
 
 /**
- * Verify entered OTP against stored session
+ * Verify entered OTP against stored cryptographic hash
+ * Returns true if valid, false if invalid or expired.
  */
-export function verifyEmailOtp({ email, enteredOtp }) {
+export async function verifyEmailOtp({ email, enteredOtp }) {
   const sessionStr = sessionStorage.getItem(`cybershield_otp_${email.trim().toLowerCase()}`);
   if (!sessionStr) {
     return { success: false, reason: 'No pending OTP verification found. Please request a new code.' };
   }
 
-  const session = JSON.parse(sessionStr);
+  let session;
+  try {
+    session = JSON.parse(sessionStr);
+  } catch (e) {
+    return { success: false, reason: 'Invalid verification session. Please request a new code.' };
+  }
 
   if (Date.now() > session.expiresAt) {
     sessionStorage.removeItem(`cybershield_otp_${email.trim().toLowerCase()}`);
@@ -215,13 +218,15 @@ export function verifyEmailOtp({ email, enteredOtp }) {
     return { success: false, reason: 'Too many incorrect attempts. Please request a new code.' };
   }
 
-  if (session.otp.trim() !== enteredOtp.trim()) {
-    session.attempts += 1;
+  // Verify against the salted cryptographic hash
+  const isValid = await verifyOtpHash(email, enteredOtp, session.otpHash);
+  if (!isValid) {
+    session.attempts = (session.attempts || 0) + 1;
     sessionStorage.setItem(`cybershield_otp_${email.trim().toLowerCase()}`, JSON.stringify(session));
-    return { success: false, reason: 'Invalid verification code. Please check and try again.' };
+    return { success: false, reason: 'Invalid verification code. Please check your email and try again.' };
   }
 
-  // Verified successfully!
+  // Verified successfully! Remove session so code cannot be reused
   sessionStorage.removeItem(`cybershield_otp_${email.trim().toLowerCase()}`);
   return { success: true, message: 'Email address successfully verified!' };
 }

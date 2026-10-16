@@ -17,6 +17,7 @@ import confetti from 'canvas-confetti';
 
 export default function CheckoutModal({ isOpen, onClose, initialReferralCode = 'ZEX-ALEX99' }) {
   const {
+    currentMember,
     getMemberByReferral,
     processSubscriptionActivation,
     commissionRules,
@@ -24,9 +25,9 @@ export default function CheckoutModal({ isOpen, onClose, initialReferralCode = '
   } = useMlm();
 
   const [referralCode, setReferralCode] = useState(initialReferralCode);
-  const [name, setName] = useState('Rahul Deshmukh');
-  const [email, setEmail] = useState('rahul.deshmukh@example.com');
-  const [phone, setPhone] = useState('+91 98200 44556');
+  const [name, setName] = useState(currentMember?.name || '');
+  const [email, setEmail] = useState(currentMember?.email || '');
+  const [phone, setPhone] = useState(currentMember?.phone || '');
   const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);

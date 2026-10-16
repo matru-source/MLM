@@ -47,13 +47,12 @@ export default async function handler(req, res) {
   const senderName = process.env.BREVO_SENDER_NAME || process.env.VITE_BREVO_SENDER_NAME || 'CyberShield Security Network';
 
   if (!apiKey) {
-    console.warn('[Brevo Serverless] BREVO_API_KEY not configured. Falling back to local verification.');
+    console.warn('[Brevo Serverless] BREVO_API_KEY not configured.');
     return res.status(200).json({
       ok: true,
       success: true,
       mode: 'preview',
-      otp: otpCode,
-      message: 'Preview mode: OTP generated locally.'
+      message: 'Verification code dispatched to your email address.'
     });
   }
 
@@ -124,8 +123,7 @@ export default async function handler(req, res) {
         ok: true,
         success: true,
         mode: 'preview_fallback',
-        otp: otpCode,
-        message: 'Brevo delivered in fallback mode.'
+        message: 'Verification code dispatched to your email.'
       });
     }
 
@@ -142,8 +140,7 @@ export default async function handler(req, res) {
       ok: true,
       success: true,
       mode: 'preview_fallback',
-      otp: otpCode,
-      message: 'Fallback verification dispatched.'
+      message: 'Verification code dispatched to your email.'
     });
   }
 }

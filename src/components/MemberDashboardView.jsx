@@ -1233,8 +1233,12 @@ export default function MemberDashboardView() {
 
         {/* SUBVIEW 4: MY SUBSCRIPTIONS & ORDERS */}
         {activeTab === 'subscriptions' && (() => {
-          const myLatestOrder = orders.find(o => o.buyer_member_id === currentMember?.member_id) || orders[0];
-          const orderNum = myLatestOrder?.order_id || (currentMember?.cs_customer_id ? `CS${currentMember.cs_customer_id}` : 'CS-ACTIVE');
+          // Strictly isolate to current member's orders; NEVER leak orders[0] from other customers
+          const myLatestOrder = orders.find(o => 
+            (o.buyer_member_id && o.buyer_member_id === currentMember?.member_id) || 
+            (o.buyer_email && o.buyer_email === currentMember?.email)
+          );
+          const orderNum = myLatestOrder?.order_id || (currentMember?.cs_customer_id ? `CS${currentMember.cs_customer_id}` : (currentMember?.member_id ? `ORD-${currentMember.member_id.slice(-6).toUpperCase()}` : 'PENDING'));
           const orderDate = myLatestOrder?.activation_date || new Date(currentMember?.joined_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
           const renewalDate = myLatestOrder?.next_renewal || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
