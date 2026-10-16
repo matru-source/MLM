@@ -94,7 +94,6 @@ export default function AuthModal() {
       setAuthStep('form');
       setOtpInput('');
       setOtpErrorMessage('');
-      setSimulatedOtpHint('');
     }
   }, [isAuthModalOpen]);
 
