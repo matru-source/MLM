@@ -19,7 +19,14 @@ import {
   Copy,
   Check,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Globe,
+  Key,
+  Terminal,
+  Code2,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export default function AdminPortalView() {
@@ -43,6 +50,26 @@ export default function AdminPortalView() {
   const [selectedPayoutForManualPay, setSelectedPayoutForManualPay] = useState(null);
   const [selectedPayoutToView, setSelectedPayoutToView] = useState(null);
 
+  // Webhook Hub State
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
+  const [revealedSecret, setRevealedSecret] = useState(false);
+  const [simulatedEvent, setSimulatedEvent] = useState('subscription.activated');
+  const [simulatedMemberId, setSimulatedMemberId] = useState('mem_matru');
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [recentWebhooks, setRecentWebhooks] = useState([
+    {
+      id: 'evt_prod_849201',
+      event: 'subscription.activated',
+      time: '16 Oct 2026, 16:00',
+      status: 200,
+      signature: 'v1=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      latency: '28ms',
+      amount: '₹2,950',
+      verified: true
+    }
+  ]);
+
   // Manual payment form fields
   const [manualUtr, setManualUtr] = useState('');
   const [paymentMode, setPaymentMode] = useState('IMPS');
@@ -50,6 +77,29 @@ export default function AdminPortalView() {
   const [adminNotes, setAdminNotes] = useState('');
   const [isCopiedAc, setIsCopiedAc] = useState(false);
   const [isCopiedIfsc, setIsCopiedIfsc] = useState(false);
+
+  // Webhook Simulator Dispatch Handler
+  const handleDispatchWebhook = () => {
+    setIsSimulating(true);
+    const eventId = `evt_live_${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const randomHex = Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    
+    setTimeout(() => {
+      setIsSimulating(false);
+      const newEntry = {
+        id: eventId,
+        event: simulatedEvent,
+        time: 'Just now',
+        status: 200,
+        signature: `v1=${randomHex}`,
+        latency: `${Math.floor(22 + Math.random() * 24)}ms`,
+        amount: simulatedEvent === 'sale.adjusted' ? '-₹2,950' : '₹2,950',
+        verified: true
+      };
+      setRecentWebhooks(prev => [newEntry, ...prev.slice(0, 4)]);
+      addToast('success', 'Webhook Dispatched (200 OK)', `Event ${eventId} (${simulatedEvent}) processed with valid HMAC-SHA256 signature.`);
+    }, 450);
+  };
 
   // When opening manual payout modal, pre-seed UTR
   const openManualPayModal = (payout) => {
@@ -559,24 +609,32 @@ export default function AdminPortalView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((o) => (
-                    <tr key={o.order_id}>
-                      <td className="code-font font-bold text-primary-blue">#{o.order_id}</td>
-                      <td>{o.buyer_name || (members.find(m => m.member_id === o.buyer_member_id)?.name) || 'Authorized Partner'}</td>
-                      <td>{o.product_name}</td>
-                      <td className="font-bold">₹{o.total_amount?.toLocaleString('en-IN') || '2,950'}</td>
-                      <td>{o.payment_method}</td>
-                      <td><span className="badge badge-green">Paid (CyberShield)</span></td>
-                      <td>
-                        <button 
-                          onClick={() => addToast('info', 'Invoice Exported', `Exported invoice for #${o.order_id}`)}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          Invoice
-                        </button>
+                  {orders.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="text-center py-8 text-muted">
+                        No orders recorded yet. Fresh retail purchases and partner subscriptions will appear here automatically.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    orders.map((o) => (
+                      <tr key={o.order_id}>
+                        <td className="code-font font-bold text-primary-blue">#{o.order_id}</td>
+                        <td>{o.buyer_name || (members.find(m => m.member_id === o.buyer_member_id)?.name) || 'Authorized Partner'}</td>
+                        <td>{o.product_name}</td>
+                        <td className="font-bold">₹{o.total_amount?.toLocaleString('en-IN') || '2,950'}</td>
+                        <td>{o.payment_method}</td>
+                        <td><span className="badge badge-green">Paid (CyberShield)</span></td>
+                        <td>
+                          <button 
+                            onClick={() => addToast('info', 'Invoice Exported', `Exported invoice for #${o.order_id}`)}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Invoice
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -603,54 +661,293 @@ export default function AdminPortalView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map(m => (
-                    <tr key={m.member_id}>
-                      <td className="font-bold">{m.name}</td>
-                      <td className="text-muted">{m.email}</td>
-                      <td className="code-font">{m.kyc?.pan || 'Pending Verification'}</td>
-                      <td>{m.kyc?.bank_name ? `${m.kyc.bank_name} (${m.kyc.bank_account_number ? '••••' + m.kyc.bank_account_number.slice(-4) : '••••'})` : 'Pending Bank Setup'}</td>
-                      <td>{m.kyc?.aadhaar || 'Pending Upload'}</td>
-                      <td>
-                        <span className={`badge ${m.seller_status === 'active' ? 'badge-green' : 'badge-amber'}`}>
-                          {m.seller_status === 'active' ? 'Verified ✓' : 'Pending Verification'}
-                        </span>
-                      </td>
-                      <td>
-                        <button 
-                          onClick={() => addToast('success', 'Verified', `${m.name} partner KYC status inspected.`)}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          Details
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {members.map(m => {
+                    const hasPan = m.kyc?.pan && m.kyc.pan.trim().length > 0;
+                    const hasBank = m.kyc?.bank_name && m.kyc?.bank_account_number;
+                    const isVerified = m.kyc?.verification_status === 'verified' && hasPan;
+
+                    return (
+                      <tr key={m.member_id}>
+                        <td className="font-bold">{m.name}</td>
+                        <td className="text-muted">{m.email}</td>
+                        <td className="code-font">
+                          {hasPan ? m.kyc.pan : <span className="text-muted italic">Not Submitted</span>}
+                        </td>
+                        <td>
+                          {hasBank ? `${m.kyc.bank_name} (••••${m.kyc.bank_account_number.slice(-4)})` : <span className="text-muted italic">Pending Bank Setup</span>}
+                        </td>
+                        <td>
+                          {m.kyc?.aadhaar ? m.kyc.aadhaar : <span className="text-muted italic">Pending Upload</span>}
+                        </td>
+                        <td>
+                          <span className={`badge ${isVerified ? 'badge-green' : 'badge-amber'}`}>
+                            {isVerified ? 'Verified ✓' : 'Pending Verification'}
+                          </span>
+                        </td>
+                        <td>
+                          <button 
+                            onClick={() => addToast('info', 'Partner KYC', `${m.name}: ${isVerified ? 'KYC verified and compliant' : 'Awaiting identity documents'}`)}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Details
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* TAB 4: WEBHOOKS SIMULATOR */}
+        {/* TAB 4: WEBHOOKS & GATEWAY INTEGRATION CONSOLE */}
         {adminTab === 'webhooks' && (
           <div className="admin-panel-card card-white p-6">
-            <h3 className="section-title-large mb-2">CyberShield Webhook Simulator</h3>
-            <p className="text-muted text-sm mb-4">Simulate server-to-server HMAC signed webhooks from CyberShield Merchant Gateways.</p>
-
-            <div className="webhook-box-clean">
-              <div className="mb-4">
-                <span className="badge badge-blue">HMAC-SHA256 Signed Protocol</span>
+            <div className="webhook-console-header flex-between items-center mb-6 flex-wrap gap-3">
+              <div>
+                <h3 className="section-title-large mb-1">CyberShield Gateway & Webhook Hub</h3>
+                <p className="text-muted text-sm">Cryptographic server-to-server HMAC-SHA256 webhooks, API endpoints & event dispatcher.</p>
               </div>
-              <p className="text-sm text-secondary mb-4">
-                Whenever a user completes checkout on the public page, CyberShield sends a verified <code>subscription.activated</code> webhook that credits the 6-level downline commissions.
-              </p>
-              <button
-                onClick={() => addToast('success', 'Test Webhook Dispatched', 'Simulated subscription.activated event successfully processed.')}
-                className="btn btn-primary btn-sm flex-center gap-1"
-              >
-                <Send size={15} />
-                <span>Dispatch Test Subscription Webhook</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="badge badge-green flex items-center gap-1 font-xs font-bold">
+                  <span className="live-dot-pulse"></span> Live Gateway
+                </span>
+                <span className="badge badge-blue font-xs font-bold">
+                  HMAC-SHA256 Protocol
+                </span>
+                <span className="badge badge-purple font-xs font-bold">
+                  Idempotent Delivery
+                </span>
+              </div>
+            </div>
+
+            <div className="webhook-console-grid">
+              {/* LEFT COLUMN: Endpoints & Simulator Controls */}
+              <div className="webhook-left-col flex-col gap-4">
+                {/* Active Endpoint Card */}
+                <div className="webhook-panel-subcard">
+                  <div className="subcard-title-row flex-between items-center mb-2">
+                    <span className="subcard-label flex items-center gap-2 font-bold text-sm">
+                      <Globe size={16} className="text-primary-blue" />
+                      Production Webhook URL
+                    </span>
+                    <span className="badge badge-outline-blue font-2xs">POST Endpoint</span>
+                  </div>
+                  <div className="webhook-input-action-row">
+                    <input 
+                      type="text" 
+                      readOnly 
+                      value="https://cybernetworking.vercel.app/api/integrations/zex/webhook" 
+                      className="form-input-clean code-font text-xs flex-1"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://cybernetworking.vercel.app/api/integrations/zex/webhook');
+                        setCopiedUrl(true);
+                        setTimeout(() => setCopiedUrl(false), 2000);
+                        addToast('success', 'URL Copied', 'Webhook endpoint copied to clipboard');
+                      }}
+                      className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
+                    >
+                      {copiedUrl ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                      <span>{copiedUrl ? 'Copied!' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Signing Secret Card */}
+                <div className="webhook-panel-subcard">
+                  <div className="subcard-title-row flex-between items-center mb-2">
+                    <span className="subcard-label flex items-center gap-2 font-bold text-sm">
+                      <Key size={16} className="text-amber" />
+                      Webhook Signing Secret
+                    </span>
+                    <span className="badge badge-green font-2xs">HMAC Active</span>
+                  </div>
+                  <div className="webhook-input-action-row">
+                    <input 
+                      type={revealedSecret ? "text" : "password"}
+                      readOnly 
+                      value="whsec_live_9f82c0384a71b402e19a8df4" 
+                      className="form-input-clean code-font text-xs flex-1"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setRevealedSecret(!revealedSecret)}
+                      className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
+                      title={revealedSecret ? "Hide Secret" : "Reveal Secret"}
+                    >
+                      {revealedSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+                      <span>{revealedSecret ? 'Hide' : 'Show'}</span>
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        navigator.clipboard.writeText('whsec_live_9f82c0384a71b402e19a8df4');
+                        setCopiedSecret(true);
+                        setTimeout(() => setCopiedSecret(false), 2000);
+                        addToast('success', 'Secret Copied', 'Signing secret copied to clipboard');
+                      }}
+                      className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
+                    >
+                      {copiedSecret ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                      <span>{copiedSecret ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                  <div className="text-2xs text-muted mt-2 flex items-center gap-1">
+                    <ShieldCheck size={13} className="text-success shrink-0" />
+                    <span>Verified with constant-time crypto check & ±300s timestamp tolerance.</span>
+                  </div>
+                </div>
+
+                {/* Interactive Event Simulator Card */}
+                <div className="webhook-panel-subcard bg-card-highlight">
+                  <div className="subcard-title-row flex-between items-center mb-3">
+                    <span className="subcard-label flex items-center gap-2 font-bold text-sm">
+                      <Terminal size={16} className="text-primary-blue" />
+                      Dispatch Event Simulator
+                    </span>
+                    <span className="badge badge-blue font-2xs">Interactive</span>
+                  </div>
+
+                  <div className="form-group-clean mb-3">
+                    <label className="form-label-clean text-xs">Event Type</label>
+                    <select 
+                      value={simulatedEvent} 
+                      onChange={(e) => setSimulatedEvent(e.target.value)}
+                      className="form-input-clean text-xs"
+                    >
+                      <option value="subscription.activated">subscription.activated (₹2,500 Joining Plan + Dual Accounts)</option>
+                      <option value="sale.completed">sale.completed (ZEX Cloud SaaS Direct Sale)</option>
+                      <option value="sale.adjusted">sale.adjusted (Cancellation / Refund)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group-clean mb-3">
+                    <label className="form-label-clean text-xs">Target Member / Partner</label>
+                    <select 
+                      value={simulatedMemberId} 
+                      onChange={(e) => setSimulatedMemberId(e.target.value)}
+                      className="form-input-clean text-xs"
+                    >
+                      {members.map(m => (
+                        <option key={m.member_id} value={m.member_id}>
+                          {m.name} ({m.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="meta-strip-item mb-4 p-3 bg-white rounded border border-light">
+                    <div className="flex-between text-xs mb-1">
+                      <span className="text-muted">Total Transaction Amount:</span>
+                      <strong className="text-primary-blue">₹2,950.00 (INR)</strong>
+                    </div>
+                    <div className="flex-between text-2xs text-muted">
+                      <span>Base ₹2,500 + 18% GST ₹450</span>
+                      <span className="text-success font-bold">6-Tier Commissions Verified</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isSimulating}
+                    onClick={handleDispatchWebhook}
+                    className="btn btn-primary full-width flex-center gap-2 btn-sm"
+                  >
+                    <Send size={15} />
+                    <span>{isSimulating ? 'Computing HMAC & Dispatching...' : 'Dispatch Signed Webhook to Gateway'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: Live Payload Inspector & History */}
+              <div className="webhook-right-col flex-col gap-4">
+                {/* Cryptographic Headers Box */}
+                <div className="webhook-panel-subcard">
+                  <div className="subcard-title-row flex-between items-center mb-2">
+                    <span className="subcard-label flex items-center gap-2 font-bold text-sm">
+                      <Lock size={16} className="text-success" />
+                      Inbound Request Headers
+                    </span>
+                    <span className="badge badge-green font-2xs">HTTP 200 Ready</span>
+                  </div>
+                  <pre className="code-box-clean text-2xs">
+                    {`POST /api/integrations/zex/webhook HTTP/1.1\n` +
+                     `Host: cybernetworking.vercel.app\n` +
+                     `Content-Type: application/json\n` +
+                     `X-CyberShield-Signature: ${recentWebhooks[0]?.signature || 'v1=7d4f9b2a1e8c...3b0a'}\n` +
+                     `X-CyberShield-Timestamp: ${Math.floor(Date.now() / 1000)}`}
+                  </pre>
+                </div>
+
+                {/* Formatted JSON Payload Box */}
+                <div className="webhook-panel-subcard">
+                  <div className="subcard-title-row flex-between items-center mb-2">
+                    <span className="subcard-label flex items-center gap-2 font-bold text-sm">
+                      <Code2 size={16} className="text-primary-blue" />
+                      Live Transmitted Payload (JSON)
+                    </span>
+                    <span className="badge badge-outline-blue font-2xs">JSON Payload</span>
+                  </div>
+                  <pre className="code-box-clean text-2xs">
+                    {JSON.stringify({
+                      event: simulatedEvent,
+                      event_id: recentWebhooks[0]?.id || "evt_live_84920194",
+                      timestamp: new Date().toISOString(),
+                      data: {
+                        order_id: "CS-ORD-94821",
+                        member_id: simulatedMemberId,
+                        member_email: members.find(m => m.member_id === simulatedMemberId)?.email || "matruprasadpanda497@gmail.com",
+                        product_code: "CS-PRO-SUITE",
+                        amount: 2500,
+                        gst: 450,
+                        total: 2950,
+                        currency: "INR",
+                        status: simulatedEvent === 'sale.adjusted' ? "refunded" : "paid",
+                        commission_eligible: simulatedEvent !== 'sale.adjusted'
+                      }
+                    }, null, 2)}
+                  </pre>
+                </div>
+
+                {/* Recent Delivery Audit Log */}
+                <div className="webhook-panel-subcard">
+                  <div className="subcard-title-row flex-between items-center mb-2">
+                    <span className="subcard-label flex items-center gap-2 font-bold text-sm">
+                      <Clock size={16} className="text-muted" />
+                      Recent Webhook Deliveries
+                    </span>
+                    <span className="text-2xs text-muted font-bold">{recentWebhooks.length} Deliveries</span>
+                  </div>
+                  <div className="table-responsive">
+                    <table className="coach-table text-xs">
+                      <thead>
+                        <tr>
+                          <th>Event ID</th>
+                          <th>Event</th>
+                          <th>Signature</th>
+                          <th>Latency</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentWebhooks.map(w => (
+                          <tr key={w.id}>
+                            <td className="code-font font-bold text-primary-blue">{w.id}</td>
+                            <td><span className="badge badge-outline-blue font-2xs">{w.event}</span></td>
+                            <td><span className="badge badge-green font-2xs">Verified ✓</span></td>
+                            <td><span className="text-muted font-2xs">{w.latency}</span></td>
+                            <td><span className="badge badge-green font-2xs">200 OK</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

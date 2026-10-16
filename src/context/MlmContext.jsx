@@ -93,6 +93,19 @@ export function MlmProvider({ children }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('register'); // 'register' | 'login'
 
+  // Automatic cache version invalidator: Purges legacy test orders/activations
+  const DATA_VERSION = 'v2026_clean_live_prod_2';
+  if (typeof window !== 'undefined' && localStorage.getItem('cybershield_schema_version') !== DATA_VERSION) {
+    localStorage.removeItem('cybershield_orders');
+    localStorage.removeItem('cybershield_activations');
+    localStorage.removeItem('cybershield_payouts');
+    localStorage.removeItem('cybershield_txs');
+    localStorage.removeItem('cybershield_members');
+    localStorage.removeItem('cybershield_balance');
+    localStorage.removeItem('cybershield_earnings');
+    localStorage.setItem('cybershield_schema_version', DATA_VERSION);
+  }
+
   // Data State with persistence (CyberShield storage prefix)
   const getStored = (key, fallback) => {
     try {
