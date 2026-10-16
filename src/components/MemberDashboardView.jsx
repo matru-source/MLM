@@ -34,7 +34,9 @@ import {
   Link2,
   Zap,
   RefreshCw,
-  Upload
+  Upload,
+  Building,
+  Lock
 } from 'lucide-react';
 import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
 
