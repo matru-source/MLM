@@ -20,6 +20,8 @@ import {
   getBrevoApiKey, 
   setBrevoApiKey 
 } from '../services/brevoOtpService';
+import { hashPassword } from '../utils/cryptoAuth';
+import { dbUpdateMemberPassword } from '../services/neonDbService';
 
 export default function AuthModal() {
   const { 
@@ -87,6 +89,33 @@ export default function AuthModal() {
     }
     return () => clearInterval(timer);
   }, [authStep, otpCountdown]);
+
+  // Forgot Password State & Timer
+  const [forgotStep, setForgotStep] = useState('request'); // 'request' | 'verify'
+  const [resetOtp, setResetOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [isSendingResetOtp, setIsSendingResetOtp] = useState(false);
+  const [resetCountdown, setResetCountdown] = useState(60);
+  const [canResendReset, setCanResendReset] = useState(false);
+
+  useEffect(() => {
+    let timer;
+    if (authMode === 'forgot' && forgotStep === 'verify' && resetCountdown > 0) {
+      timer = setInterval(() => {
+        setResetCountdown(prev => {
+          if (prev <= 1) {
+            setCanResendReset(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [authMode, forgotStep, resetCountdown]);
 
   // Reset steps when modal opens/closes
   useEffect(() => {
@@ -259,6 +288,87 @@ export default function AuthModal() {
     addToast('success', 'Brevo API Configured', 'Brevo API key saved. Real transactional emails will be dispatched.');
   };
 
+  // Forgot Password: Step 1 - Send OTP to registered email
+  const handleSendResetCode = async (e) => {
+    e.preventDefault();
+    setForgotError('');
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setForgotError('Please enter a valid registered email address.');
+      return;
+    }
+
+    const foundMember = (members || []).find(m => m.email && m.email.toLowerCase() === cleanEmail);
+    if (!foundMember) {
+      setForgotError(`No registered partner account found with email "${cleanEmail}".`);
+      return;
+    }
+
+    setIsSendingResetOtp(true);
+    try {
+      const res = await sendEmailOtp({ email: cleanEmail, fullName: foundMember.name });
+      if (!res.success) {
+        setForgotError(res.message || 'Failed to dispatch password reset code.');
+        return;
+      }
+      setForgotStep('verify');
+      setResetCountdown(60);
+      setCanResendReset(false);
+      addToast('success', 'Reset Code Dispatched', `A 6-digit verification code has been sent to ${cleanEmail}`);
+    } catch (err) {
+      setForgotError(err.message);
+    } finally {
+      setIsSendingResetOtp(false);
+    }
+  };
+
+  // Forgot Password: Step 2 - Verify OTP & Set New Password
+  const handleConfirmResetPassword = async (e) => {
+    e.preventDefault();
+    setForgotError('');
+
+    if (!resetOtp || resetOtp.trim().length !== 6) {
+      setForgotError('Please enter the 6-digit verification code sent to your email.');
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      setForgotError('New password must contain at least 6 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setForgotError('Passwords do not match. Please verify and re-type.');
+      return;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const verification = await verifyEmailOtp({ email: cleanEmail, enteredOtp: resetOtp.trim() });
+    if (!verification.success) {
+      setForgotError(verification.reason || 'Invalid verification code.');
+      return;
+    }
+
+    const foundMember = (members || []).find(m => m.email && m.email.toLowerCase() === cleanEmail);
+    if (!foundMember) {
+      setForgotError('Account not found.');
+      return;
+    }
+
+    const newHash = await hashPassword(newPassword);
+    foundMember.password = newHash;
+    dbUpdateMemberPassword(foundMember.member_id, newHash).catch(err => console.warn('dbUpdateMemberPassword error:', err));
+
+    addToast('success', 'Password Reset Successful!', 'Your password has been updated. Please sign in with your new credentials.');
+    setPassword('');
+    setAuthMode('login');
+    setForgotStep('request');
+    setResetOtp('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+  };
+
   return (
     <div className="modal-overlay">
       <div className={`modal-box ${authMode === 'register' && authStep === 'form' ? 'auth-modal-wide' : 'auth-modal-width'}`}>
@@ -272,14 +382,20 @@ export default function AuthModal() {
           <h3 className="auth-title">
             {authMode === 'register' 
               ? (authStep === 'otp' ? 'Verify Email Address' : 'Create Partner Account') 
-              : 'Welcome Back'}
+              : authMode === 'forgot'
+                ? (forgotStep === 'verify' ? 'Set New Password' : 'Reset Account Password')
+                : 'Welcome Back'}
           </h3>
           <p className="auth-subtitle">
             {authMode === 'register' 
               ? (authStep === 'otp' 
                   ? `Enter the 6-digit verification code sent to ${email}`
                   : 'Join the authorized cyber defense network and earn multi-tier commissions.')
-              : 'Log in to access your partner dashboard, licenses, and payouts.'}
+              : authMode === 'forgot'
+                ? (forgotStep === 'verify'
+                    ? `Enter the 6-digit code sent to ${email} and choose your new password.`
+                    : 'Enter your registered email to receive a password reset verification code.')
+                : 'Log in to access your partner dashboard, licenses, and payouts.'}
           </p>
 
           <button onClick={() => setIsAuthModalOpen(false)} className="auth-modal-close-btn" aria-label="Close modal">
@@ -566,7 +682,7 @@ export default function AuthModal() {
                 </div>
               </form>
             )
-          ) : (
+          ) : authMode === 'login' ? (
             /* Login Mode */
             <form onSubmit={handleLoginSubmit}>
               {loginErrorMessage && (
@@ -588,7 +704,20 @@ export default function AuthModal() {
               </div>
 
               <div className="form-group-clean">
-                <label className="form-label-clean">Password</label>
+                <div className="flex-between items-center mb-1">
+                  <label className="form-label-clean mb-0">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('forgot');
+                      setForgotStep('request');
+                      setForgotError('');
+                    }}
+                    className="text-xs text-primary-blue bg-transparent border-0 cursor-pointer hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
                 <div className="relative-input-wrapper">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -629,6 +758,156 @@ export default function AuthModal() {
                 </button>
               </div>
             </form>
+          ) : (
+            /* Forgot Password Mode */
+            forgotStep === 'request' ? (
+              <form onSubmit={handleSendResetCode}>
+                {forgotError && (
+                  <div className="otp-error-banner mb-3" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 12px', borderRadius: '6px', color: '#EF4444', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{forgotError}</span>
+                  </div>
+                )}
+                <div className="form-group-clean">
+                  <label className="form-label-clean">Registered Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter registered email"
+                    className="form-input-clean"
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={isSendingResetOtp}
+                  className="btn btn-primary full-width btn-lg mt-4 flex-center gap-2"
+                >
+                  {isSendingResetOtp ? (
+                    <>
+                      <RotateCcw size={16} className="animate-spin" />
+                      <span>Sending Reset Code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail size={16} />
+                      <span>Send Password Reset Code</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="text-center mt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('login');
+                      setForgotError('');
+                    }}
+                    className="text-muted text-xs bg-transparent border-0 cursor-pointer hover:underline"
+                  >
+                    ← Back to Sign In
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleConfirmResetPassword}>
+                {forgotError && (
+                  <div className="otp-error-banner mb-3" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 12px', borderRadius: '6px', color: '#EF4444', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{forgotError}</span>
+                  </div>
+                )}
+                <div className="form-group-clean">
+                  <label className="form-label-clean">6-Digit Verification Code</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={resetOtp}
+                    onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Enter 6-digit OTP"
+                    className="form-input-clean code-font text-center font-bold"
+                    style={{ letterSpacing: '4px', fontSize: '1.1rem' }}
+                  />
+                </div>
+
+                <div className="form-group-clean">
+                  <label className="form-label-clean">New Password</label>
+                  <div className="relative-input-wrapper">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      className="form-input-clean pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="input-eye-btn"
+                      aria-label="Toggle password visibility"
+                    >
+                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group-clean">
+                  <label className="form-label-clean">Confirm New Password</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    placeholder="Re-type new password"
+                    className="form-input-clean"
+                  />
+                </div>
+
+                <div className="flex-between items-center mt-2 mb-3">
+                  {canResendReset ? (
+                    <button
+                      type="button"
+                      onClick={handleSendResetCode}
+                      className="text-xs text-primary-blue bg-transparent border-0 cursor-pointer hover:underline flex-center gap-1"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Resend Code</span>
+                    </button>
+                  ) : (
+                    <span className="text-muted text-xs">
+                      Resend code in <strong>{resetCountdown}s</strong>
+                    </span>
+                  )}
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="btn btn-primary full-width btn-lg mt-2 flex-center gap-2"
+                >
+                  <Key size={16} />
+                  <span>Reset & Update Password</span>
+                </button>
+
+                <div className="text-center mt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('login');
+                      setForgotError('');
+                    }}
+                    className="text-muted text-xs bg-transparent border-0 cursor-pointer hover:underline"
+                  >
+                    ← Cancel & Back to Sign In
+                  </button>
+                </div>
+              </form>
+            )
           )}
         </div>
       </div>

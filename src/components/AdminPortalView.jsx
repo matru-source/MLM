@@ -127,96 +127,27 @@ export default function AdminPortalView() {
     }
   };
 
-  // Helper to generate a realistic IMPS receipt screenshot
-  const handleAutoGenerateScreenshot = () => {
-    if (!selectedPayoutForManualPay) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 380;
-    const ctx = canvas.getContext('2d');
-
-    // Background
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, 600, 380);
-
-    // Top Header Banner
-    ctx.fillStyle = '#0F172A';
-    ctx.fillRect(0, 0, 600, 80);
-
-    ctx.fillStyle = '#10B981';
-    ctx.beginPath();
-    ctx.arc(46, 40, 20, 0, 2 * Math.PI);
-    ctx.fill();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('✓', 39, 47);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 18px sans-serif';
-    ctx.fillText('IMPS TRANSFER SUCCESSFUL', 80, 36);
-
-    ctx.font = '12px sans-serif';
-    ctx.fillStyle = '#94A3B8';
-    ctx.fillText('Corporate Banking Gateway • CyberShield Disbursements', 80, 56);
-
-    // Body content
-    ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('BENEFICIARY DETAILS', 40, 115);
-
-    ctx.font = '13px sans-serif';
-    ctx.fillStyle = '#64748B';
-    ctx.fillText('Beneficiary Name:', 40, 142);
-    ctx.fillText('Bank Name:', 40, 170);
-    ctx.fillText('Account Number:', 40, 198);
-    ctx.fillText('IFSC Code:', 40, 226);
-    ctx.fillText('UTR / Bank Reference:', 40, 254);
-    ctx.fillText('Transfer Mode:', 40, 282);
-
-    ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText(selectedPayoutForManualPay.bank_details?.account_holder || selectedPayoutForManualPay.member_name, 220, 142);
-    ctx.fillText(selectedPayoutForManualPay.bank_details?.bank_name || 'Bank', 220, 170);
-    ctx.fillText(selectedPayoutForManualPay.bank_details?.account_number || 'N/A', 220, 198);
-    ctx.fillText(selectedPayoutForManualPay.bank_details?.ifsc || 'N/A', 220, 226);
-    ctx.fillText(manualUtr || 'UTR-CS-REF', 220, 254);
-    ctx.fillText(paymentMode || 'IMPS', 220, 282);
-
-    // Bottom Amount Highlight
-    ctx.fillStyle = '#F8FAFC';
-    ctx.fillRect(20, 310, 560, 54);
-    ctx.strokeStyle = '#E2E8F0';
-    ctx.strokeRect(20, 310, 560, 54);
-
-    ctx.fillStyle = '#475569';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('NET DISBURSED AMOUNT:', 40, 342);
-
-    ctx.fillStyle = '#059669';
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(`₹${selectedPayoutForManualPay.net_payable.toLocaleString('en-IN')}`, 430, 344);
-
-    const dataUrl = canvas.toDataURL('image/png');
-    setScreenshotPreview(dataUrl);
-    addToast('success', 'Screenshot Generated', 'Official IMPS transfer confirmation screenshot created and attached.');
-  };
-
   const handleConfirmDisbursement = (e) => {
     e.preventDefault();
     if (!selectedPayoutForManualPay) return;
 
-    if (!manualUtr.trim()) {
-      addToast('error', 'UTR Missing', 'Please enter a valid Bank Reference / UTR Number.');
+    const cleanUtr = manualUtr.trim().toUpperCase();
+    if (!cleanUtr || cleanUtr.length < 8) {
+      addToast('error', 'UTR Missing or Invalid', 'Please enter a valid 8 to 22-digit Bank Reference / UTR Number from your corporate bank transfer.');
+      return;
+    }
+
+    if (!screenshotPreview) {
+      addToast('error', 'Bank Counterfoil Required', 'Compliance Requirement: Please attach the genuine bank transfer receipt/screenshot before confirming disbursement.');
       return;
     }
 
     approvePayout({
       payoutId: selectedPayoutForManualPay.id,
-      utrNumber: manualUtr,
+      utrNumber: cleanUtr,
       receiptUrl: screenshotPreview,
       paymentMode: paymentMode,
-      adminNotes: adminNotes
+      adminNotes: adminNotes || 'Disbursed via verified corporate net banking.'
     });
 
     setSelectedPayoutForManualPay(null);
@@ -1148,16 +1079,12 @@ export default function AdminPortalView() {
               {/* Screenshot Attachment Section */}
               <div className="form-group-clean">
                 <div className="screenshot-label-row">
-                  <label className="form-label-clean mb-0">Payment Confirmation Screenshot *</label>
-                  <button
-                    type="button"
-                    onClick={handleAutoGenerateScreenshot}
-                    className="btn btn-outline-blue btn-xs flex-center gap-1"
-                  >
-                    <ImageIcon size={12} />
-                    <span>Auto-Generate Verified IMPS Screenshot</span>
-                  </button>
+                  <label className="form-label-clean mb-0">Genuine Bank Payment Proof / Counterfoil *</label>
+                  <span className="badge badge-amber font-xs font-semibold">Banking Compliance Mandate</span>
                 </div>
+                <p className="text-muted font-xs mt-1 mb-2">
+                  Admin must disburse funds via corporate net banking / UPI and attach the authentic bank counterfoil. Simulated or fabricated receipts are strictly prohibited under financial audit rules.
+                </p>
 
                 <div className="upload-dropzone-box">
                   <input

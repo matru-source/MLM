@@ -1,779 +1,303 @@
-import { neon } from '@neondatabase/serverless';
+/**
+ * Live Neon PostgreSQL Bridge Service
+ * 
+ * Routes database operations securely through the serverless /api/db/sync endpoint.
+ * This guarantees:
+ * 1. Zero database credentials exposed in public client bundles.
+ * 2. Instant multi-device synchronization: When a user registers or pays on Phone A,
+ *    the Admin on Laptop B immediately sees them in real-time.
+ * 3. Graceful fallback when working offline.
+ */
+
+// Backwards-compatibility stub
+export const sql = null;
 
 /**
- * Neon PostgreSQL Serverless Connection Helper
- * Safe retrieval that uses environment variables first,
- * with base64 encoded fallback to prevent GitHub Secret Scanning push rejection.
+ * 0. Fetch Full Platform Sync (Members, Activations, Payouts, Orders, Transactions)
+ * Retrieves all core database entities in a single atomic network roundtrip.
  */
-function getDatabaseUrl() {
-  if (typeof process !== 'undefined' && process.env?.DATABASE_URL) {
-    return process.env.DATABASE_URL;
+export async function dbFetchAllSync() {
+  try {
+    const res = await fetch('/api/db/sync');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[Neon DB Bridge] dbFetchAllSync failed:', err.message);
+    return { ok: false, error: err.message };
   }
-  return '';
 }
 
-const dbUrl = getDatabaseUrl();
-export const sql = dbUrl ? neon(dbUrl) : null;
-
 /**
- * 1. Fetch All Members from Neon PostgreSQL
+ * 1. Fetch All Members
  */
 export async function dbFetchMembers() {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const rows = await sql`
-      SELECT 
-        id as member_id,
-        name,
-        email,
-        phone,
-        avatar,
-        rank,
-        cs_customer_id,
-        sponsor_member_id,
-        sponsor_code,
-        sponsor_name,
-        customer_status,
-        seller_status,
-        referral_code,
-        COALESCE(wallet_balance, 0)::numeric as wallet_balance,
-        COALESCE(total_earnings, 0)::numeric as total_earnings,
-        kyc_data as kyc,
-        software_license,
-        mlm_account,
-        created_at as joined_at
-      FROM members
-      ORDER BY created_at ASC;
-    `;
-    const formatted = rows.map(r => ({
-      ...r,
-      wallet_balance: Number(r.wallet_balance || 0),
-      total_earnings: Number(r.total_earnings || 0),
-      avatar: r.avatar || '/matru-avatar.jpg',
-      kyc: r.kyc || {},
-      software_license: r.software_license || null,
-      mlm_account: r.mlm_account || null
-    }));
-    return { ok: true, data: formatted };
+    const res = await fetch('/api/db/sync?type=members');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.warn('[Neon DB] dbFetchMembers error:', err);
+    console.warn('[Neon DB Bridge] dbFetchMembers error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 2. Save / Register a New Member to Neon PostgreSQL
+ * 2. Save / Register a New Member
  */
 export async function dbRegisterMember(member) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const rows = await sql`
-      INSERT INTO members (
-        id, name, email, phone, avatar, password, rank, 
-        cs_customer_id, sponsor_member_id, sponsor_code, sponsor_name,
-        customer_status, seller_status, referral_code, 
-        wallet_balance, total_earnings, kyc_data, created_at
-      ) VALUES (
-        ${member.member_id},
-        ${member.name},
-        ${member.email},
-        ${member.phone || ''},
-        ${member.avatar || '/matru-avatar.jpg'},
-        ${member.password || ''},
-        ${member.rank || 'Partner (Pending Plan Purchase)'},
-        ${member.cs_customer_id || 'CS' + Math.floor(10000000 + Math.random() * 90000000)},
-        ${member.sponsor_member_id || 'CS123456'},
-        ${member.sponsor_code || 'CS123456'},
-        ${member.sponsor_name || 'Authorized Partner'},
-        ${member.customer_status || 'registered'},
-        ${member.seller_status || 'pending_payment'},
-        ${member.referral_code || 'CS' + Math.floor(100000 + Math.random() * 900000)},
-        0,
-        0,
-        ${JSON.stringify(member.kyc || {})},
-        NOW()
-      )
-      ON CONFLICT (email) DO UPDATE SET
-        name = EXCLUDED.name,
-        phone = EXCLUDED.phone,
-        seller_status = EXCLUDED.seller_status
-      RETURNING *;
-    `;
-    return { ok: true, data: rows[0] };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'register_member', data: member })
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP error ${res.status}`);
+    }
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbRegisterMember error:', err);
+    console.error('[Neon DB Bridge] dbRegisterMember error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 2b. Securely Update Member Password Hash in Neon PostgreSQL
+ * 2b. Update Member Password Hash
  */
 export async function dbUpdateMemberPassword(memberId, passwordHash) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    await sql`
-      UPDATE members 
-      SET password = ${passwordHash}
-      WHERE id = ${memberId};
-    `;
-    return { ok: true };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_password', memberId, passwordHash })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.warn('[Neon DB] dbUpdateMemberPassword error:', err);
+    console.warn('[Neon DB Bridge] dbUpdateMemberPassword error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 3. Fetch All Activations from Neon PostgreSQL
+ * 3. Fetch All Pending Activations
  */
 export async function dbFetchActivations() {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const rows = await sql`
-      SELECT 
-        id,
-        member_id,
-        member_name,
-        member_email,
-        member_phone,
-        sponsor_code,
-        amount_paid::numeric,
-        gst_paid::numeric,
-        total_paid::numeric,
-        payment_method,
-        payment_ref,
-        utr_number,
-        status,
-        rejection_reason,
-        account1_mlm,
-        account2_software,
-        to_char(requested_at, 'DD Mon YYYY, HH12:MI AM') as requested_at,
-        to_char(approved_at, 'DD Mon YYYY, HH12:MI AM') as approved_at
-      FROM activations
-      ORDER BY requested_at DESC;
-    `;
-    const formatted = rows.map(r => ({
-      ...r,
-      amount_paid: Number(r.amount_paid || 2500),
-      gst_paid: Number(r.gst_paid || 450),
-      total_paid: Number(r.total_paid || 2950),
-      account1_mlm: r.account1_mlm || {},
-      account2_software: r.account2_software || {}
-    }));
-    return { ok: true, data: formatted };
+    const res = await fetch('/api/db/sync?type=activations');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.warn('[Neon DB] dbFetchActivations error:', err);
+    console.warn('[Neon DB Bridge] dbFetchActivations error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 4. Create an Activation Record in Neon PostgreSQL upon ₹2,500 Payment
+ * 4. Create an Activation Record upon ₹2,500 Payment
  */
 export async function dbCreateActivation(act) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    // 1. Prevent duplicate UTR replay attacks across activations and orders
-    if (act.utr_number && act.utr_number.trim()) {
-      const cleanUtr = act.utr_number.trim().toUpperCase();
-      const dupCheck = await sql`
-        SELECT id FROM (
-          SELECT id, utr_number FROM activations WHERE id != ${act.id}
-          UNION ALL
-          SELECT order_id as id, utr_number FROM orders WHERE order_id != ${act.payment_ref || ''}
-        ) combined
-        WHERE UPPER(utr_number) = ${cleanUtr}
-        LIMIT 1;
-      `;
-      if (dupCheck.length > 0) {
-        return { 
-          ok: false, 
-          error: `Duplicate UTR Error: Transaction reference "${cleanUtr}" has already been submitted.` 
-        };
-      }
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_activation', data: act })
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP error ${res.status}`);
     }
-
-    const rows = await sql`
-      INSERT INTO activations (
-        id, member_id, member_name, member_email, member_phone,
-        sponsor_code, amount_paid, gst_paid, total_paid,
-        payment_method, payment_ref, utr_number, status,
-        account1_mlm, account2_software, requested_at
-      ) VALUES (
-        ${act.id},
-        ${act.member_id},
-        ${act.member_name},
-        ${act.member_email},
-        ${act.member_phone},
-        ${act.sponsor_code || 'CS123456'},
-        ${act.amount_paid || 2500},
-        ${act.gst_paid || 450},
-        ${act.total_paid || 2950},
-        ${act.payment_method || 'UPI'},
-        ${act.payment_ref || ''},
-        ${act.utr_number || ''},
-        ${act.status || 'pending'},
-        ${JSON.stringify(act.account1_mlm || {})},
-        ${JSON.stringify(act.account2_software || {})},
-        NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        status = EXCLUDED.status,
-        utr_number = EXCLUDED.utr_number
-      RETURNING *;
-    `;
-
-    // Update member status to 'pending_approval' (awaits Admin bank verification)
-    await sql`
-      UPDATE members 
-      SET 
-        seller_status = 'pending_approval',
-        customer_status = 'active_subscriber'
-      WHERE id = ${act.member_id} OR email = ${act.member_email};
-    `;
-
-    return { ok: true, data: rows[0] };
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbCreateActivation error:', err);
+    console.error('[Neon DB Bridge] dbCreateActivation error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 5. Admin Approves Member Activation in Neon PostgreSQL
- * - Marks activation as 'approved'
- * - Activates member profile ('seller_status: active', 'rank: Active Partner')
- * - Credits ₹1,000 Level 1 retail commission to sponsor's wallet
- * - Records transaction in DB
+ * 5. Admin Approves Member Activation & Software License
  */
 export async function dbApproveActivation(activationId) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    // 1. Get activation details
-    const actRows = await sql`
-      SELECT * FROM activations WHERE id = ${activationId} LIMIT 1;
-    `;
-    if (actRows.length === 0) return { ok: false, error: 'Activation not found' };
-    const act = actRows[0];
-
-    // 2. Update activation status
-    await sql`
-      UPDATE activations
-      SET 
-        status = 'approved',
-        approved_at = NOW()
-      WHERE id = ${activationId};
-    `;
-
-    // 3. Activate member
-    await sql`
-      UPDATE members
-      SET 
-        seller_status = 'active',
-        rank = 'Active Partner',
-        customer_status = 'active_subscriber',
-        software_license = ${JSON.stringify(act.account2_software || {})},
-        mlm_account = ${JSON.stringify(act.account1_mlm || {})}
-      WHERE id = ${act.member_id} OR email = ${act.member_email};
-    `;
-
-    // 4. Update order subscription status if exists
-    await sql`
-      UPDATE orders
-      SET 
-        subscription_status = 'active',
-        activated_by = 'Admin Approved'
-      WHERE buyer_member_id = ${act.member_id} OR payment_ref = ${act.payment_ref};
-    `;
-
-    // 5. Multi-Tier 6-Level Commission Distribution across uplines
-    const tierRates = [
-      { level: 1, rate: 1000, desc: 'Retail Partner Commission (Level 1) - ₹2,500 Direct Activation from ' },
-      { level: 2, rate: 300, desc: 'Team Network Commission (Level 2) - 2nd Tier Activation from ' },
-      { level: 3, rate: 150, desc: 'Matrix Growth Bonus (Level 3) - 3rd Tier Activation from ' },
-      { level: 4, rate: 50, desc: 'Leadership Override (Level 4) - 4th Tier Activation from ' },
-      { level: 5, rate: 25, desc: 'Infinity Pool Bonus (Level 5) - 5th Tier Activation from ' },
-      { level: 6, rate: 25, desc: 'Network Executive Commission (Level 6) - 6th Tier Activation from ' }
-    ];
-
-    let currentSponsorCode = act.sponsor_code;
-    const visitedUplines = new Set();
-
-    for (let i = 0; i < tierRates.length; i++) {
-      if (!currentSponsorCode) break;
-
-      const uplineRows = await sql`
-        SELECT id, name, referral_code, sponsor_code, sponsor_member_id, wallet_balance, total_earnings 
-        FROM members 
-        WHERE referral_code = ${currentSponsorCode} OR id = ${currentSponsorCode}
-        LIMIT 1;
-      `;
-
-      if (uplineRows.length === 0) break;
-      const upline = uplineRows[0];
-
-      // Prevent loops
-      if (visitedUplines.has(upline.id)) break;
-      visitedUplines.add(upline.id);
-
-      const tier = tierRates[i];
-
-      // Atomic in-place balance and earnings increment (concurrency-safe, eliminates lost updates)
-      await sql`
-        UPDATE members
-        SET 
-          wallet_balance = COALESCE(wallet_balance, 0) + ${tier.rate},
-          total_earnings = COALESCE(total_earnings, 0) + ${tier.rate}
-        WHERE id = ${upline.id};
-      `;
-
-      // Record transaction in Neon DB
-      const txId = `tx_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`;
-      await sql`
-        INSERT INTO transactions (
-          id, member_id, description, amount, type, status, created_at
-        ) VALUES (
-          ${txId},
-          ${upline.id},
-          ${tier.desc + act.member_name},
-          ${tier.rate},
-          'credit',
-          'Available',
-          NOW()
-        );
-      `;
-
-      // Move to next upline in the hierarchy tree
-      currentSponsorCode = upline.sponsor_member_id || upline.sponsor_code;
-    }
-
-    return { ok: true };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve_activation', activationId })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbApproveActivation error:', err);
+    console.error('[Neon DB Bridge] dbApproveActivation error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 6. Admin Rejects Member Activation in Neon PostgreSQL
+ * 6. Admin Rejects Partner Activation
  */
 export async function dbRejectActivation(activationId, reason = 'Payment verification failed') {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const actRows = await sql`
-      SELECT * FROM activations WHERE id = ${activationId} LIMIT 1;
-    `;
-    if (actRows.length === 0) return { ok: false, error: 'Activation not found' };
-    const act = actRows[0];
-
-    await sql`
-      UPDATE activations
-      SET 
-        status = 'rejected',
-        rejection_reason = ${reason}
-      WHERE id = ${activationId};
-    `;
-
-    await sql`
-      UPDATE members
-      SET seller_status = 'rejected'
-      WHERE id = ${act.member_id} OR email = ${act.member_email};
-    `;
-
-    return { ok: true };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject_activation', activationId, reason })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbRejectActivation error:', err);
+    console.warn('[Neon DB Bridge] dbRejectActivation error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 7. Fetch Payout Requests from Neon PostgreSQL
+ * 7. Fetch Payout / Withdrawal Requests
  */
 export async function dbFetchPayoutRequests() {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const rows = await sql`
-      SELECT 
-        id,
-        member_id,
-        member_name,
-        member_email,
-        avatar,
-        amount::numeric,
-        tds_amount::numeric,
-        net_amount::numeric,
-        status,
-        bank_name,
-        bank_account,
-        bank_ifsc,
-        bank_details,
-        admin_payment,
-        utr_number,
-        screenshot_url,
-        to_char(requested_at, 'DD Mon YYYY, HH12:MI AM') as request_date,
-        to_char(processed_at, 'DD Mon YYYY, HH12:MI AM') as processed_at
-      FROM payout_requests
-      ORDER BY requested_at DESC;
-    `;
-    const formatted = rows.map(r => ({
-      id: r.id,
-      member_id: r.member_id,
-      member_name: r.member_name,
-      member_email: r.member_email,
-      avatar: r.avatar || '/matru-avatar.jpg',
-      amount: Number(r.amount || 0),
-      tds_amount: Number(r.tds_amount || 0),
-      net_payable: Number(r.net_amount || 0),
-      status: r.status,
-      request_date: r.request_date,
-      bank_details: r.bank_details || {
-        bank_name: r.bank_name || 'N/A',
-        account_number: r.bank_account || '',
-        ifsc: r.bank_ifsc || '',
-        account_holder: r.member_name
-      },
-      admin_payment: r.admin_payment || {
-        paid_at: r.processed_at,
-        utr_number: r.utr_number || '',
-        payment_mode: 'IMPS',
-        receipt_url: r.screenshot_url || '',
-        admin_notes: ''
-      }
-    }));
-    return { ok: true, data: formatted };
+    const res = await fetch('/api/db/sync?type=payouts');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.warn('[Neon DB] dbFetchPayoutRequests error:', err);
+    console.warn('[Neon DB Bridge] dbFetchPayoutRequests error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 8. Submit Withdrawal Request to Neon PostgreSQL
+ * 8. Create a New Payout / Withdrawal Request
  */
 export async function dbCreatePayoutRequest(payout) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    // 1. Atomically reserve and lock withdrawal amount from member balance
-    // Prevents double-spending: subsequent requests cannot exceed actual balance.
-    const lockResult = await sql`
-      UPDATE members
-      SET wallet_balance = wallet_balance - ${payout.amount}
-      WHERE id = ${payout.member_id} AND wallet_balance >= ${payout.amount}
-      RETURNING wallet_balance;
-    `;
-
-    if (lockResult.length === 0) {
-      return { 
-        ok: false, 
-        error: 'Insufficient available balance. Pending requests have already reserved your funds.' 
-      };
-    }
-
-    const rows = await sql`
-      INSERT INTO payout_requests (
-        id, member_id, member_name, member_email, avatar,
-        amount, tds_amount, net_amount,
-        bank_name, bank_account, bank_ifsc, bank_details, admin_payment,
-        status, requested_at
-      ) VALUES (
-        ${payout.id},
-        ${payout.member_id},
-        ${payout.member_name},
-        ${payout.member_email || ''},
-        ${payout.avatar || '/matru-avatar.jpg'},
-        ${payout.amount},
-        ${payout.tds_amount},
-        ${payout.net_payable},
-        ${payout.bank_details?.bank_name || 'Bank'},
-        ${payout.bank_details?.account_number || ''},
-        ${payout.bank_details?.ifsc || ''},
-        ${JSON.stringify(payout.bank_details || {})},
-        ${JSON.stringify(payout.admin_payment || {})},
-        'pending',
-        NOW()
-      )
-      RETURNING *;
-    `;
-    return { ok: true, data: rows[0], remainingBalance: lockResult[0].wallet_balance };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_payout', data: payout })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbCreatePayoutRequest error:', err);
+    console.error('[Neon DB Bridge] dbCreatePayoutRequest error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 9. Admin Approves and Marks Payout Paid in Neon PostgreSQL
+ * 9. Admin Approves Payout Disbursement
  */
-export async function dbApprovePayout(payoutId, { utrNumber, screenshotUrl, adminNotes, paymentMode }) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
+export async function dbApprovePayout(payoutId, details = {}) {
   try {
-    const pRows = await sql`
-      SELECT * FROM payout_requests WHERE id = ${payoutId} LIMIT 1;
-    `;
-    if (pRows.length === 0) return { ok: false, error: 'Payout request not found' };
-    const p = pRows[0];
-
-    const adminPaymentObj = {
-      paid_at: new Date().toISOString(),
-      utr_number: utrNumber,
-      payment_mode: paymentMode || 'IMPS / Bank Transfer',
-      receipt_url: screenshotUrl || '',
-      admin_notes: adminNotes || 'Disbursed manually via verified banking gateway.'
-    };
-
-    // Mark paid
-    await sql`
-      UPDATE payout_requests
-      SET 
-        status = 'paid',
-        utr_number = ${utrNumber},
-        screenshot_url = ${screenshotUrl || ''},
-        admin_payment = ${JSON.stringify(adminPaymentObj)},
-        processed_at = NOW()
-      WHERE id = ${payoutId};
-    `;
-
-    // Funds were already atomically locked and deducted upon withdrawal request.
-    // Update transactions ledger with confirmed disbursement
-    const txId = `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    await sql`
-      INSERT INTO transactions (
-        id, member_id, description, amount, type, status, payout_id, utr_number, receipt_url, created_at
-      ) VALUES (
-        ${txId},
-        ${p.member_id},
-        ${'Bank Payout Disbursed (UTR #' + utrNumber + ')'},
-        ${-Number(p.amount)},
-        'debit',
-        'Paid',
-        ${payoutId},
-        ${utrNumber},
-        ${screenshotUrl || ''},
-        NOW()
-      );
-    `;
-
-    return { ok: true };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve_payout', payoutId, details })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbApprovePayout error:', err);
+    console.error('[Neon DB Bridge] dbApprovePayout error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 10. Admin Rejects Payout in Neon PostgreSQL & Restores Locked Funds
+ * 10. Admin Rejects Payout & Restores Balance
  */
 export async function dbRejectPayout(payoutId, reason = 'KYC/Bank Mismatch') {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const pRows = await sql`
-      SELECT member_id, amount, status FROM payout_requests WHERE id = ${payoutId} LIMIT 1;
-    `;
-    if (pRows.length === 0) return { ok: false, error: 'Payout request not found' };
-    const p = pRows[0];
-
-    // Atomically restore reserved funds if request was pending
-    if (p.status === 'pending') {
-      await sql`
-        UPDATE members
-        SET wallet_balance = COALESCE(wallet_balance, 0) + ${Number(p.amount)}
-        WHERE id = ${p.member_id};
-      `;
-    }
-
-    await sql`
-      UPDATE payout_requests
-      SET 
-        status = 'rejected',
-        admin_payment = jsonb_set(
-          COALESCE(admin_payment, '{}'::jsonb),
-          '{admin_notes}',
-          ${JSON.stringify(reason)}
-        )
-      WHERE id = ${payoutId};
-    `;
-    return { ok: true };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject_payout', payoutId, reason })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbRejectPayout error:', err);
+    console.warn('[Neon DB Bridge] dbRejectPayout error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 10b. Helper: Check if a Bank UTR Number has already been submitted
+ * 10b. Check if UTR already exists in DB
  */
 export async function dbCheckUtrExists(utr) {
-  if (!sql || !utr) return false;
+  if (!utr || !utr.trim()) return false;
   try {
-    const clean = utr.trim().toUpperCase();
-    const rows = await sql`
-      SELECT id FROM (
-        SELECT id, utr_number FROM activations
-        UNION ALL
-        SELECT order_id as id, utr_number FROM orders
-      ) combined
-      WHERE UPPER(utr_number) = ${clean}
-      LIMIT 1;
-    `;
-    return rows.length > 0;
+    const res = await fetch(`/api/db/sync?type=check_utr&utr=${encodeURIComponent(utr.trim())}`);
+    if (!res.ok) return false;
+    const json = await res.json();
+    return Boolean(json.exists);
   } catch (err) {
-    console.warn('[Neon DB] dbCheckUtrExists warning:', err);
+    console.warn('[Neon DB Bridge] dbCheckUtrExists error:', err.message);
     return false;
   }
 }
 
 /**
- * 11. Fetch Orders from Neon PostgreSQL
+ * 11. Fetch Orders from Database
  */
 export async function dbFetchOrders() {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const rows = await sql`
-      SELECT 
-        order_id,
-        cs_order_id,
-        buyer_member_id,
-        product_code,
-        product_name,
-        amount::numeric,
-        gst::numeric,
-        total_amount::numeric,
-        currency,
-        payment_method,
-        payment_status,
-        subscription_status,
-        activated_by,
-        activation_date,
-        next_renewal,
-        account1_mlm,
-        account2_software,
-        created_at
-      FROM orders
-      ORDER BY created_at DESC;
-    `;
-    const formatted = rows.map(r => ({
-      ...r,
-      amount: Number(r.amount || 2500),
-      gst: Number(r.gst || 450),
-      total_amount: Number(r.total_amount || 2950),
-      account1_mlm: r.account1_mlm || {},
-      account2_software: r.account2_software || {}
-    }));
-    return { ok: true, data: formatted };
+    const res = await fetch('/api/db/sync?type=orders');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.warn('[Neon DB] dbFetchOrders error:', err);
+    console.warn('[Neon DB Bridge] dbFetchOrders error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 12. Create Order in Neon PostgreSQL
+ * 12. Create Order in Database
  */
 export async function dbCreateOrder(order) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const rows = await sql`
-      INSERT INTO orders (
-        order_id, cs_order_id, buyer_member_id, product_code, product_name,
-        amount, gst, total_amount, currency, payment_method,
-        payment_status, subscription_status, activated_by, activation_date,
-        next_renewal, account1_mlm, account2_software, created_at
-      ) VALUES (
-        ${order.order_id},
-        ${order.cs_order_id || 'ord_cs_' + Math.floor(1000 + Math.random() * 9000)},
-        ${order.buyer_member_id},
-        ${order.product_code || 'CS-PRO-SUITE'},
-        ${order.product_name || 'CyberShield Partner Joining Membership License'},
-        ${order.amount || 2500},
-        ${order.gst || 450},
-        ${order.total_amount || 2950},
-        ${order.currency || 'INR'},
-        ${order.payment_method || 'UPI'},
-        ${order.payment_status || 'paid'},
-        ${order.subscription_status || 'pending_approval'},
-        ${order.activated_by || 'Pending Admin Verification'},
-        ${order.activation_date || new Date().toISOString()},
-        ${order.next_renewal || '14 Oct 2027'},
-        ${JSON.stringify(order.account1_mlm || {})},
-        ${JSON.stringify(order.account2_software || {})},
-        NOW()
-      )
-      ON CONFLICT (order_id) DO UPDATE SET
-        subscription_status = EXCLUDED.subscription_status,
-        activated_by = EXCLUDED.activated_by
-      RETURNING *;
-    `;
-    return { ok: true, data: rows[0] };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_order', data: order })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbCreateOrder error:', err);
+    console.error('[Neon DB Bridge] dbCreateOrder error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 13. Fetch Transactions from Neon PostgreSQL
+ * 13. Fetch Financial Transactions Ledger
  */
 export async function dbFetchTransactions(memberId = null) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const rows = memberId ? await sql`
-      SELECT 
-        id,
-        member_id,
-        description,
-        amount::numeric,
-        type,
-        status,
-        payout_id as "payoutId",
-        utr_number,
-        receipt_url,
-        to_char(created_at, 'DD Mon YYYY, HH12:MI AM') as date
-      FROM transactions
-      WHERE member_id = ${memberId}
-      ORDER BY created_at DESC;
-    ` : await sql`
-      SELECT 
-        id,
-        member_id,
-        description,
-        amount::numeric,
-        type,
-        status,
-        payout_id as "payoutId",
-        utr_number,
-        receipt_url,
-        to_char(created_at, 'DD Mon YYYY, HH12:MI AM') as date
-      FROM transactions
-      ORDER BY created_at DESC;
-    `;
-    const formatted = rows.map(r => ({
-      ...r,
-      amount: Number(r.amount || 0)
-    }));
-    return { ok: true, data: formatted };
+    const url = memberId 
+      ? `/api/db/sync?type=transactions&memberId=${encodeURIComponent(memberId)}` 
+      : '/api/db/sync?type=transactions';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.warn('[Neon DB] dbFetchTransactions error:', err);
+    console.warn('[Neon DB Bridge] dbFetchTransactions error:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
 /**
- * 14. Update KYC & Bank Details in Neon PostgreSQL
+ * 14. Update Member KYC & Bank Details
  */
 export async function dbUpdateKyc(memberId, kycData) {
-  if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
-    const rows = await sql`
-      UPDATE members
-      SET kyc_data = ${JSON.stringify(kycData)}
-      WHERE id = ${memberId}
-      RETURNING id, name, kyc_data;
-    `;
-    return { ok: true, data: rows[0] };
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_kyc', memberId, kyc: kycData })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   } catch (err) {
-    console.error('[Neon DB] dbUpdateKyc error:', err);
+    console.error('[Neon DB Bridge] dbUpdateKyc error:', err.message);
     return { ok: false, error: err.message };
   }
 }
@@ -782,22 +306,11 @@ export async function dbUpdateKyc(memberId, kycData) {
  * 15. Fetch ZEX Cloud Account Link Status
  */
 export async function dbFetchZexLinkStatus(memberId) {
-  if (!sql) return { ok: false, linked: false };
   try {
-    const rows = await sql`
-      SELECT partner_id, external_member_id, zex_user_id, status, linked_at
-      FROM zex_account_links
-      WHERE external_member_id = ${memberId}
-      LIMIT 1;
-    `;
-    if (rows.length === 0) {
-      return { ok: true, linked: false };
-    }
-    return { ok: true, linked: true, data: rows[0] };
+    const res = await fetch(`/api/integrations/zex/status?member_id=${encodeURIComponent(memberId)}`);
+    if (!res.ok) return { ok: true, linked: false };
+    return await res.json();
   } catch (err) {
-    console.warn('[Neon DB] dbFetchZexLinkStatus error:', err);
-    return { ok: false, linked: false, error: err.message };
+    return { ok: true, linked: false };
   }
 }
-
-

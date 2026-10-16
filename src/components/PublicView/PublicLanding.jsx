@@ -66,13 +66,13 @@ export default function PublicLanding() {
           </div>
 
           <h1 className="hero-heading">
-            Institutional Trading Intelligence. <br />
+            Enterprise Cyber Defense Suite. <br />
             <span className="gradient-text">Transparent Direct Sales Network.</span>
           </h1>
 
           <p className="hero-subheading">
-            Access ZEX Pro’s enterprise automated algorithms, real-time crypto & equity market signals, 
-            and proprietary trading tools. Backed by India’s most compliant direct sales rewards architecture.
+            Access CyberShield Pro’s enterprise endpoint protection, real-time threat intelligence & monitoring, 
+            and proprietary security defense tools. Backed by India’s most compliant direct sales rewards architecture.
           </p>
 
           <div className="hero-cta-group">
@@ -116,7 +116,7 @@ export default function PublicLanding() {
             <div className="showcase-header">
               <div>
                 <span className="badge badge-cyan">Flagship Retail License</span>
-                <h3 className="showcase-title">ZEX Pro Enterprise Trader</h3>
+                <h3 className="showcase-title">CyberShield Pro Enterprise Defense</h3>
               </div>
               <div className="showcase-price-tag">
                 <span className="amount">{formatINR(2500)}</span>
@@ -127,11 +127,11 @@ export default function PublicLanding() {
             <div className="features-list">
               <div className="feature-item">
                 <div className="feature-icon-box">
-                  <TrendingUp size={16} className="text-emerald" />
+                  <ShieldCheck size={16} className="text-emerald" />
                 </div>
                 <div>
-                  <div className="feature-title">Proprietary AI Signal Engine</div>
-                  <div className="feature-desc">99.4% uptime execution on Indian NSE/BSE & Global Markets</div>
+                  <div className="feature-title">AI Threat Intelligence Engine</div>
+                  <div className="feature-desc">24/7 automated threat detection & endpoint vulnerability shield</div>
                 </div>
               </div>
 
@@ -190,11 +190,11 @@ export default function PublicLanding() {
           <div className="product-details-grid">
             <div className="detail-card glass-panel">
               <div className="detail-icon bg-emerald-dim">
-                <TrendingUp size={24} className="text-emerald" />
+                <ShieldCheck size={24} className="text-emerald" />
               </div>
-              <h3 className="detail-title">Algorithmic Trade Bot</h3>
+              <h3 className="detail-title">Cyber Threat Defense Engine</h3>
               <p className="detail-desc">
-                Deploy battle-tested quantitative algorithms with zero coding. Real-time backtesting against 10 years of tick data.
+                Deploy enterprise endpoint security with real-time zero-day intrusion detection, automated firewall protection, and vulnerability scanning.
               </p>
             </div>
 

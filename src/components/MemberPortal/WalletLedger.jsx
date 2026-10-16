@@ -15,12 +15,25 @@ import {
 import PayoutModal from '../Modals/PayoutModal';
 
 export default function WalletLedger({ memberId }) {
-  const { currentMember, getMemberWallet, walletLedger } = useMlm();
+  const { currentMember, getMemberWallet, walletLedger = [], transactions = [] } = useMlm();
   const [filterType, setFilterType] = useState('ALL');
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
 
-  const wallet = getMemberWallet(memberId);
-  const memberEntries = walletLedger.filter(l => l.member_id === memberId);
+  const wallet = getMemberWallet ? getMemberWallet(memberId) : { available: 0, pending: 0, paid: 0, totalEarned: 0 };
+  const rawLedger = Array.isArray(walletLedger) && walletLedger.length > 0 
+    ? walletLedger 
+    : (Array.isArray(transactions) ? transactions.map(t => ({
+        ledger_id: t.id,
+        member_id: t.member_id || memberId,
+        created_at: t.created_at || new Date().toISOString(),
+        transaction_type: t.type === 'credit' ? 'COMMISSION_CREDIT' : 'PAYOUT_DEBIT',
+        reference_id: t.payoutId || t.utr_number || t.id,
+        description: t.description || 'Transaction',
+        balance_effect: t.amount >= 0 ? 'CREDIT' : 'DEBIT',
+        amount: t.amount || 0
+      })) : []);
+
+  const memberEntries = rawLedger.filter(l => l.member_id === memberId || !l.member_id || l.member_id === currentMember?.member_id);
 
   const filteredEntries = memberEntries.filter(entry => {
     if (filterType === 'ALL') return true;

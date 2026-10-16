@@ -22,14 +22,14 @@ import {
 
 export default function AdminDashboard() {
   const { 
-    members, 
-    orders, 
-    commissionRules, 
-    commissionEntries, 
-    walletLedger, 
-    payouts, 
-    auditLogs, 
-    companyReserve,
+    members = [], 
+    orders = [], 
+    commissionRules = [], 
+    commissionEntries = [], 
+    walletLedger = [], 
+    payouts = [], 
+    auditLogs = [], 
+    companyReserve = 0,
     reviewKyc,
     maturePendingCommissions,
     processRefund,
@@ -39,6 +39,7 @@ export default function AdminDashboard() {
 
   const [activeAdminTab, setActiveAdminTab] = useState('orders'); // 'orders' | 'kyc' | 'rules' | 'payouts' | 'fraud' | 'audit'
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+  const [selectedProofModal, setSelectedProofModal] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingRuleLevel, setEditingRuleLevel] = useState(null);
   const [newRuleAmount, setNewRuleAmount] = useState('');
@@ -357,12 +358,44 @@ export default function AdminDashboard() {
                           {m.seller_status}
                         </span>
                       </td>
-                      <td className="code-font">{m.kyc?.pan ? maskPan(m.kyc.pan) : 'Not Provided'}</td>
+                      <td>
+                        <div className="code-font">{m.kyc?.pan ? maskPan(m.kyc.pan) : 'Not Provided'}</div>
+                        {m.kyc?.documents?.pan && m.kyc.documents.pan.startsWith('data:') && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedProofModal({
+                              title: `PAN Card Photo — ${m.name}`,
+                              dataUrl: m.kyc.documents.pan,
+                              name: m.kyc.documents.panName || 'PAN_Card.jpg',
+                              identifier: m.kyc.pan
+                            })}
+                            className="btn btn-outline-cyan btn-xs flex-center gap-1 mt-1"
+                          >
+                            <Eye size={11} />
+                            <span>View Photo</span>
+                          </button>
+                        )}
+                      </td>
                       <td>
                         {m.kyc?.bank_name ? (
                           <div className="font-xs">
                             <div>{m.kyc.bank_name}</div>
                             <div className="code-font text-secondary">{maskBankAccount(m.kyc.bank_account_number)}</div>
+                            {m.kyc?.documents?.bankAccount && m.kyc.documents.bankAccount.startsWith('data:') && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedProofModal({
+                                  title: `Bank Settlement Proof — ${m.name}`,
+                                  dataUrl: m.kyc.documents.bankAccount,
+                                  name: m.kyc.documents.bankAccountName || 'Bank_Proof.jpg',
+                                  identifier: `${m.kyc.bank_name} • ${m.kyc.bank_account_number}`
+                                })}
+                                className="btn btn-outline-cyan btn-xs flex-center gap-1 mt-1"
+                              >
+                                <Eye size={11} />
+                                <span>View Proof</span>
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-secondary font-xs">None</span>
@@ -644,6 +677,43 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* KYC Proof Image Inspection Modal */}
+      {selectedProofModal && (
+        <div 
+          className="modal-overlay" 
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={() => setSelectedProofModal(null)}
+        >
+          <div 
+            className="modal-box glass-panel p-5" 
+            style={{ maxWidth: '640px', width: '100%', background: '#0F172A', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '16px' }} 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex-between items-center mb-3">
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#FFFFFF', fontWeight: 700 }}>{selectedProofModal.title}</h4>
+                <span className="code-font text-secondary font-xs">Ref: {selectedProofModal.identifier} • {selectedProofModal.name}</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setSelectedProofModal(null)}
+                className="btn btn-secondary btn-sm"
+              >
+                Close
+              </button>
+            </div>
+
+            <div style={{ background: '#020617', padding: '12px', borderRadius: '10px', textAlign: 'center', maxHeight: '480px', overflowY: 'auto' }}>
+              <img 
+                src={selectedProofModal.dataUrl} 
+                alt={selectedProofModal.title}
+                style={{ maxWidth: '100%', maxHeight: '440px', objectFit: 'contain', borderRadius: '6px' }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

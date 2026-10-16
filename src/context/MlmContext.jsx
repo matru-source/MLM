@@ -11,6 +11,7 @@ import {
 import { generateId } from '../utils/cryptoSim';
 import { provisionDualAccounts } from '../services/accountProvisioningService';
 import {
+  dbFetchAllSync,
   dbFetchMembers,
   dbRegisterMember,
   dbUpdateMemberPassword,
@@ -78,46 +79,100 @@ export function MlmProvider({ children }) {
     setIsAdminMode(false);
   };
 
-  // Dedicated Admin Executive Authentication Gate
+  // Dedicated Admin Executive Authentication Gate (Cryptographic Server Token)
+  const isTokenFormatValid = (tok) => {
+    if (!tok || typeof tok !== 'string') return false;
+    const parts = tok.split('.');
+    if (parts.length !== 2) return false;
+    try {
+      // Decode base64url
+      const b64 = parts[0].replace(/-/g, '+').replace(/_/g, '/');
+      const json = atob(b64);
+      const payload = JSON.parse(json);
+      return payload.exp && Number(payload.exp) > Date.now();
+    } catch (e) {
+      return false;
+    }
+  };
+
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
     try {
-      return sessionStorage.getItem('cybershield_admin_auth') === 'true';
+      const token = sessionStorage.getItem('cybershield_admin_token');
+      return isTokenFormatValid(token);
     } catch (e) {
       return false;
     }
   });
 
-  const loginAdmin = ({ username, password }) => {
-    const cleanUser = (username || '').trim().toLowerCase();
-    const authorizedAdmins = [
-      'admin@cybershield.network', 
-      'matruprasadpanda497@gmail.com', 
-      'admin', 
-      'matru'
-    ];
-    // Master executive passphrases
-    const validPassphrases = ['CyberShield#Admin2026!', 'Admin@2026#CS'];
-
-    const isUserValid = authorizedAdmins.includes(cleanUser);
-    const isPassValid = validPassphrases.includes(password);
-
-    if (isUserValid && isPassValid) {
-      setIsAdminAuthenticated(true);
-      try {
-        sessionStorage.setItem('cybershield_admin_auth', 'true');
-      } catch (e) {}
-      return { ok: true };
+  // Verify server token against backend on mount if route is admin
+  useEffect(() => {
+    if (isAdminMode) {
+      const token = sessionStorage.getItem('cybershield_admin_token');
+      if (token && isTokenFormatValid(token)) {
+        fetch('/api/admin/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'verify', token })
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (!data.ok || !data.valid) {
+              setIsAdminAuthenticated(false);
+              sessionStorage.removeItem('cybershield_admin_token');
+            }
+          })
+          .catch(() => {
+            // Keep current session if format is valid and server unreachable
+          });
+      } else {
+        setIsAdminAuthenticated(false);
+      }
     }
+  }, [isAdminMode]);
 
-    return { 
-      ok: false, 
-      error: 'Invalid administrator credentials. Access to executive console denied.' 
-    };
+  const loginAdmin = async ({ username, password }) => {
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', username, password })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 429) {
+        return {
+          ok: false,
+          locked: true,
+          error: data.error || 'Terminal temporarily locked due to failed attempts.',
+          remainingSeconds: data.remainingSeconds || 900
+        };
+      }
+
+      if (res.ok && data.ok && data.token) {
+        sessionStorage.setItem('cybershield_admin_token', data.token);
+        setIsAdminAuthenticated(true);
+        return { ok: true };
+      }
+
+      return {
+        ok: false,
+        error: data.error || 'Invalid administrator credentials. Access to executive console denied.',
+        remainingAttempts: data.remainingAttempts
+      };
+    } catch (err) {
+      console.warn('[Admin Auth] Backend API call failed:', err);
+      return {
+        ok: false,
+        error: 'Unable to communicate with executive security gateway. Please try again.'
+      };
+    }
   };
 
   const logoutAdmin = () => {
     setIsAdminAuthenticated(false);
     try {
+      sessionStorage.removeItem('cybershield_admin_token');
       sessionStorage.removeItem('cybershield_admin_auth');
     } catch (e) {}
     navigateToUserSite();
@@ -188,24 +243,21 @@ export function MlmProvider({ children }) {
 
   const [isDbConnected, setIsDbConnected] = useState(false);
 
-  // Live Neon PostgreSQL Synchronization
+  // Live Neon PostgreSQL Multi-Device Synchronization
   useEffect(() => {
     let active = true;
+
     async function loadNeonData() {
       try {
-        const [mRes, aRes, pRes, oRes, tRes] = await Promise.all([
-          dbFetchMembers(),
-          dbFetchActivations(),
-          dbFetchPayoutRequests(),
-          dbFetchOrders(),
-          dbFetchTransactions()
-        ]);
+        const res = await dbFetchAllSync();
+        if (!active || !res || !res.ok || !res.data) return;
 
-        if (!active) return;
+        const { members: liveMembers, activations: liveActivations, payouts: livePayouts, orders: liveOrders, transactions: liveTxs } = res.data;
 
-        if (mRes.ok && mRes.data) {
-          setMembers(mRes.data);
-          const current = mRes.data.find(m => m.member_id === currentMemberId);
+        if (Array.isArray(liveMembers) && liveMembers.length > 0) {
+          setMembers(liveMembers);
+          setIsDbConnected(true);
+          const current = liveMembers.find(m => m.member_id === currentMemberId);
           if (current) {
             setAvailableBalance(Number(current.wallet_balance || 0));
             setTotalEarnings(Number(current.total_earnings || 0));
@@ -213,26 +265,45 @@ export function MlmProvider({ children }) {
             setAvailableBalance(0);
             setTotalEarnings(0);
           }
-          setIsDbConnected(true);
         }
-        if (aRes.ok && aRes.data) {
-          setPendingActivations(aRes.data);
+
+        if (Array.isArray(liveActivations)) {
+          setPendingActivations(liveActivations);
         }
-        if (pRes.ok && pRes.data) {
-          setPayoutRequests(pRes.data);
+
+        if (Array.isArray(livePayouts)) {
+          setPayoutRequests(livePayouts);
         }
-        if (oRes.ok && oRes.data) {
-          setOrders(oRes.data);
+
+        if (Array.isArray(liveOrders)) {
+          setOrders(liveOrders);
         }
-        if (tRes.ok && tRes.data) {
-          setTransactions(tRes.data);
+
+        if (Array.isArray(liveTxs)) {
+          setTransactions(liveTxs);
         }
       } catch (err) {
-        console.warn('[Neon Sync] Background sync warning:', err);
+        console.warn('[Neon Sync] Multi-device background sync warning:', err);
       }
     }
+
+    // Initial load
     loadNeonData();
-    return () => { active = false; };
+
+    // Live background polling every 15s so changes on Phone A appear on Laptop B without reload
+    const interval = setInterval(loadNeonData, 15000);
+
+    // Refresh immediately when window/tab is focused
+    const handleFocus = () => {
+      loadNeonData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [currentMemberId]);
 
   const addToast = (type, title, message) => {
@@ -686,9 +757,13 @@ export function MlmProvider({ children }) {
     const pending = payoutRequests
       .filter(p => p.member_id === mem?.member_id && p.status === 'pending')
       .reduce((acc, p) => acc + Number(p.amount || 0), 0);
+    const paid = payoutRequests
+      .filter(p => p.member_id === mem?.member_id && p.status === 'paid')
+      .reduce((acc, p) => acc + Number(p.amount || 0), 0);
     return {
       available,
       pending,
+      paid,
       totalEarned: Number(mem?.total_earnings || 0)
     };
   };
@@ -991,9 +1066,12 @@ export function MlmProvider({ children }) {
     const submittedDocs = kycDetails.documents || {};
     const documents = {
       aadhaar: submittedDocs.aadhaar || existingDocs.aadhaar || 'Pending Upload',
+      aadhaarName: submittedDocs.aadhaarName || existingDocs.aadhaarName || 'Aadhaar_Card.jpg',
       pan: submittedDocs.pan || existingDocs.pan || 'Pending Upload',
+      panName: submittedDocs.panName || existingDocs.panName || 'PAN_Card.jpg',
       addressProof: submittedDocs.addressProof || existingDocs.addressProof || 'Pending Upload',
-      bankAccount: submittedDocs.bankAccount || existingDocs.bankAccount || 'Pending Upload'
+      bankAccount: submittedDocs.bankAccount || existingDocs.bankAccount || 'Pending Upload',
+      bankAccountName: submittedDocs.bankAccountName || existingDocs.bankAccountName || 'Bank_Proof.jpg'
     };
 
     // Real document validation: Require uploaded documents rather than instant auto-approval on plain text
@@ -1145,14 +1223,47 @@ export function MlmProvider({ children }) {
       return o;
     }));
 
-    // Increment official active team members count upon approval
-    setTeamMembersCount(prev => prev + 1);
+    // Credit direct retail partner commission (₹1,000) to actual referring sponsor
+    const activatedMember = members.find(m => m.member_id === act.member_id);
+    const targetSponsorRef = (activatedMember?.sponsor_member_id || 
+                              activatedMember?.sponsor_code || 
+                              act.sponsor_code || '').trim().toUpperCase();
 
-    // Credit direct retail partner commission (₹1,000) to current sponsor wallet
-    setAvailableBalance(prev => prev + 1000);
-    setTotalEarnings(prev => prev + 1000);
+    const actualSponsor = targetSponsorRef
+      ? members.find(m => 
+          (m.member_id && m.member_id.toUpperCase() === targetSponsorRef) ||
+          (m.referral_code && m.referral_code.toUpperCase() === targetSponsorRef) ||
+          (m.cs_customer_id && m.cs_customer_id.toUpperCase() === targetSponsorRef)
+        )
+      : null;
+
+    const sponsorIdentifier = actualSponsor?.member_id || targetSponsorRef || 'mem_matru';
+
+    setMembers(prev => prev.map(m => {
+      const isSponsor = actualSponsor 
+        ? m.member_id === actualSponsor.member_id 
+        : ((m.member_id && m.member_id.toUpperCase() === targetSponsorRef) || 
+           (m.referral_code && m.referral_code.toUpperCase() === targetSponsorRef));
+      if (isSponsor) {
+        return {
+          ...m,
+          wallet_balance: Number(m.wallet_balance || 0) + 1000,
+          total_earnings: Number(m.total_earnings || 0) + 1000
+        };
+      }
+      return m;
+    }));
+
+    // CRUCIAL: Only update the active session's wallet balance IF the currently logged-in user IS genuinely the sponsor!
+    // Admin approving someone else's referral must NEVER have their own wallet balance increase!
+    if (currentMember && actualSponsor && currentMember.member_id === actualSponsor.member_id) {
+      setAvailableBalance(prev => prev + 1000);
+      setTotalEarnings(prev => prev + 1000);
+    }
+
     setTransactions(prev => [{
       id: generateId('tx'),
+      member_id: sponsorIdentifier,
       date: 'Just Now',
       description: `Retail Partner Commission (Level 1) - ₹2,500 Joining Activation from ${act.member_name}`,
       amount: 1000,
@@ -1327,6 +1438,18 @@ export function MlmProvider({ children }) {
     }))
   ];
 
+  // Derive immutable walletLedger for financial ledger views
+  const dynamicWalletLedger = (transactions || []).map(t => ({
+    ledger_id: t.id,
+    member_id: t.member_id || currentMemberId || 'mem_matru',
+    created_at: t.date === 'Just Now' ? new Date().toISOString() : (t.created_at || new Date().toISOString()),
+    transaction_type: t.type === 'credit' ? 'COMMISSION_CREDIT' : (t.type === 'debit' ? 'PAYOUT_DEBIT' : 'TRANSACTION'),
+    reference_id: t.payoutId || t.utr_number || t.id,
+    description: t.description || 'Transaction',
+    balance_effect: t.amount >= 0 ? 'CREDIT' : 'DEBIT',
+    amount: t.amount || 0
+  }));
+
   return (
     <MlmContext.Provider value={{
       isAdminMode,
@@ -1347,6 +1470,11 @@ export function MlmProvider({ children }) {
       members,
       orders,
       transactions,
+      walletLedger: dynamicWalletLedger,
+      commissionEntries: [],
+      payouts: payoutRequests,
+      auditLogs: [],
+      companyReserve: 0,
       payoutRequests,
       pendingActivations,
       pendingPayoutsTotal,

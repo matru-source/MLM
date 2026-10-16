@@ -92,7 +92,7 @@ export default function CheckoutModal({ isOpen, onClose, initialReferralCode = '
               <Lock size={12} />
               <span>ZEX Authoritative Checkout</span>
             </div>
-            <h2 className="modal-title">ZEX Pro Trader Membership</h2>
+            <h2 className="modal-title">CyberShield Pro Enterprise Membership</h2>
           </div>
           <button onClick={onClose} className="modal-close-btn">
             <X size={18} />
@@ -106,7 +106,7 @@ export default function CheckoutModal({ isOpen, onClose, initialReferralCode = '
               <div className="summary-row-top">
                 <div>
                   <div className="plan-name">Annual Enterprise Subscription</div>
-                  <div className="plan-sub">Full algorithmic trading, API access & technical signals</div>
+                  <div className="plan-sub">Full CyberShield Pro Defense Suite, 5 endpoint licenses & threat detection</div>
                 </div>
                 <div className="plan-price-block">
                   <div className="plan-amount">{formatINR(2500)}</div>

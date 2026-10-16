@@ -30,13 +30,18 @@ export default function KycModal({ isOpen, onClose, member }) {
         setError('Maximum file size allowed is 5MB.');
         return;
       }
-      setter({
-        name: file.name,
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        type: file.type,
-        uploadedAt: new Date().toLocaleTimeString()
-      });
-      setError('');
+      const reader = new FileReader();
+      reader.onload = (loadEvt) => {
+        setter({
+          name: file.name,
+          size: (file.size / 1024).toFixed(1) + ' KB',
+          type: file.type,
+          dataUrl: loadEvt.target.result,
+          uploadedAt: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        });
+        setError('');
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -63,8 +68,8 @@ export default function KycModal({ isOpen, onClose, member }) {
 
     // Direct Selling Rules 2021 compliance: require genuine document uploads
     const existingDocs = member?.kyc?.documents || {};
-    const hasPanDoc = panFile || (existingDocs.pan && existingDocs.pan.startsWith('Uploaded'));
-    const hasBankDoc = bankFile || (existingDocs.bankAccount && existingDocs.bankAccount.startsWith('Uploaded'));
+    const hasPanDoc = panFile || (existingDocs.pan && existingDocs.pan !== 'Not Uploaded' && existingDocs.pan !== 'Pending Upload');
+    const hasBankDoc = bankFile || (existingDocs.bankAccount && existingDocs.bankAccount !== 'Not Uploaded' && existingDocs.bankAccount !== 'Pending Upload');
 
     if (!hasPanDoc || !hasBankDoc) {
       setError('Direct Selling Rules 2021 require proof of identity (PAN Card) and Bank Account proof file uploads. Text-only submissions cannot be verified.');
@@ -77,9 +82,12 @@ export default function KycModal({ isOpen, onClose, member }) {
     }
 
     const submittedDocs = {
-      pan: panFile ? `Uploaded (${panFile.name})` : (existingDocs.pan || 'Pending Upload'),
-      bankAccount: bankFile ? `Uploaded (${bankFile.name})` : (existingDocs.bankAccount || 'Pending Upload'),
-      aadhaar: aadhaarFile ? `Uploaded (${aadhaarFile.name})` : (existingDocs.aadhaar || 'Pending Upload'),
+      pan: panFile ? panFile.dataUrl : (existingDocs.pan || 'Pending Upload'),
+      panName: panFile ? panFile.name : (existingDocs.panName || 'PAN_Card.jpg'),
+      bankAccount: bankFile ? bankFile.dataUrl : (existingDocs.bankAccount || 'Pending Upload'),
+      bankAccountName: bankFile ? bankFile.name : (existingDocs.bankAccountName || 'Bank_Proof.jpg'),
+      aadhaar: aadhaarFile ? aadhaarFile.dataUrl : (existingDocs.aadhaar || 'Pending Upload'),
+      aadhaarName: aadhaarFile ? aadhaarFile.name : (existingDocs.aadhaarName || 'Aadhaar_Card.jpg'),
       addressProof: existingDocs.addressProof || 'Pending Upload'
     };
 

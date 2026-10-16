@@ -119,11 +119,11 @@ export default function CheckoutModal() {
     }
   };
 
-  // Download official receipt
+  // Download payment acknowledgment receipt
   const handleDownloadInvoice = () => {
     downloadTaxInvoice({ order: paymentResult?.order, member: currentMember });
     const orderId = paymentResult?.order?.order_id || 'CS20261010';
-    addToast('success', 'Tax Invoice Downloaded', `Official GST Tax Invoice #${orderId} generated & downloaded.`);
+    addToast('info', 'Payment Acknowledgment Downloaded', `Provisional payment submission receipt #${orderId} generated & downloaded. Official GST Tax Invoice is issued upon Admin clearance.`);
   };
 
   return (
@@ -493,9 +493,9 @@ export default function CheckoutModal() {
               <div className="flex-between items-center mb-3">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <FileText size={18} className="text-primary-blue" />
-                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0F172A' }}>Official Tax Invoice & Order Details</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0F172A' }}>Provisional Payment Acknowledgment</span>
                 </div>
-                <span className="badge badge-amber font-xs font-bold">PENDING VERIFICATION ⏳</span>
+                <span className="badge badge-amber font-xs font-bold">AWAITING ADMIN CLEARANCE ⏳</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', fontSize: '0.85rem' }}>
@@ -584,7 +584,7 @@ export default function CheckoutModal() {
                 style={{ flex: 1 }}
               >
                 <Download size={16} />
-                <span>Download Tax Invoice (PDF)</span>
+                <span>Download Payment Acknowledgment (PDF)</span>
               </button>
               
               <button

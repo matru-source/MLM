@@ -8,6 +8,13 @@ import { jsPDF } from 'jspdf';
  * Generates and downloads an authentic, legally compliant Tax Invoice PDF (CGST Act 2017 & Direct Selling Rules 2021)
  */
 export function downloadTaxInvoice({ order, member }) {
+  const isApproved = (
+    order?.payment_status === 'verified' || 
+    order?.payment_status === 'succeeded' || 
+    order?.subscription_status === 'active' || 
+    member?.seller_status === 'active'
+  ) && (order?.payment_status !== 'pending_verification' && order?.subscription_status !== 'pending_approval');
+
   const orderId = order?.order_id || (order?.id ? `ORD-${order.id}` : `INV-${Date.now().toString().slice(-6)}`);
   const orderDate = order?.created_at 
     ? new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -22,7 +29,9 @@ export function downloadTaxInvoice({ order, member }) {
   const utrNumber = order?.utr_number || 'Pending Bank Verification';
   const referralCode = member?.referral_code || 'N/A';
   const distributorId = member?.member_id || 'N/A';
-  const licenseKey = member?.software_license?.license_key || order?.account2_software?.license_key || (distributorId !== 'N/A' ? `CS-PRO-${distributorId}` : 'PENDING-ACTIVATION');
+  const licenseKey = isApproved 
+    ? (member?.software_license?.license_key || order?.account2_software?.license_key || `CS-PRO-${distributorId}`)
+    : 'LOCKED (AWAITING ADMIN CLEARANCE)';
 
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -52,24 +61,34 @@ export function downloadTaxInvoice({ order, member }) {
 
   // Invoice Title & Meta (Right aligned)
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(15, 23, 42);
-  doc.text('TAX INVOICE', margin + contentWidth, 26, { align: 'right' });
+  doc.setFontSize(isApproved ? 16 : 12);
+  doc.setTextColor(isApproved ? 15 : 180, isApproved ? 23 : 83, isApproved ? 42 : 9);
+  doc.text(isApproved ? 'TAX INVOICE' : 'PAYMENT ACKNOWLEDGMENT', margin + contentWidth, 26, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(71, 85, 105);
-  doc.text(`Invoice No: #INV-${orderId}`, margin + contentWidth, 31, { align: 'right' });
+  doc.text(isApproved ? `Invoice No: #INV-${orderId}` : `Submission Ref: #SUB-${orderId}`, margin + contentWidth, 31, { align: 'right' });
   doc.text(`Date of Supply: ${orderDate}`, margin + contentWidth, 36, { align: 'right' });
   doc.text('Place of Supply: Odisha (Code 21)', margin + contentWidth, 41, { align: 'right' });
 
-  // Paid in Full badge
-  doc.setFillColor(220, 252, 231); // Light green #dcfce7
-  doc.roundedRect(margin + contentWidth - 32, 44, 32, 6, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(21, 128, 61); // Green #15803d
-  doc.text('PAID IN FULL', margin + contentWidth - 16, 48.2, { align: 'center' });
+  if (isApproved) {
+    // Paid in Full badge (Green)
+    doc.setFillColor(220, 252, 231); // Light green #dcfce7
+    doc.roundedRect(margin + contentWidth - 32, 44, 32, 6, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(21, 128, 61); // Green #15803d
+    doc.text('PAID IN FULL', margin + contentWidth - 16, 48.2, { align: 'center' });
+  } else {
+    // Pending Verification badge (Amber)
+    doc.setFillColor(254, 243, 199); // Light amber #fef3c7
+    doc.roundedRect(margin + contentWidth - 55, 44, 55, 6, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 83, 9); // Amber #b45309
+    doc.text('PENDING BANK VERIFICATION', margin + contentWidth - 27.5, 48.2, { align: 'center' });
+  }
 
   // Divider line
   doc.setDrawColor(226, 232, 240);
@@ -224,12 +243,17 @@ export function downloadTaxInvoice({ order, member }) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text('This is a computer-generated statutory tax invoice issued under Section 31 of the CGST Act, 2017.', margin + contentWidth / 2, footerY + 5, { align: 'center' });
-  doc.text('Consumer Protection (Direct Selling) Rules, 2021 Compliant  |  7-Day Cooling-off Guarantee Active.', margin + contentWidth / 2, footerY + 9, { align: 'center' });
-  doc.text('Inquiries: support@cybershield.network  |  Plot 42, Cyber Gateway Tech Zone, PIN: 751024', margin + contentWidth / 2, footerY + 13, { align: 'center' });
-
-  // Trigger PDF file download
-  doc.save(`CyberShield_Tax_Invoice_${orderId}.pdf`);
+  if (isApproved) {
+    doc.text('This is a computer-generated statutory tax invoice issued under Section 31 of the CGST Act, 2017.', margin + contentWidth / 2, footerY + 5, { align: 'center' });
+    doc.text('Consumer Protection (Direct Selling) Rules, 2021 Compliant  |  7-Day Cooling-off Guarantee Active.', margin + contentWidth / 2, footerY + 9, { align: 'center' });
+    doc.text('Inquiries: support@cybershield.network  |  Plot 42, Cyber Gateway Tech Zone, PIN: 751024', margin + contentWidth / 2, footerY + 13, { align: 'center' });
+    doc.save(`CyberShield_Tax_Invoice_${orderId}.pdf`);
+  } else {
+    doc.text('PROVISIONAL SUBMISSION: This is an interim payment acknowledgment receipt.', margin + contentWidth / 2, footerY + 5, { align: 'center' });
+    doc.text('Official GST Tax Invoice and unlocked software licenses are issued immediately upon Admin Bank Verification.', margin + contentWidth / 2, footerY + 9, { align: 'center' });
+    doc.text('Inquiries: support@cybershield.network  |  Plot 42, Cyber Gateway Tech Zone, PIN: 751024', margin + contentWidth / 2, footerY + 13, { align: 'center' });
+    doc.save(`CyberShield_Payment_Acknowledgment_${orderId}.pdf`);
+  }
 }
 
 /**

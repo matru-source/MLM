@@ -248,17 +248,10 @@ export default function MemberDashboardView() {
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => {
-                    window.location.hash = '#admin';
-                    window.location.reload();
-                  }}
-                  className="btn btn-secondary btn-sm flex-center gap-1"
-                  title="Open Admin to test instant approval"
-                >
-                  <span>Admin Desk</span>
-                  <ExternalLink size={14} />
-                </button>
+                <div className="badge badge-amber font-xs font-bold flex-center gap-1 shrink-0">
+                  <Clock size={14} />
+                  <span>Awaiting Bank Verification</span>
+                </div>
               </div>
             )}
 

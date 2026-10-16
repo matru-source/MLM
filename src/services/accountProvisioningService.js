@@ -45,7 +45,7 @@ export async function provisionDualAccounts({ memberDetails, paymentDetails }) {
     full_name: memberDetails.name,
     email: memberDetails.email,
     phone: memberDetails.phone,
-    sponsor_code: memberDetails.sponsorId || 'CS123456',
+    sponsor_code: memberDetails.sponsor_code || memberDetails.sponsor_member_id || memberDetails.sponsorId || 'CS123456',
     referral_code: generatePartnerCode(),
     commission_wallet_id: `WAL-CS-${Math.floor(100000 + Math.random() * 900000)}`,
     membership_plan: 'CyberShield Partner Membership (₹2,500)',

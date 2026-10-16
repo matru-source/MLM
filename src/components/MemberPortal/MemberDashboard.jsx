@@ -95,9 +95,9 @@ export default function MemberDashboard() {
             <span className="badge badge-cyan">Authoritative Merchant: ZEX Technologies Ltd</span>
             <span className="badge badge-emerald">Subscription Active</span>
           </div>
-          <h3 className="sub-product-name">ZEX Pro Enterprise Trader License</h3>
+          <h3 className="sub-product-name">CyberShield Pro Enterprise Cyber Defense License</h3>
           <p className="sub-license-desc">
-            Authorized direct sales agent attribution. Full algorithmic access enabled.
+            Authorized direct sales partner attribution. Full enterprise endpoint security enabled.
           </p>
         </div>
 

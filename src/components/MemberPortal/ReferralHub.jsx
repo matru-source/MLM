@@ -84,8 +84,8 @@ export default function ReferralHub({ member }) {
           <div className="marketing-compliance-box">
             <ShieldCheck size={18} className="text-amber" />
             <div className="marketing-compliance-text">
-              <strong>Approved Marketing Guidelines:</strong> You must always present ZEX as genuine 
-              algorithmic trading software. Guaranteed returns or income promises are strictly prohibited under Indian law.
+              <strong>Approved Marketing Guidelines:</strong> You must always present CyberShield as genuine 
+              enterprise cybersecurity and threat protection software. Guaranteed returns or income promises are strictly prohibited under Indian law.
             </div>
           </div>
         </div>
