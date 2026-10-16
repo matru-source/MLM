@@ -128,7 +128,16 @@ export default function CheckoutModal() {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-box checkout-modal-width" style={{ maxWidth: step === 'confirmed' ? '680px' : '760px' }}>
+      <div 
+        className="modal-box checkout-modal-width" 
+        style={{ 
+          maxWidth: '960px', 
+          width: '94vw', 
+          maxHeight: '94vh',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
         
         {/* Top Header */}
         <div className="checkout-top-header" style={{ position: 'relative' }}>
@@ -473,53 +482,53 @@ export default function CheckoutModal() {
           /* ========================================================
              STEP 2: PAYMENT CONFIRMATION RECEIPT & TAX INVOICE
              ======================================================== */
-          <div className="p-6">
+          <div style={{ padding: '20px 28px' }}>
             {/* Header Box */}
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                <Clock size={36} style={{ color: '#D97706' }} />
+            <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
+                <Clock size={28} style={{ color: '#D97706' }} />
               </div>
-              <span className="badge badge-amber font-xs font-bold mb-2">Awaiting Admin Bank Verification</span>
-              <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0F172A', margin: '4px 0' }}>
+              <span className="badge badge-amber font-xs font-bold mb-1" style={{ display: 'inline-block' }}>Awaiting Admin Bank Verification</span>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: '2px 0 4px' }}>
                 Payment Reference Submitted!
               </h2>
-              <p style={{ color: '#64748B', fontSize: '0.875rem', maxWidth: '480px', margin: '0 auto' }}>
+              <p style={{ color: '#64748B', fontSize: '0.84rem', maxWidth: '780px', margin: '0 auto', lineHeight: '1.45' }}>
                 Your payment submission for <strong>₹2,950</strong> has been received with UTR reference <strong>{paymentResult?.order?.utr_number}</strong>. Our accounts desk verifies incoming bank credits before activating full distributor privileges.
               </p>
             </div>
 
             {/* Official Order Receipt Card */}
-            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '18px', marginBottom: '20px' }}>
-              <div className="flex-between items-center mb-3">
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '12px 18px', marginBottom: '14px' }}>
+              <div className="flex-between items-center mb-2">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FileText size={18} className="text-primary-blue" />
-                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0F172A' }}>Provisional Payment Acknowledgment</span>
+                  <FileText size={16} className="text-primary-blue" />
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0F172A' }}>Provisional Payment Acknowledgment</span>
                 </div>
                 <span className="badge badge-amber font-xs font-bold">AWAITING ADMIN CLEARANCE ⏳</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', fontSize: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', fontSize: '0.82rem' }}>
                 <div>
-                  <span style={{ color: '#64748B', fontSize: '0.75rem', display: 'block' }}>Order Reference</span>
-                  <span className="code-font font-bold text-primary-blue">
+                  <span style={{ color: '#64748B', fontSize: '0.72rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Order Reference</span>
+                  <span className="code-font font-bold text-primary-blue" style={{ fontSize: '0.88rem' }}>
                     #{paymentResult?.order?.order_id || 'CS-PENDING'}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', fontSize: '0.75rem', display: 'block' }}>Payment Method</span>
-                  <span style={{ fontWeight: 600 }}>
+                  <span style={{ color: '#64748B', fontSize: '0.72rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Payment Method</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A' }}>
                     {paymentResult?.order?.payment_method || 'UPI (Google Pay / PhonePe)'}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', fontSize: '0.75rem', display: 'block' }}>UTR / Reference No.</span>
-                  <span className="code-font font-semibold" style={{ fontSize: '0.8rem' }}>
+                  <span style={{ color: '#64748B', fontSize: '0.72rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.4px' }}>UTR / Reference No.</span>
+                  <span className="code-font font-semibold" style={{ fontSize: '0.85rem', color: '#0F172A' }}>
                     {paymentResult?.order?.utr_number || 'UTR-CS-PENDING'}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', fontSize: '0.75rem', display: 'block' }}>Amount Paid (incl. 18% GST)</span>
-                  <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '1rem' }}>
+                  <span style={{ color: '#64748B', fontSize: '0.72rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Amount Paid (incl. 18% GST)</span>
+                  <span style={{ fontWeight: 800, color: '#0F172A', fontSize: '0.95rem' }}>
                     ₹2,950
                   </span>
                 </div>
@@ -527,43 +536,43 @@ export default function CheckoutModal() {
             </div>
 
             {/* Dual Accounts Provisioned Box */}
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                 Dual Accounts Pre-Configured via Official API
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 {/* Account 1: MLM Account */}
-                <div style={{ background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: '12px', padding: '14px' }}>
+                <div style={{ background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: '12px', padding: '12px 16px' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Account 1: Partner MLM Account
                   </div>
-                  <div style={{ fontSize: '0.82rem', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
                     <span style={{ color: '#64748B' }}>Member ID: </span>
-                    <strong className="code-font">{currentMember.member_id}</strong>
+                    <strong className="code-font">{currentMember?.member_id || 'mem_pending'}</strong>
                   </div>
-                  <div style={{ fontSize: '0.82rem', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
                     <span style={{ color: '#64748B' }}>Distributor Code: </span>
-                    <strong className="code-font text-primary-blue">{currentMember.referral_code}</strong>
+                    <strong className="code-font text-primary-blue">{currentMember?.referral_code || 'CS-PENDING'}</strong>
                   </div>
                   <div style={{ fontSize: '0.82rem' }}>
                     <span style={{ color: '#64748B' }}>Status: </span>
-                    <strong className="text-amber">Pending Admin Verification ⏳</strong>
+                    <strong className="text-amber font-semibold">Pending Admin Verification ⏳</strong>
                   </div>
                 </div>
 
                 {/* Account 2: Software License */}
-                <div style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '14px' }}>
+                <div style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '12px 16px' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Account 2: Cyber Defense License
                   </div>
-                  <div style={{ fontSize: '0.82rem', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
                     <span style={{ color: '#64748B' }}>License Key: </span>
                     <strong className="code-font text-muted" style={{ fontSize: '0.75rem' }}>
                       Locked (Unlocks Upon Bank Verification)
                     </strong>
                   </div>
-                  <div style={{ fontSize: '0.82rem', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
                     <span style={{ color: '#64748B' }}>Device Seats: </span>
                     <strong>5 Protected Devices</strong>
                   </div>
@@ -576,12 +585,12 @@ export default function CheckoutModal() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex-between flex-wrap gap-3">
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <button
                 type="button"
                 onClick={handleDownloadInvoice}
                 className="btn btn-secondary"
-                style={{ flex: 1 }}
+                style={{ flex: 1, padding: '11px 18px', fontSize: '0.88rem' }}
               >
                 <Download size={16} />
                 <span>Download Payment Acknowledgment (PDF)</span>
@@ -594,7 +603,7 @@ export default function CheckoutModal() {
                   setCurrentPage('dashboard');
                 }}
                 className="btn btn-primary"
-                style={{ flex: 1.5, fontWeight: 700 }}
+                style={{ flex: 1.2, padding: '11px 22px', fontSize: '0.88rem', fontWeight: 700 }}
               >
                 <span>Track Verification Status</span>
                 <ArrowRight size={16} />

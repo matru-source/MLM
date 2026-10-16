@@ -243,11 +243,6 @@ export default function AuthModal() {
 
     setIsAuthModalOpen(false);
     addToast('success', 'Email Verified!', 'Account created successfully. Proceed to join with ₹2,500 plan.');
-    
-    // Automatically prompt to complete ₹2,500 joining plan
-    setTimeout(() => {
-      openCheckout('Joining');
-    }, 400);
   };
 
   // Handle Login submission with Cryptographic Password Verification

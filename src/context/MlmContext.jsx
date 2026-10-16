@@ -625,7 +625,10 @@ export function MlmProvider({ children }) {
 
   // Open Checkout for a plan
   const openCheckout = (planName = 'Joining') => {
-    if (!isLoggedIn || !currentMember) {
+    const activeMemberId = currentMemberId || (typeof window !== 'undefined' ? localStorage.getItem('cybershield_currentMemberId') : null);
+    const activeMember = currentMember || (activeMemberId ? members.find(m => m.member_id === activeMemberId) : null);
+
+    if (!isLoggedIn && !activeMember && !activeMemberId) {
       setAuthMode('register');
       setIsAuthModalOpen(true);
       addToast('info', 'Registration Required', 'Please register or log in first so your partner license is tied to your account.');
