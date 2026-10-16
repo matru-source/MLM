@@ -1,0 +1,158 @@
+{
+  "info": {
+    "_postman_id": "a91b8273-5182-41f2-9591-628d61394f72",
+    "name": "CyberShield MLM Platform API Suite",
+    "description": "Comprehensive Postman test collection for CyberShield MLM Platform serverless APIs and ZEX integrations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "testMemberId",
+      "value": "MEM-TEST-001",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "partner@cybershield.net",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth APIs",
+      "item": [
+        {
+          "name": "Send OTP (Serverless)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"fullName\": \"CyberShield Partner\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/send-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "send-otp"]
+            },
+            "description": "Sends transactional OTP via Brevo backend serverless function without exposing API keys."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ZEX Integration APIs",
+      "item": [
+        {
+          "name": "Check ZEX Member Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/integrations/zex/status?member_id={{testMemberId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "integrations", "zex", "status"],
+              "query": [
+                {
+                  "key": "member_id",
+                  "value": "{{testMemberId}}"
+                }
+              ]
+            },
+            "description": "Retrieves ZEX connection status for a member. Resilient to database state."
+          },
+          "response": []
+        },
+        {
+          "name": "Initiate ZEX Connect Attempt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": \"{{testMemberId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/integrations/zex/connect",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "integrations", "zex", "connect"]
+            },
+            "description": "Creates an idempotent connection session to link a member with ZEX portal."
+          },
+          "response": []
+        },
+        {
+          "name": "ZEX Webhook (Sale Confirmed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-zex-signature",
+                "value": "sha256=test_signature_or_generated_hmac"
+              },
+              {
+                "key": "x-zex-timestamp",
+                "value": "1773000000"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"11111111-2222-3333-4444-555555555555\",\n  \"event_type\": \"sale.confirmed\",\n  \"timestamp\": \"2026-03-09T10:00:00.000Z\",\n  \"partner_id\": \"cybernetworking\",\n  \"data\": {\n    \"sale_id\": \"sale_test_999\",\n    \"buyer_member_id\": \"{{testMemberId}}\",\n    \"amount_paise\": 295000,\n    \"commission_eligible\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/integrations/zex/webhook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "integrations", "zex", "webhook"]
+            },
+            "description": "Processes incoming ZEX sales events and distributes commissions."
+          },
+          "response": []
+        },
+        {
+          "name": "ZEX OAuth Callback",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/integrations/zex/callback?state=test_state_1234567890123456&code=auth_code_sample",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "integrations", "zex", "callback"],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "test_state_1234567890123456"
+                },
+                {
+                  "key": "code",
+                  "value": "auth_code_sample"
+                }
+              ]
+            },
+            "description": "Handles the browser redirect after member authorizes ZEX connection."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
