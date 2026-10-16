@@ -314,3 +314,22 @@ export async function dbFetchZexLinkStatus(memberId) {
     return { ok: true, linked: false };
   }
 }
+
+/**
+ * 16. Update Member Profile Info (Name, Phone, etc.)
+ */
+export async function dbUpdateProfile(memberId, profile) {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_profile', memberId, profile })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[Neon DB Bridge] dbUpdateProfile error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+

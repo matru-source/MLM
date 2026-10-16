@@ -26,7 +26,8 @@ import {
   Code2,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  FileText
 } from 'lucide-react';
 
 export default function AdminPortalView() {
@@ -52,6 +53,7 @@ export default function AdminPortalView() {
   const [adminTab, setAdminTab] = useState('activations'); // 'activations' | 'payouts' | 'orders' | 'kyc' | 'webhooks'
   const [selectedPayoutForManualPay, setSelectedPayoutForManualPay] = useState(null);
   const [selectedPayoutToView, setSelectedPayoutToView] = useState(null);
+  const [selectedKycMember, setSelectedKycMember] = useState(null);
 
   // Webhook Hub State
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -598,47 +600,80 @@ export default function AdminPortalView() {
                     <th>Partner</th>
                     <th>Email</th>
                     <th>PAN Card</th>
-                    <th>Bank Account</th>
-                    <th>Aadhaar</th>
+                    <th>Bank Settlement</th>
+                    <th>Identity Proofs</th>
                     <th>Status</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {members.map(m => {
-                    const hasPan = m.kyc?.pan && m.kyc.pan.trim().length > 0;
-                    const hasBank = m.kyc?.bank_name && m.kyc?.bank_account_number;
-                    const status = m.kyc?.verification_status || (hasPan && hasBank ? 'under_review' : 'pending_documents');
+                    const hasPanText = Boolean(m.kyc?.pan && m.kyc.pan.trim().length > 0);
+                    const hasBankText = Boolean(m.kyc?.bank_name && m.kyc?.bank_account_number);
+                    const docs = m.kyc?.documents || {};
+                    const hasPanDoc = Boolean(docs.pan && docs.pan !== 'Pending Upload' && docs.pan !== 'Not Uploaded');
+                    const hasBankDoc = Boolean(docs.bankAccount && docs.bankAccount !== 'Pending Upload' && docs.bankAccount !== 'Not Uploaded');
+                    const hasAadhaarDoc = Boolean(docs.aadhaar && docs.aadhaar !== 'Pending Upload' && docs.aadhaar !== 'Not Uploaded');
+                    const hasAddressDoc = Boolean(docs.addressProof && docs.addressProof !== 'Pending Upload' && docs.addressProof !== 'Not Uploaded');
+
+                    const hasAnySubmissions = hasPanText || hasBankText || hasPanDoc || hasBankDoc || hasAadhaarDoc || hasAddressDoc;
+                    const status = m.kyc?.verification_status || (hasAnySubmissions ? 'under_review' : 'pending_documents');
                     const isVerified = status === 'verified';
                     const isUnderReview = status === 'under_review';
-                    const docs = m.kyc?.documents || {};
 
                     return (
-                      <tr key={m.member_id}>
-                        <td className="font-bold">{m.name}</td>
+                      <tr key={m.member_id || m.id}>
+                        <td>
+                          <div className="font-bold">{m.name}</div>
+                          <div className="text-xs text-muted">{m.rank || 'Partner'}</div>
+                        </td>
                         <td className="text-muted">{m.email}</td>
                         <td className="code-font">
-                          {hasPan ? (
+                          {hasPanText ? (
                             <div>
-                              <span>{m.kyc.pan}</span>
-                              <div className="text-xs text-muted">{docs.pan || 'No Document Attached'}</div>
+                              <span className="font-semibold">{m.kyc.pan}</span>
+                              <div className="text-xs text-muted">{hasPanDoc ? docs.pan : 'No File Attached'}</div>
+                            </div>
+                          ) : hasPanDoc ? (
+                            <div>
+                              <div className="text-xs font-semibold text-primary-blue">{docs.pan}</div>
+                              <span className="badge badge-amber text-xs font-normal mt-0.5 inline-block">Doc Uploaded • Text Pending</span>
                             </div>
                           ) : (
                             <span className="text-muted italic">Not Submitted</span>
                           )}
                         </td>
                         <td>
-                          {hasBank ? (
+                          {hasBankText ? (
                             <div>
-                              <span>{m.kyc.bank_name} (••••{m.kyc.bank_account_number.slice(-4)})</span>
-                              <div className="text-xs text-muted">{docs.bankAccount || 'No Document Attached'}</div>
+                              <span className="font-semibold">{m.kyc.bank_name} (••••{m.kyc.bank_account_number.slice(-4)})</span>
+                              {m.kyc.bank_ifsc && <div className="text-xs text-muted">IFSC: {m.kyc.bank_ifsc}</div>}
+                              <div className="text-xs text-muted">{hasBankDoc ? docs.bankAccount : 'No File Attached'}</div>
+                            </div>
+                          ) : hasBankDoc ? (
+                            <div>
+                              <div className="text-xs font-semibold text-primary-blue">{docs.bankAccount}</div>
+                              <span className="badge badge-amber text-xs font-normal mt-0.5 inline-block">Doc Uploaded • Details Pending</span>
                             </div>
                           ) : (
                             <span className="text-muted italic">Pending Bank Setup</span>
                           )}
                         </td>
                         <td>
-                          <div className="text-xs">{docs.aadhaar || 'Pending Upload'}</div>
+                          <div className="text-xs">
+                            <span className="text-muted">Aadhaar: </span>
+                            <span className={hasAadhaarDoc ? 'text-primary-blue font-semibold' : 'text-muted'}>
+                              {docs.aadhaar || 'Pending Upload'}
+                            </span>
+                          </div>
+                          {docs.addressProof && (
+                            <div className="text-xs mt-0.5">
+                              <span className="text-muted">Address: </span>
+                              <span className={hasAddressDoc ? 'text-primary-blue font-semibold' : 'text-muted'}>
+                                {docs.addressProof}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td>
                           <span className={`badge ${isVerified ? 'badge-green' : (isUnderReview ? 'badge-amber' : 'badge-neutral')}`}>
@@ -647,26 +682,28 @@ export default function AdminPortalView() {
                         </td>
                         <td>
                           <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedKycMember(m)}
+                              className="btn btn-secondary btn-sm py-1 px-2 text-xs"
+                              title="Inspect full partner KYC dossier"
+                            >
+                              Details
+                            </button>
                             {!isVerified && (
                               <button 
-                                onClick={() => approveKyc(m.member_id)}
+                                type="button"
+                                onClick={() => approveKyc(m.member_id || m.id)}
                                 className="btn btn-primary btn-sm py-1 px-2 text-xs"
                                 title="Approve KYC documents"
                               >
                                 Approve
                               </button>
                             )}
-                            {isVerified && (
-                              <button 
-                                onClick={() => addToast('info', 'Partner KYC', `${m.name}: KYC verified and compliant`)}
-                                className="btn btn-secondary btn-sm py-1 px-2 text-xs"
-                              >
-                                Details
-                              </button>
-                            )}
                             {!isVerified && (
                               <button 
-                                onClick={() => rejectKyc(m.member_id, 'Document illegible or mismatched')}
+                                type="button"
+                                onClick={() => rejectKyc(m.member_id || m.id, 'Document illegible or mismatched')}
                                 className="btn btn-secondary btn-sm py-1 px-2 text-xs text-rose"
                                 title="Reject KYC"
                               >
@@ -1249,6 +1286,114 @@ export default function AdminPortalView() {
           </div>
         </div>
       )}
+
+      {/* MODAL: Full KYC Dossier Review */}
+      {selectedKycMember && (() => {
+        const m = selectedKycMember;
+        const docs = m.kyc?.documents || {};
+        const isVerified = m.kyc?.verification_status === 'verified';
+        return (
+          <div className="receipt-modal-backdrop" onClick={() => setSelectedKycMember(null)}>
+            <div className="receipt-modal-content card-white max-w-2xl" onClick={e => e.stopPropagation()}>
+              <div className="receipt-modal-header flex-between items-center border-b pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={22} className="text-primary-blue" />
+                  <h3 className="section-title-large">Partner KYC Dossier</h3>
+                </div>
+                <button type="button" onClick={() => setSelectedKycMember(null)} className="btn-icon">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Header Summary */}
+                <div className="p-3 bg-card-alt border-rounded flex-between items-center">
+                  <div>
+                    <h4 className="font-bold text-base">{m.name}</h4>
+                    <span className="text-muted text-xs">{m.email} • ID: {m.member_id || m.id}</span>
+                  </div>
+                  <span className={`badge ${isVerified ? 'badge-green' : 'badge-amber'}`}>
+                    {isVerified ? 'KYC Verified ✓' : 'Under Review'}
+                  </span>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="card-alt p-3 border-rounded">
+                    <span className="text-xs text-muted block mb-1 font-semibold">1. Permanent Account Number (PAN)</span>
+                    <div className="font-bold code-font text-sm">{m.kyc?.pan || 'PAN Number Pending'}</div>
+                    <div className="text-xs text-primary-blue mt-1">
+                      Doc: {docs.pan || 'No file attached'}
+                    </div>
+                  </div>
+
+                  <div className="card-alt p-3 border-rounded">
+                    <span className="text-xs text-muted block mb-1 font-semibold">2. Bank Settlement Account</span>
+                    <div className="font-bold text-sm">{m.kyc?.bank_name || 'Bank Name Pending'}</div>
+                    <div className="text-xs code-font text-muted">A/C: {m.kyc?.bank_account_number || 'Pending'} • IFSC: {m.kyc?.bank_ifsc || 'Pending'}</div>
+                    <div className="text-xs text-primary-blue mt-1">
+                      Doc: {docs.bankAccount || 'No file attached'}
+                    </div>
+                  </div>
+
+                  <div className="card-alt p-3 border-rounded">
+                    <span className="text-xs text-muted block mb-1 font-semibold">3. Aadhaar Identity Proof</span>
+                    <div className="text-xs font-semibold text-primary-blue">{docs.aadhaar || 'Pending Upload'}</div>
+                  </div>
+
+                  <div className="card-alt p-3 border-rounded">
+                    <span className="text-xs text-muted block mb-1 font-semibold">4. Address Proof</span>
+                    <div className="text-xs font-semibold text-primary-blue">{docs.addressProof || 'Pending Upload'}</div>
+                  </div>
+                </div>
+
+                {/* Compliance & Agreement */}
+                <div className="p-3 bg-card-alt border-rounded text-xs text-muted flex-between">
+                  <div>
+                    <span>Direct Selling Agreement: </span>
+                    <strong className="text-primary">{m.kyc?.agreement_version || 'v2026.1'} Accepted</strong>
+                  </div>
+                  {m.kyc?.submitted_at && (
+                    <span>Submitted: {new Date(m.kyc.submitted_at).toLocaleDateString('en-IN')}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="receipt-modal-footer flex-between items-center mt-6 pt-3 border-t">
+                <button type="button" onClick={() => setSelectedKycMember(null)} className="btn btn-secondary">
+                  Close
+                </button>
+                <div className="flex items-center gap-2">
+                  {!isVerified && (
+                    <>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          rejectKyc(m.member_id || m.id, 'Document illegible or mismatched');
+                          setSelectedKycMember(null);
+                        }} 
+                        className="btn btn-secondary text-rose"
+                      >
+                        Reject KYC
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          approveKyc(m.member_id || m.id);
+                          setSelectedKycMember(null);
+                        }} 
+                        className="btn btn-primary"
+                      >
+                        Approve KYC
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

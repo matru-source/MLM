@@ -27,6 +27,7 @@ import {
   dbCreateOrder,
   dbFetchTransactions,
   dbUpdateKyc,
+  dbUpdateProfile,
   dbFetchZexLinkStatus
 } from '../services/neonDbService';
 import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
@@ -257,9 +258,14 @@ export function MlmProvider({ children }) {
         const { members: liveMembers, activations: liveActivations, payouts: livePayouts, orders: liveOrders, transactions: liveTxs } = res.data;
 
         if (Array.isArray(liveMembers) && liveMembers.length > 0) {
-          setMembers(liveMembers);
+          const normalizedMembers = liveMembers.map(m => ({
+            ...m,
+            member_id: m.member_id || m.id,
+            id: m.member_id || m.id
+          }));
+          setMembers(normalizedMembers);
           setIsDbConnected(true);
-          const current = liveMembers.find(m => m.member_id === currentMemberId);
+          const current = normalizedMembers.find(m => m.member_id === currentMemberId);
           if (current) {
             setAvailableBalance(Number(current.wallet_balance || 0));
             setTotalEarnings(Number(current.total_earnings || 0));
@@ -1087,11 +1093,12 @@ export function MlmProvider({ children }) {
     const verificationStatus = hasDocuments ? 'under_review' : 'pending_documents';
 
     const updatedKyc = {
-      legal_name: kycDetails.legal_name || existingMember?.name,
-      pan: (kycDetails.pan || '').toUpperCase().trim(),
-      bank_name: kycDetails.bank_name || '',
-      bank_account_number: (kycDetails.bank_account_number || '').trim(),
-      bank_ifsc: (kycDetails.bank_ifsc || '').toUpperCase().trim(),
+      ...existingKyc,
+      legal_name: kycDetails.legal_name || existingKyc.legal_name || existingMember?.name,
+      pan: kycDetails.pan !== undefined ? (kycDetails.pan || '').toUpperCase().trim() : (existingKyc.pan || ''),
+      bank_name: kycDetails.bank_name !== undefined ? (kycDetails.bank_name || '') : (existingKyc.bank_name || ''),
+      bank_account_number: kycDetails.bank_account_number !== undefined ? (kycDetails.bank_account_number || '').trim() : (existingKyc.bank_account_number || ''),
+      bank_ifsc: kycDetails.bank_ifsc !== undefined ? (kycDetails.bank_ifsc || '').toUpperCase().trim() : (existingKyc.bank_ifsc || ''),
       verification_status: verificationStatus,
       agreement_accepted: true,
       agreement_version: 'v2026.1',
@@ -1114,6 +1121,23 @@ export function MlmProvider({ children }) {
     } else {
       addToast('warning', 'Bank Details Saved (Documents Pending)', 'Bank details saved, but please upload your PAN and Aadhaar identity documents for compliance verification.');
     }
+    return true;
+  };
+
+  // Update Member Profile (Name, Phone, DOB, etc.)
+  const updateMemberProfile = (memberId, profileData) => {
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === memberId) {
+        return {
+          ...m,
+          ...profileData
+        };
+      }
+      return m;
+    }));
+
+    dbUpdateProfile(memberId, profileData).catch(err => console.warn('[Neon DB] dbUpdateProfile error:', err));
+    addToast('success', 'Profile Updated', 'Personal details saved successfully.');
     return true;
   };
 
@@ -1514,6 +1538,7 @@ export function MlmProvider({ children }) {
       getMemberByReferralCode,
       validateReferralCode,
       submitKyc,
+      updateMemberProfile,
       uploadKycDocument,
       approveKyc,
       rejectKyc,

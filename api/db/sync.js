@@ -162,6 +162,8 @@ export default async function handler(req, res) {
 
       const formattedMembers = members.map(r => ({
         ...r,
+        id: r.member_id || r.id,
+        member_id: r.member_id || r.id,
         password: r.password || '',
         wallet_balance: Number(r.wallet_balance || 0),
         total_earnings: Number(r.total_earnings || 0),
@@ -625,6 +627,19 @@ export default async function handler(req, res) {
         await sql`
           UPDATE members
           SET password = ${passwordHash}
+          WHERE id = ${memberId};
+        `;
+        return res.status(200).json({ ok: true });
+      }
+
+      // 2k. Update Member Profile Information
+      if (action === 'update_profile') {
+        const { memberId, profile = {} } = body;
+        await sql`
+          UPDATE members
+          SET 
+            name = COALESCE(${profile.name || null}, name),
+            phone = COALESCE(${profile.phone || null}, phone)
           WHERE id = ${memberId};
         `;
         return res.status(200).json({ ok: true });

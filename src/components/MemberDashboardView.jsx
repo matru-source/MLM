@@ -54,6 +54,8 @@ export default function MemberDashboardView() {
     payoutRequests,
     pendingPayoutsTotal,
     requestWithdrawal,
+    submitKyc,
+    updateMemberProfile,
     uploadKycDocument,
     isDbConnected,
     logout,
@@ -1542,12 +1544,23 @@ export default function MemberDashboardView() {
 
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  addToast('success', 'Profile Updated!', 'Personal details saved successfully.');
+                  const formData = new FormData(e.target);
+                  const updatedData = {
+                    name: (formData.get('name') || '').trim() || currentMember?.name,
+                    email: currentMember?.email,
+                    phone: (formData.get('phone') || '').trim() || currentMember?.phone,
+                    dob: (formData.get('dob') || '').trim(),
+                    gender: formData.get('gender') || 'Male',
+                    city: (formData.get('city') || '').trim(),
+                    address: (formData.get('address') || '').trim()
+                  };
+                  updateMemberProfile(currentMember.member_id || currentMember.id, updatedData);
                 }} className="kyc-form-grid">
                   <div className="form-group-clean">
                     <label className="form-label-clean">Full Name</label>
                     <input 
                       type="text" 
+                      name="name"
                       defaultValue={currentMember?.name || ''} 
                       placeholder="Enter legal full name"
                       className="form-input-clean" 
@@ -1556,12 +1569,13 @@ export default function MemberDashboardView() {
                   </div>
 
                   <div className="form-group-clean">
-                    <label className="form-label-clean">Email Address</label>
+                    <label className="form-label-clean">Email Address (Read-only)</label>
                     <input 
                       type="email" 
-                      defaultValue={currentMember?.email || ''} 
-                      placeholder="name@example.com"
-                      className="form-input-clean" 
+                      name="email"
+                      value={currentMember?.email || ''} 
+                      readOnly
+                      className="form-input-clean opacity-75" 
                       required 
                     />
                   </div>
@@ -1570,6 +1584,7 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">Mobile Number</label>
                     <input 
                       type="tel" 
+                      name="phone"
                       defaultValue={currentMember?.phone || ''} 
                       placeholder="10-digit mobile number"
                       className="form-input-clean" 
@@ -1581,6 +1596,7 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">Date of Birth</label>
                     <input 
                       type="text" 
+                      name="dob"
                       defaultValue={currentMember?.dob || ''} 
                       placeholder="DD/MM/YYYY"
                       className="form-input-clean" 
@@ -1589,7 +1605,7 @@ export default function MemberDashboardView() {
 
                   <div className="form-group-clean">
                     <label className="form-label-clean">Gender</label>
-                    <select defaultValue={currentMember?.gender || 'Male'} className="form-input-clean">
+                    <select name="gender" defaultValue={currentMember?.gender || 'Male'} className="form-input-clean">
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
@@ -1600,6 +1616,7 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">City & State</label>
                     <input 
                       type="text" 
+                      name="city"
                       defaultValue={currentMember?.city || ''} 
                       placeholder="e.g. City, State"
                       className="form-input-clean" 
@@ -1610,6 +1627,7 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">Residential Address</label>
                     <input 
                       type="text" 
+                      name="address"
                       defaultValue={currentMember?.address || ''} 
                       placeholder="Enter flat / house no., street, PIN code"
                       className="form-input-clean" 
@@ -1618,7 +1636,7 @@ export default function MemberDashboardView() {
 
                   <div className="full-grid-width mt-2">
                     <button type="submit" className="btn btn-primary">
-                      Save Changes
+                      Save Personal Details
                     </button>
                   </div>
                 </form>
@@ -1815,6 +1833,103 @@ export default function MemberDashboardView() {
                       <div className="font-bold text-lg text-secondary mt-1">Unregistered</div>
                       <span className="text-muted text-xs mt-2 block">Turnover below ₹20 Lakh threshold</span>
                     </div>
+                  </div>
+
+                  {/* Bank Settlement & Tax Details Form */}
+                  <div className="card-white p-5 mt-4">
+                    <h5 className="font-bold text-base mb-1">Bank Settlement & Statutory Tax Account</h5>
+                    <p className="text-muted text-xs mb-4">Enter your Permanent Account Number (PAN) and verified bank account details to receive direct commission payouts via IMPS/NEFT.</p>
+
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.target);
+                      const panVal = (formData.get('pan') || '').toUpperCase().trim();
+                      const bankNameVal = (formData.get('bank_name') || '').trim();
+                      const accountVal = (formData.get('bank_account_number') || '').trim();
+                      const ifscVal = (formData.get('bank_ifsc') || '').toUpperCase().trim();
+                      const legalNameVal = (formData.get('legal_name') || '').trim();
+
+                      if (panVal && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panVal)) {
+                        addToast('error', 'Invalid PAN Format', 'PAN must be 10 alphanumeric characters (e.g., ABCDE1234F).');
+                        return;
+                      }
+
+                      if (ifscVal && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscVal)) {
+                        addToast('error', 'Invalid IFSC Format', 'IFSC code must be 11 characters (e.g., HDFC0001234).');
+                        return;
+                      }
+
+                      submitKyc(currentMember.member_id || currentMember.id, {
+                        pan: panVal,
+                        bank_name: bankNameVal,
+                        bank_account_number: accountVal,
+                        bank_ifsc: ifscVal,
+                        legal_name: legalNameVal || currentMember?.name
+                      });
+                    }} className="kyc-form-grid">
+                      <div className="form-group-clean">
+                        <label className="form-label-clean">10-Digit PAN Number</label>
+                        <input 
+                          type="text" 
+                          name="pan"
+                          defaultValue={currentMember?.kyc?.pan || ''} 
+                          placeholder="e.g. ABCDE1234F"
+                          maxLength={10}
+                          className="form-input-clean code-font uppercase" 
+                        />
+                      </div>
+
+                      <div className="form-group-clean">
+                        <label className="form-label-clean">Legal Name (As on PAN & Bank)</label>
+                        <input 
+                          type="text" 
+                          name="legal_name"
+                          defaultValue={currentMember?.kyc?.legal_name || currentMember?.name || ''} 
+                          placeholder="Legal full name"
+                          className="form-input-clean" 
+                        />
+                      </div>
+
+                      <div className="form-group-clean">
+                        <label className="form-label-clean">Settlement Bank Name</label>
+                        <input 
+                          type="text" 
+                          name="bank_name"
+                          defaultValue={currentMember?.kyc?.bank_name || ''} 
+                          placeholder="e.g. HDFC Bank, SBI, ICICI"
+                          className="form-input-clean" 
+                        />
+                      </div>
+
+                      <div className="form-group-clean">
+                        <label className="form-label-clean">Bank Account Number</label>
+                        <input 
+                          type="text" 
+                          name="bank_account_number"
+                          defaultValue={currentMember?.kyc?.bank_account_number || ''} 
+                          placeholder="Enter bank account number"
+                          className="form-input-clean code-font" 
+                        />
+                      </div>
+
+                      <div className="form-group-clean">
+                        <label className="form-label-clean">Bank IFSC Code</label>
+                        <input 
+                          type="text" 
+                          name="bank_ifsc"
+                          defaultValue={currentMember?.kyc?.bank_ifsc || ''} 
+                          placeholder="e.g. HDFC0001234"
+                          maxLength={11}
+                          className="form-input-clean code-font uppercase" 
+                        />
+                      </div>
+
+                      <div className="full-grid-width mt-2">
+                        <button type="submit" className="btn btn-primary">
+                          Save Bank & Tax Details
+                        </button>
+                      </div>
+                    </form>
                   </div>
 
                 <div className="tax-certificates-card card-white p-5 mt-4">
