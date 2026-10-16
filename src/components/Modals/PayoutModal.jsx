@@ -12,7 +12,13 @@ export default function PayoutModal({ isOpen, onClose, member }) {
 
   const wallet = getMemberWallet(member.member_id);
   const numAmount = Number(amount) || 0;
-  const tds = Math.round(numAmount * 0.05); // 5% TDS
+  
+  // Section 206AA compliance: 5% TDS with valid PAN, 20% without PAN
+  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  const memberPan = (member?.kyc?.pan || '').trim().toUpperCase();
+  const hasValidPan = panRegex.test(memberPan);
+  const tdsRate = hasValidPan ? 0.05 : 0.20;
+  const tds = Math.round(numAmount * tdsRate);
   const netAmount = Math.max(0, numAmount - tds);
 
   const handleSubmit = (e) => {
@@ -41,7 +47,7 @@ export default function PayoutModal({ isOpen, onClose, member }) {
           <div className="modal-header-left">
             <div className="zex-secure-badge">
               <Wallet size={12} />
-              <span>Section 194H Compliant Payout</span>
+              <span>{hasValidPan ? 'Section 194H Compliant Payout (5% TDS)' : 'Section 206AA Compliant Payout (20% TDS)'}</span>
             </div>
             <h2 className="modal-title">Request Commission Payout</h2>
           </div>
@@ -101,9 +107,16 @@ export default function PayoutModal({ isOpen, onClose, member }) {
                 <span className="code-font">{formatINR(numAmount)}</span>
               </div>
               <div className="tax-row">
-                <span>Tax Deducted at Source (TDS 5% under Sec 194H):</span>
+                <span>
+                  Tax Deducted at Source ({hasValidPan ? 'TDS 5% under Sec 194H' : 'TDS 20% under Sec 206AA - No PAN'}):
+                </span>
                 <span className="code-font text-rose">-{formatINR(tds)}</span>
               </div>
+              {!hasValidPan && (
+                <div style={{ fontSize: '11px', color: '#b45309', background: '#fef3c7', padding: '6px 10px', borderRadius: '6px', marginTop: '4px' }}>
+                  ⚠️ Statutory Notice: Indian law requires 20% TDS without a valid PAN. Link your PAN in Profile &gt; KYC to reduce TDS to 5%.
+                </div>
+              )}
               <div className="tax-row net-payout-row">
                 <span>Net Credited to Verified Bank Account:</span>
                 <span className="code-font text-emerald font-bold">{formatINR(netAmount)}</span>

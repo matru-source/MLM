@@ -33,7 +33,8 @@ import {
   ExternalLink,
   Link2,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Upload
 } from 'lucide-react';
 import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
 
@@ -53,6 +54,7 @@ export default function MemberDashboardView() {
     payoutRequests,
     pendingPayoutsTotal,
     requestWithdrawal,
+    uploadKycDocument,
     isDbConnected,
     logout,
     addToast,
@@ -1165,25 +1167,39 @@ export default function MemberDashboardView() {
                     </div>
 
                     {/* Statutory Calculation Breakdown */}
-                    {Number(withdrawAmount) >= 500 && (
-                      <div className="payout-tax-breakdown-card">
-                        <div className="tax-row">
-                          <span className="text-muted">Gross Amount Requested</span>
-                          <span className="font-bold">₹{Number(withdrawAmount).toLocaleString('en-IN')}</span>
+                    {Number(withdrawAmount) >= 500 && (() => {
+                      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+                      const hasPan = panRegex.test((currentMember?.kyc?.pan || '').trim().toUpperCase());
+                      const rate = hasPan ? 0.05 : 0.20;
+                      const calculatedTds = Math.round(Number(withdrawAmount) * rate);
+                      const netEstimated = Number(withdrawAmount) - calculatedTds;
+                      return (
+                        <div className="payout-tax-breakdown-card">
+                          <div className="tax-row">
+                            <span className="text-muted">Gross Amount Requested</span>
+                            <span className="font-bold">₹{Number(withdrawAmount).toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="tax-row">
+                            <span className="text-muted">
+                              {hasPan ? '5% Statutory TDS (Sec 194H)' : '20% Statutory TDS (Sec 206AA - No PAN)'}
+                            </span>
+                            <span className="text-rose font-semibold">-₹{calculatedTds.toLocaleString('en-IN')}</span>
+                          </div>
+                          {!hasPan && (
+                            <div style={{ fontSize: '11px', color: '#b45309', background: '#fef3c7', padding: '6px 10px', borderRadius: '6px', margin: '4px 0' }}>
+                              ⚠️ Statutory Notice: Indian law mandates 20% TDS under Section 206AA when no valid PAN is linked. Update your PAN in KYC to reduce TDS to 5%.
+                            </div>
+                          )}
+                          <div className="tax-divider" />
+                          <div className="tax-row net-row">
+                            <span className="font-bold text-primary">Net Bank Deposit (Estimated)</span>
+                            <span className="font-extrabold text-success text-base">
+                              ₹{netEstimated.toLocaleString('en-IN')}
+                            </span>
+                          </div>
                         </div>
-                        <div className="tax-row">
-                          <span className="text-muted">5% Statutory TDS (Direct Selling Rules)</span>
-                          <span className="text-rose font-semibold">-₹{Math.round(Number(withdrawAmount) * 0.05).toLocaleString('en-IN')}</span>
-                        </div>
-                        <div className="tax-divider" />
-                        <div className="tax-row net-row">
-                          <span className="font-bold text-primary">Net Bank Deposit (Estimated)</span>
-                          <span className="font-extrabold text-success text-base">
-                            ₹{(Number(withdrawAmount) - Math.round(Number(withdrawAmount) * 0.05)).toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     <div className="withdraw-notice-box">
                       <AlertCircle size={15} className="text-amber flex-shrink-0" />
@@ -1450,9 +1466,15 @@ export default function MemberDashboardView() {
                 className="kyc-large-avatar"
               />
               <div>
-                <h3 className="kyc-user-name">{currentMember?.name || 'Matru Prasad Panda'}</h3>
-                <span className="badge badge-amber">{currentMember?.rank || 'Silver Member'}</span>
-                <span className="badge badge-green ml-2">KYC Verified ✓</span>
+                <h3 className="kyc-user-name">{currentMember?.name || 'Registered Partner'}</h3>
+                <span className="badge badge-amber">{currentMember?.rank || 'Partner Member'}</span>
+                {(() => {
+                  const status = currentMember?.kyc?.verification_status;
+                  if (status === 'verified') return <span className="badge badge-green ml-2">KYC Verified ✓</span>;
+                  if (status === 'under_review') return <span className="badge badge-blue ml-2">KYC Under Review</span>;
+                  if (status === 'rejected') return <span className="badge badge-rose ml-2">KYC Rejected</span>;
+                  return <span className="badge badge-amber ml-2">KYC Documents Pending</span>;
+                })()}
               </div>
             </div>
 
@@ -1547,139 +1569,197 @@ export default function MemberDashboardView() {
               </div>
             )}
 
-            {/* TAB 2: KYC DOCUMENTS (Matching Screen 8) */}
-            {kycTab === 'documents' && (
-              <div className="tab-pane-content">
-                <h4 className="tab-pane-title">Statutory Identity & Banking Documents</h4>
-                <p className="tab-pane-sub">Required by Direct Selling Rules, 2021 before commission withdrawal.</p>
+            {/* TAB 2: KYC DOCUMENTS */}
+            {kycTab === 'documents' && (() => {
+              const checkDocStatus = (docVal) => {
+                if (!docVal || docVal === 'Pending' || docVal === 'Pending Upload' || docVal === 'Not Uploaded') {
+                  return { label: 'Pending Upload', badge: 'badge-neutral', isUploaded: false, isVerified: false };
+                }
+                if (currentMember?.kyc?.verification_status === 'verified' || docVal.includes('Verified')) {
+                  return { label: 'Verified ✓', badge: 'badge-green', isUploaded: true, isVerified: true };
+                }
+                return { label: 'Under Review', badge: 'badge-amber', isUploaded: true, isVerified: false };
+              };
 
-                <div className="documents-upload-grid">
-                  {/* Doc 1: Aadhaar */}
-                  <div className="doc-item-card">
-                    <div className="doc-info">
-                      <FileText size={20} className="text-primary-blue" />
-                      <div>
-                        <div className="doc-title">Aadhaar Card</div>
-                        <div className="doc-sub">Identity & Address verification (••••{currentMember?.kyc?.aadhaar ? currentMember.kyc.aadhaar.slice(-4) : '----'})</div>
-                      </div>
-                    </div>
-                    <div className="doc-actions-pill">
-                      <span className={`badge ${currentMember?.kyc?.aadhaar ? 'badge-green' : 'badge-neutral'}`}>
-                        {currentMember?.kyc?.aadhaar ? 'Uploaded ✓' : 'Pending'}
-                      </span>
-                      <button 
-                        type="button" 
-                        onClick={() => addToast('info', 'Aadhaar Status', currentMember?.kyc?.aadhaar ? 'Aadhaar verified via DigiLocker token.' : 'Please upload your Aadhaar in KYC.')}
-                        className="btn-link-action"
-                      >
-                        View
-                      </button>
-                    </div>
-                  </div>
+              const handleDocUpload = (docKey) => (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                  addToast('error', 'File Too Large', 'Maximum file size allowed is 5MB.');
+                  return;
+                }
+                uploadKycDocument(currentMember.member_id, docKey, {
+                  name: file.name,
+                  size: (file.size / 1024).toFixed(1) + ' KB',
+                  type: file.type
+                });
+              };
 
-                  {/* Doc 2: PAN */}
-                  <div className="doc-item-card">
-                    <div className="doc-info">
-                      <FileText size={20} className="text-primary-blue" />
-                      <div>
-                        <div className="doc-title">PAN Card</div>
-                        <div className="doc-sub">Tax ID for commission payouts ({currentMember?.kyc?.pan || 'Not Submitted'})</div>
-                      </div>
-                    </div>
-                    <div className="doc-actions-pill">
-                      <span className={`badge ${currentMember?.kyc?.pan ? 'badge-green' : 'badge-neutral'}`}>
-                        {currentMember?.kyc?.pan ? 'Uploaded ✓' : 'Pending'}
-                      </span>
-                      <button 
-                        type="button" 
-                        onClick={() => addToast('info', 'PAN Status', currentMember?.kyc?.pan ? `PAN ${currentMember.kyc.pan} validated with NSDL database.` : 'Please upload your PAN card.')}
-                        className="btn-link-action"
-                      >
-                        View
-                      </button>
-                    </div>
-                  </div>
+              const aadhaarStatus = checkDocStatus(currentMember?.kyc?.documents?.aadhaar);
+              const panStatus = checkDocStatus(currentMember?.kyc?.documents?.pan);
+              const addressStatus = checkDocStatus(currentMember?.kyc?.documents?.addressProof);
+              const bankStatus = checkDocStatus(currentMember?.kyc?.documents?.bankAccount);
 
-                  {/* Doc 3: Address Proof */}
-                  <div className="doc-item-card">
-                    <div className="doc-info">
-                      <FileText size={20} className="text-primary-blue" />
-                      <div>
-                        <div className="doc-title">Address Proof</div>
-                        <div className="doc-sub">Electricity bill / Bank statement</div>
-                      </div>
-                    </div>
-                    <div className="doc-actions-pill">
-                      <span className={`badge ${currentMember?.kyc?.documents?.addressProof === 'Uploaded' ? 'badge-green' : 'badge-neutral'}`}>
-                        {currentMember?.kyc?.documents?.addressProof === 'Uploaded' ? 'Uploaded ✓' : 'Pending'}
-                      </span>
-                      <button 
-                        type="button" 
-                        onClick={() => addToast('info', 'Address Verified', currentMember?.kyc?.documents?.addressProof === 'Uploaded' ? 'Address matching partner record.' : 'Please upload your address proof document.')}
-                        className="btn-link-action"
-                      >
-                        View
-                      </button>
-                    </div>
-                  </div>
+              return (
+                <div className="tab-pane-content">
+                  <h4 className="tab-pane-title">Statutory Identity & Banking Documents</h4>
+                  <p className="tab-pane-sub">Required under Direct Selling Rules, 2021 before commission withdrawals are authorized.</p>
 
-                  {/* Doc 4: Bank Account */}
-                  <div className="doc-item-card">
-                    <div className="doc-info">
-                      <FileText size={20} className="text-primary-blue" />
-                      <div>
-                        <div className="doc-title">Bank Account (Passbook / Cancelled Cheque)</div>
-                        <div className="doc-sub">
-                          {currentMember?.kyc?.bank_account_number 
-                            ? `${currentMember.kyc.bank_name || 'Bank'} ••••${currentMember.kyc.bank_account_number.slice(-4)} (Verified for instant payouts)`
-                            : 'Bank Account Not Linked'}
+                  <div className="documents-upload-grid">
+                    {/* Doc 1: Aadhaar */}
+                    <div className="doc-item-card">
+                      <div className="doc-info">
+                        <FileText size={20} className="text-primary-blue" />
+                        <div>
+                          <div className="doc-title">Aadhaar Card</div>
+                          <div className="doc-sub">
+                            {currentMember?.kyc?.documents?.aadhaar || 'Identity & Address verification document'}
+                          </div>
                         </div>
                       </div>
+                      <div className="doc-actions-pill">
+                        <span className={`badge ${aadhaarStatus.badge}`}>
+                          {aadhaarStatus.label}
+                        </span>
+                        <input 
+                          type="file" 
+                          id="dash-upload-aadhaar" 
+                          accept="image/*,.pdf" 
+                          style={{ display: 'none' }} 
+                          onChange={handleDocUpload('aadhaar')} 
+                        />
+                        <label htmlFor="dash-upload-aadhaar" className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                          <Upload size={12} className="inline mr-1" />
+                          <span>{aadhaarStatus.isUploaded ? 'Replace' : 'Upload'}</span>
+                        </label>
+                      </div>
                     </div>
-                    <div className="doc-actions-pill">
-                      <span className={`badge ${currentMember?.kyc?.bank_account_number ? 'badge-green' : 'badge-amber'}`}>
-                        {currentMember?.kyc?.bank_account_number ? 'Uploaded ✓' : 'Pending'}
-                      </span>
-                      <button 
-                        type="button" 
-                        onClick={() => addToast('info', 'Bank Status', currentMember?.kyc?.bank_account_number ? 'Penny-drop verification confirmed.' : 'Please link your bank account.')}
-                        className="btn-link-action"
-                      >
-                        View
-                      </button>
+
+                    {/* Doc 2: PAN Card */}
+                    <div className="doc-item-card">
+                      <div className="doc-info">
+                        <FileText size={20} className="text-primary-blue" />
+                        <div>
+                          <div className="doc-title">PAN Card (Form 16A / Section 194H)</div>
+                          <div className="doc-sub">
+                            {currentMember?.kyc?.documents?.pan || (currentMember?.kyc?.pan ? `PAN: ${currentMember.kyc.pan}` : 'Mandatory tax ID document')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="doc-actions-pill">
+                        <span className={`badge ${panStatus.badge}`}>
+                          {panStatus.label}
+                        </span>
+                        <input 
+                          type="file" 
+                          id="dash-upload-pan" 
+                          accept="image/*,.pdf" 
+                          style={{ display: 'none' }} 
+                          onChange={handleDocUpload('pan')} 
+                        />
+                        <label htmlFor="dash-upload-pan" className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                          <Upload size={12} className="inline mr-1" />
+                          <span>{panStatus.isUploaded ? 'Replace' : 'Upload'}</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Doc 3: Address Proof */}
+                    <div className="doc-item-card">
+                      <div className="doc-info">
+                        <FileText size={20} className="text-primary-blue" />
+                        <div>
+                          <div className="doc-title">Address Proof</div>
+                          <div className="doc-sub">
+                            {currentMember?.kyc?.documents?.addressProof || 'Electricity bill / Utility / Rent agreement'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="doc-actions-pill">
+                        <span className={`badge ${addressStatus.badge}`}>
+                          {addressStatus.label}
+                        </span>
+                        <input 
+                          type="file" 
+                          id="dash-upload-address" 
+                          accept="image/*,.pdf" 
+                          style={{ display: 'none' }} 
+                          onChange={handleDocUpload('addressProof')} 
+                        />
+                        <label htmlFor="dash-upload-address" className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                          <Upload size={12} className="inline mr-1" />
+                          <span>{addressStatus.isUploaded ? 'Replace' : 'Upload'}</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Doc 4: Bank Account Proof */}
+                    <div className="doc-item-card">
+                      <div className="doc-info">
+                        <FileText size={20} className="text-primary-blue" />
+                        <div>
+                          <div className="doc-title">Bank Passbook / Cancelled Cheque</div>
+                          <div className="doc-sub">
+                            {currentMember?.kyc?.documents?.bankAccount || (currentMember?.kyc?.bank_account_number ? `A/C ending in ••••${currentMember.kyc.bank_account_number.slice(-4)}` : 'Proof of bank payout settlement account')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="doc-actions-pill">
+                        <span className={`badge ${bankStatus.badge}`}>
+                          {bankStatus.label}
+                        </span>
+                        <input 
+                          type="file" 
+                          id="dash-upload-bank" 
+                          accept="image/*,.pdf" 
+                          style={{ display: 'none' }} 
+                          onChange={handleDocUpload('bankAccount')} 
+                        />
+                        <label htmlFor="dash-upload-bank" className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                          <Upload size={12} className="inline mr-1" />
+                          <span>{bankStatus.isUploaded ? 'Replace' : 'Upload'}</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* TAB 3: TAX DETAILS */}
-            {kycTab === 'tax' && (
-              <div className="tab-pane-content">
-                <h4 className="tab-pane-title">Tax Details & TDS Compliance</h4>
-                <p className="tab-pane-sub">Income tax withholdings as per Section 194H of the Indian Income Tax Act.</p>
+            {kycTab === 'tax' && (() => {
+              const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+              const hasValidPan = panRegex.test((currentMember?.kyc?.pan || '').trim().toUpperCase());
+              return (
+                <div className="tab-pane-content">
+                  <h4 className="tab-pane-title">Tax Details & TDS Compliance</h4>
+                  <p className="tab-pane-sub">Income tax withholdings as per Section 194H & Section 206AA of the Indian Income Tax Act.</p>
 
-                <div className="tax-details-grid">
-                  <div className="tax-stat-box card-white p-4">
-                    <span className="text-muted text-xs">Permanent Account Number (PAN)</span>
-                    <div className="font-bold text-lg code-font mt-1">{currentMember?.kyc?.pan || 'Not Submitted'}</div>
-                    <span className={`badge ${currentMember?.kyc?.pan ? 'badge-green' : 'badge-amber'} font-xs mt-2`}>
-                      {currentMember?.kyc?.pan ? 'Verified with ITD' : 'Pending Submission'}
-                    </span>
-                  </div>
+                  <div className="tax-details-grid">
+                    <div className="tax-stat-box card-white p-4">
+                      <span className="text-muted text-xs">Permanent Account Number (PAN)</span>
+                      <div className="font-bold text-lg code-font mt-1">{currentMember?.kyc?.pan || 'Not Submitted'}</div>
+                      <span className={`badge ${hasValidPan ? 'badge-green' : 'badge-amber'} font-xs mt-2`}>
+                        {hasValidPan ? 'Verified with ITD (5% TDS)' : 'Pending Submission (20% TDS)'}
+                      </span>
+                    </div>
 
-                  <div className="tax-stat-box card-white p-4">
-                    <span className="text-muted text-xs">Statutory TDS Rate (Sec 194H)</span>
-                    <div className="font-bold text-lg text-primary-blue mt-1">5.0%</div>
-                    <span className="text-muted text-xs mt-2 block">Deducted automatically on payouts</span>
-                  </div>
+                    <div className="tax-stat-box card-white p-4">
+                      <span className="text-muted text-xs">Statutory TDS Rate</span>
+                      <div className={`font-bold text-lg mt-1 ${hasValidPan ? 'text-primary-blue' : 'text-rose'}`}>
+                        {hasValidPan ? '5.0% (Sec 194H)' : '20.0% (Sec 206AA)'}
+                      </div>
+                      <span className="text-muted text-xs mt-2 block">
+                        {hasValidPan ? 'Standard rate on commission payouts' : 'Higher rate: No PAN furnished'}
+                      </span>
+                    </div>
 
-                  <div className="tax-stat-box card-white p-4">
-                    <span className="text-muted text-xs">GST Registration Status</span>
-                    <div className="font-bold text-lg text-secondary mt-1">Unregistered</div>
-                    <span className="text-muted text-xs mt-2 block">Turnover below ₹20 Lakh threshold</span>
+                    <div className="tax-stat-box card-white p-4">
+                      <span className="text-muted text-xs">GST Registration Status</span>
+                      <div className="font-bold text-lg text-secondary mt-1">Unregistered</div>
+                      <span className="text-muted text-xs mt-2 block">Turnover below ₹20 Lakh threshold</span>
+                    </div>
                   </div>
-                </div>
 
                 <div className="tax-certificates-card card-white p-5 mt-4">
                   <h5 className="font-bold text-base mb-2">Withholding Tax Certificates (Form 16A)</h5>
@@ -1712,7 +1792,8 @@ export default function MemberDashboardView() {
                   )}
                 </div>
               </div>
-            )}
+            );
+          })()}
 
             {/* TAB 4: AGREEMENT */}
             {kycTab === 'agreement' && (

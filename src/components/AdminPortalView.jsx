@@ -43,6 +43,8 @@ export default function AdminPortalView() {
     rejectMemberActivation,
     approvePayout,
     rejectPayout,
+    approveKyc,
+    rejectKyc,
     isDbConnected,
     addToast 
   } = useMlm();
@@ -675,33 +677,72 @@ export default function AdminPortalView() {
                   {members.map(m => {
                     const hasPan = m.kyc?.pan && m.kyc.pan.trim().length > 0;
                     const hasBank = m.kyc?.bank_name && m.kyc?.bank_account_number;
-                    const isVerified = m.kyc?.verification_status === 'verified' && hasPan;
+                    const status = m.kyc?.verification_status || (hasPan && hasBank ? 'under_review' : 'pending_documents');
+                    const isVerified = status === 'verified';
+                    const isUnderReview = status === 'under_review';
+                    const docs = m.kyc?.documents || {};
 
                     return (
                       <tr key={m.member_id}>
                         <td className="font-bold">{m.name}</td>
                         <td className="text-muted">{m.email}</td>
                         <td className="code-font">
-                          {hasPan ? m.kyc.pan : <span className="text-muted italic">Not Submitted</span>}
+                          {hasPan ? (
+                            <div>
+                              <span>{m.kyc.pan}</span>
+                              <div className="text-xs text-muted">{docs.pan || 'No Document Attached'}</div>
+                            </div>
+                          ) : (
+                            <span className="text-muted italic">Not Submitted</span>
+                          )}
                         </td>
                         <td>
-                          {hasBank ? `${m.kyc.bank_name} (••••${m.kyc.bank_account_number.slice(-4)})` : <span className="text-muted italic">Pending Bank Setup</span>}
+                          {hasBank ? (
+                            <div>
+                              <span>{m.kyc.bank_name} (••••{m.kyc.bank_account_number.slice(-4)})</span>
+                              <div className="text-xs text-muted">{docs.bankAccount || 'No Document Attached'}</div>
+                            </div>
+                          ) : (
+                            <span className="text-muted italic">Pending Bank Setup</span>
+                          )}
                         </td>
                         <td>
-                          {m.kyc?.aadhaar ? m.kyc.aadhaar : <span className="text-muted italic">Pending Upload</span>}
+                          <div className="text-xs">{docs.aadhaar || 'Pending Upload'}</div>
                         </td>
                         <td>
-                          <span className={`badge ${isVerified ? 'badge-green' : 'badge-amber'}`}>
-                            {isVerified ? 'Verified ✓' : 'Pending Verification'}
+                          <span className={`badge ${isVerified ? 'badge-green' : (isUnderReview ? 'badge-amber' : 'badge-neutral')}`}>
+                            {isVerified ? 'Verified ✓' : (isUnderReview ? 'Under Review' : 'Pending Documents')}
                           </span>
                         </td>
                         <td>
-                          <button 
-                            onClick={() => addToast('info', 'Partner KYC', `${m.name}: ${isVerified ? 'KYC verified and compliant' : 'Awaiting identity documents'}`)}
-                            className="btn btn-secondary btn-sm"
-                          >
-                            Details
-                          </button>
+                          <div className="flex items-center gap-1">
+                            {!isVerified && (
+                              <button 
+                                onClick={() => approveKyc(m.member_id)}
+                                className="btn btn-primary btn-sm py-1 px-2 text-xs"
+                                title="Approve KYC documents"
+                              >
+                                Approve
+                              </button>
+                            )}
+                            {isVerified && (
+                              <button 
+                                onClick={() => addToast('info', 'Partner KYC', `${m.name}: KYC verified and compliant`)}
+                                className="btn btn-secondary btn-sm py-1 px-2 text-xs"
+                              >
+                                Details
+                              </button>
+                            )}
+                            {!isVerified && (
+                              <button 
+                                onClick={() => rejectKyc(m.member_id, 'Document illegible or mismatched')}
+                                className="btn btn-secondary btn-sm py-1 px-2 text-xs text-rose"
+                                title="Reject KYC"
+                              >
+                                Reject
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1058,7 +1099,7 @@ export default function AdminPortalView() {
                 <div className="admin-net-pay-banner">
                   <div className="pay-banner-breakdown">
                     <span>Gross Requested: <strong>₹{selectedPayoutForManualPay.amount.toLocaleString('en-IN')}</strong></span>
-                    <span>5% TDS Deducted: <strong className="text-rose">-₹{selectedPayoutForManualPay.tds_amount.toLocaleString('en-IN')}</strong></span>
+                    <span>{selectedPayoutForManualPay.tds_rate ? `${selectedPayoutForManualPay.tds_rate}% TDS Deducted` : 'TDS Deducted'} ({selectedPayoutForManualPay.tds_section || 'Statutory'}): <strong className="text-rose">-₹{selectedPayoutForManualPay.tds_amount.toLocaleString('en-IN')}</strong></span>
                   </div>
                   <div className="pay-banner-final">
                     <span className="final-pay-lbl">NET AMOUNT TO TRANSFER:</span>

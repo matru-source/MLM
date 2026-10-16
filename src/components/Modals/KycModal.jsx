@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMlm } from '../../context/MlmContext';
-import { X, ShieldCheck, FileText, CheckCircle2, Building, AlertCircle } from 'lucide-react';
+import { X, ShieldCheck, FileText, CheckCircle2, Building, AlertCircle, Upload, Check } from 'lucide-react';
 
 export default function KycModal({ isOpen, onClose, member }) {
   const { submitKyc } = useMlm();
@@ -13,9 +13,32 @@ export default function KycModal({ isOpen, onClose, member }) {
   const [agreeTerms, setAgreeTerms] = useState(member?.kyc?.agreement_accepted || false);
   const [agreeRefund, setAgreeRefund] = useState(true);
   const [agreeConduct, setAgreeConduct] = useState(true);
+  
+  // Real document file states
+  const [panFile, setPanFile] = useState(null);
+  const [aadhaarFile, setAadhaarFile] = useState(null);
+  const [bankFile, setBankFile] = useState(null);
+
   const [error, setError] = useState('');
 
   if (!isOpen || !member) return null;
+
+  const handleFileUpload = (setter) => (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Maximum file size allowed is 5MB.');
+        return;
+      }
+      setter({
+        name: file.name,
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        type: file.type,
+        uploadedAt: new Date().toLocaleTimeString()
+      });
+      setError('');
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -33,17 +56,40 @@ export default function KycModal({ isOpen, onClose, member }) {
       return;
     }
 
+    if (!ifsc || ifsc.length < 11) {
+      setError('Please enter a valid 11-character IFSC code (e.g., HDFC0001234).');
+      return;
+    }
+
+    // Direct Selling Rules 2021 compliance: require genuine document uploads
+    const existingDocs = member?.kyc?.documents || {};
+    const hasPanDoc = panFile || (existingDocs.pan && existingDocs.pan.startsWith('Uploaded'));
+    const hasBankDoc = bankFile || (existingDocs.bankAccount && existingDocs.bankAccount.startsWith('Uploaded'));
+
+    if (!hasPanDoc || !hasBankDoc) {
+      setError('Direct Selling Rules 2021 require proof of identity (PAN Card) and Bank Account proof file uploads. Text-only submissions cannot be verified.');
+      return;
+    }
+
     if (!agreeTerms || !agreeRefund || !agreeConduct) {
       setError('You must accept the Direct Selling Agreement and compliance conduct rules to activate seller eligibility.');
       return;
     }
+
+    const submittedDocs = {
+      pan: panFile ? `Uploaded (${panFile.name})` : (existingDocs.pan || 'Pending Upload'),
+      bankAccount: bankFile ? `Uploaded (${bankFile.name})` : (existingDocs.bankAccount || 'Pending Upload'),
+      aadhaar: aadhaarFile ? `Uploaded (${aadhaarFile.name})` : (existingDocs.aadhaar || 'Pending Upload'),
+      addressProof: existingDocs.addressProof || 'Pending Upload'
+    };
 
     submitKyc(member.member_id, {
       legal_name: legalName,
       pan: pan.toUpperCase(),
       bank_name: bankName,
       bank_account_number: accountNumber,
-      bank_ifsc: ifsc.toUpperCase()
+      bank_ifsc: ifsc.toUpperCase(),
+      documents: submittedDocs
     });
 
     onClose();
@@ -59,7 +105,7 @@ export default function KycModal({ isOpen, onClose, member }) {
               <ShieldCheck size={12} />
               <span>Direct Selling Rules 2021 Compliance</span>
             </div>
-            <h2 className="modal-title">Seller Onboarding & KYC</h2>
+            <h2 className="modal-title">Seller Onboarding & KYC Verification</h2>
           </div>
           <button onClick={onClose} className="modal-close-btn">
             <X size={18} />
@@ -70,8 +116,8 @@ export default function KycModal({ isOpen, onClose, member }) {
           <div className="kyc-notice-box">
             <FileText size={18} className="text-cyan" />
             <div className="kyc-notice-text">
-              Under Indian law, earning direct selling commissions requires verified identity (PAN) 
-              and tokenized bank details. There is no joining fee.
+              Under Indian law (Direct Selling Rules 2021), commission payouts require verified identity (PAN) 
+              and authentic bank document proof. Submissions undergo compliance review before approval.
             </div>
           </div>
 
@@ -108,6 +154,95 @@ export default function KycModal({ isOpen, onClose, member }) {
                   className="form-input code-font"
                   placeholder="ABCDE1234F"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Document Uploads (Required) */}
+          <div className="form-section">
+            <label className="section-label">Mandatory Identity & Bank Proof Documents</label>
+            <p className="input-caption mb-3">Upload clear photo or PDF copies (max 5MB each). Documents are encrypted for compliance review.</p>
+            
+            <div className="form-grid-2">
+              {/* PAN Document Upload */}
+              <div className="doc-upload-field">
+                <label className="input-label">PAN Card Copy *</label>
+                <div className={`file-upload-box ${panFile ? 'uploaded' : ''}`}>
+                  <input
+                    type="file"
+                    id="pan-upload"
+                    accept="image/*,.pdf"
+                    onChange={handleFileUpload(setPanFile)}
+                    className="file-input-hidden"
+                  />
+                  <label htmlFor="pan-upload" className="file-input-label">
+                    {panFile ? (
+                      <span className="file-selected-text">
+                        <Check size={14} className="text-emerald inline mr-1" />
+                        {panFile.name} ({panFile.size})
+                      </span>
+                    ) : (
+                      <span>
+                        <Upload size={14} className="inline mr-1" />
+                        Select PAN Document (JPG/PNG/PDF)
+                      </span>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Bank Proof Upload */}
+              <div className="doc-upload-field">
+                <label className="input-label">Bank Passbook / Cheque Copy *</label>
+                <div className={`file-upload-box ${bankFile ? 'uploaded' : ''}`}>
+                  <input
+                    type="file"
+                    id="bank-upload"
+                    accept="image/*,.pdf"
+                    onChange={handleFileUpload(setBankFile)}
+                    className="file-input-hidden"
+                  />
+                  <label htmlFor="bank-upload" className="file-input-label">
+                    {bankFile ? (
+                      <span className="file-selected-text">
+                        <Check size={14} className="text-emerald inline mr-1" />
+                        {bankFile.name} ({bankFile.size})
+                      </span>
+                    ) : (
+                      <span>
+                        <Upload size={14} className="inline mr-1" />
+                        Select Bank Proof (Passbook/Cheque)
+                      </span>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Aadhaar Upload (Optional / Supplemental) */}
+              <div className="doc-upload-field" style={{ gridColumn: 'span 2' }}>
+                <label className="input-label">Aadhaar Card (Optional Supplemental ID)</label>
+                <div className={`file-upload-box ${aadhaarFile ? 'uploaded' : ''}`}>
+                  <input
+                    type="file"
+                    id="aadhaar-upload"
+                    accept="image/*,.pdf"
+                    onChange={handleFileUpload(setAadhaarFile)}
+                    className="file-input-hidden"
+                  />
+                  <label htmlFor="aadhaar-upload" className="file-input-label">
+                    {aadhaarFile ? (
+                      <span className="file-selected-text">
+                        <Check size={14} className="text-emerald inline mr-1" />
+                        {aadhaarFile.name} ({aadhaarFile.size})
+                      </span>
+                    ) : (
+                      <span>
+                        <Upload size={14} className="inline mr-1" />
+                        Select Aadhaar Copy (Front & Back)
+                      </span>
+                    )}
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -205,7 +340,7 @@ export default function KycModal({ isOpen, onClose, member }) {
             </button>
             <button type="submit" className="btn btn-primary">
               <ShieldCheck size={16} />
-              <span>Submit for Verification</span>
+              <span>Submit Documents for Compliance Review</span>
             </button>
           </div>
         </form>

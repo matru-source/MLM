@@ -34,7 +34,7 @@ export const initialMembers = [
       bank_name: '',
       bank_account_number: '',
       bank_ifsc: '',
-      verification_status: 'verified',
+      verification_status: 'pending_documents',
       agreement_accepted: true,
       agreement_version: 'v2026.1',
       documents: {

@@ -728,7 +728,13 @@ export function MlmProvider({ children }) {
       return false;
     }
 
-    const tdsAmount = Math.round(numAmount * 0.05); // 5% statutory TDS
+    // Section 206AA statutory compliance: 5% TDS under Sec 194H if valid PAN furnished, 20% if no PAN or invalid
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    const memberPan = (currentMember?.kyc?.pan || '').trim().toUpperCase();
+    const hasValidPan = panRegex.test(memberPan);
+    const tdsRate = hasValidPan ? 0.05 : 0.20;
+    const tdsSection = hasValidPan ? 'Section 194H (5%)' : 'Section 206AA (20% - No PAN)';
+    const tdsAmount = Math.round(numAmount * tdsRate);
     const netPayable = numAmount - tdsAmount;
     const newPayoutId = `PAY-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -739,7 +745,10 @@ export function MlmProvider({ children }) {
       member_email: currentMember.email,
       avatar: currentMember.avatar || '/matru-avatar.jpg',
       amount: numAmount,
+      tds_rate: hasValidPan ? 5 : 20,
+      tds_section: tdsSection,
       tds_amount: tdsAmount,
+      pan_furnished: hasValidPan ? memberPan : 'NOT_FURNISHED',
       net_payable: netPayable,
       status: 'pending', // 'pending' | 'paid' | 'rejected'
       request_date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -968,21 +977,36 @@ export function MlmProvider({ children }) {
 
   // Submit / Update Member KYC & Payout Bank Details
   const submitKyc = (memberId, kycDetails) => {
+    const existingMember = members.find(m => m.member_id === memberId) || currentMember;
+    const existingKyc = existingMember?.kyc || {};
+    const existingDocs = existingKyc.documents || {};
+
+    const submittedDocs = kycDetails.documents || {};
+    const documents = {
+      aadhaar: submittedDocs.aadhaar || existingDocs.aadhaar || 'Pending Upload',
+      pan: submittedDocs.pan || existingDocs.pan || 'Pending Upload',
+      addressProof: submittedDocs.addressProof || existingDocs.addressProof || 'Pending Upload',
+      bankAccount: submittedDocs.bankAccount || existingDocs.bankAccount || 'Pending Upload'
+    };
+
+    // Real document validation: Require uploaded documents rather than instant auto-approval on plain text
+    const uploadedDocs = Object.entries(documents).filter(([_, val]) => 
+      val && val !== 'Pending Upload' && val !== 'Not Uploaded' && val !== 'Pending'
+    );
+    const hasDocuments = uploadedDocs.length > 0;
+    const verificationStatus = hasDocuments ? 'under_review' : 'pending_documents';
+
     const updatedKyc = {
-      legal_name: kycDetails.legal_name || currentMember?.name,
+      legal_name: kycDetails.legal_name || existingMember?.name,
       pan: (kycDetails.pan || '').toUpperCase().trim(),
       bank_name: kycDetails.bank_name || '',
       bank_account_number: (kycDetails.bank_account_number || '').trim(),
       bank_ifsc: (kycDetails.bank_ifsc || '').toUpperCase().trim(),
-      verification_status: 'verified',
+      verification_status: verificationStatus,
       agreement_accepted: true,
       agreement_version: 'v2026.1',
-      documents: {
-        aadhaar: 'Uploaded',
-        pan: 'Uploaded',
-        addressProof: 'Uploaded',
-        bankAccount: 'Uploaded'
-      }
+      documents: documents,
+      submitted_at: new Date().toISOString()
     };
 
     setMembers(prev => prev.map(m => {
@@ -995,8 +1019,83 @@ export function MlmProvider({ children }) {
     // Persist to live Neon PostgreSQL
     dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
 
-    addToast('success', 'KYC & Bank Details Saved!', 'Your settlement details are securely verified for commission payouts.');
+    if (hasDocuments) {
+      addToast('info', 'KYC Documents Submitted for Review', 'Your KYC documents have been submitted to compliance. Verification takes 24-48 hours.');
+    } else {
+      addToast('warning', 'Bank Details Saved (Documents Pending)', 'Bank details saved, but please upload your PAN and Aadhaar identity documents for compliance verification.');
+    }
     return true;
+  };
+
+  // Upload an individual KYC document (Aadhaar, PAN, Address Proof, Bank Proof)
+  const uploadKycDocument = (memberId, docType, fileInfo) => {
+    const existingMember = members.find(m => m.member_id === memberId) || currentMember;
+    const existingKyc = existingMember?.kyc || {};
+    const existingDocs = existingKyc.documents || {};
+
+    const docLabel = fileInfo?.name ? `Uploaded (${fileInfo.name})` : 'Uploaded';
+    const updatedDocs = {
+      ...existingDocs,
+      [docType]: docLabel
+    };
+
+    const updatedKyc = {
+      ...existingKyc,
+      documents: updatedDocs,
+      verification_status: 'under_review',
+      submitted_at: new Date().toISOString()
+    };
+
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === memberId) {
+        return { ...m, kyc: updatedKyc };
+      }
+      return m;
+    }));
+
+    dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
+    addToast('success', 'Document Uploaded', `${docType.toUpperCase()} file uploaded. Status updated to Under Review.`);
+    return true;
+  };
+
+  // Admin Approves Partner KYC
+  const approveKyc = (memberId) => {
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === memberId) {
+        const kyc = m.kyc || {};
+        const verifiedDocs = {};
+        Object.keys(kyc.documents || {}).forEach(k => {
+          verifiedDocs[k] = 'Verified ✓';
+        });
+        const updatedKyc = {
+          ...kyc,
+          verification_status: 'verified',
+          documents: { ...kyc.documents, ...verifiedDocs },
+          verified_at: new Date().toISOString()
+        };
+        dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
+        return { ...m, kyc: updatedKyc };
+      }
+      return m;
+    }));
+    addToast('success', 'KYC Approved', 'Partner KYC and documents successfully verified.');
+  };
+
+  // Admin Rejects Partner KYC
+  const rejectKyc = (memberId, reason = 'Document quality unclear') => {
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === memberId) {
+        const updatedKyc = {
+          ...(m.kyc || {}),
+          verification_status: 'rejected',
+          rejection_reason: reason
+        };
+        dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
+        return { ...m, kyc: updatedKyc };
+      }
+      return m;
+    }));
+    addToast('error', 'KYC Rejected', `Partner KYC rejected: ${reason}`);
   };
 
   // 1. Admin Approves Partner Activation & Software License
@@ -1275,6 +1374,9 @@ export function MlmProvider({ children }) {
       getMemberByReferralCode,
       validateReferralCode,
       submitKyc,
+      uploadKycDocument,
+      approveKyc,
+      rejectKyc,
       getMemberWallet,
       requestPayout,
       loginUserByEmail,
