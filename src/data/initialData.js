@@ -17,7 +17,7 @@ export const initialMembers = [
     email: 'matruprasadpanda497@gmail.com',
     phone: '+91 9876543210',
     avatar: '/matru-avatar.jpg',
-    rank: 'Senior Partner',
+    rank: 'Head Office Partner',
     cs_customer_id: 'CS20261010',
     sponsor_member_id: null,
     sponsor_code: null,
@@ -29,54 +29,19 @@ export const initialMembers = [
     joined_at: '2026-01-10T10:00:00Z',
     kyc: {
       legal_name: 'Matru Prasad Panda',
-      pan: 'ABCDE1234F',
-      aadhaar: 'XXXX-XXXX-9012',
-      bank_name: 'HDFC Bank',
-      bank_account_number: '501004928172',
-      bank_ifsc: 'HDFC0001234',
+      pan: '',
+      aadhaar: '',
+      bank_name: '',
+      bank_account_number: '',
+      bank_ifsc: '',
       verification_status: 'verified',
       agreement_accepted: true,
       agreement_version: 'v2026.1',
       documents: {
-        aadhaar: 'Uploaded',
-        pan: 'Uploaded',
-        addressProof: 'Uploaded',
-        bankAccount: 'Uploaded'
-      }
-    }
-  },
-  {
-    member_id: 'mem_rahul',
-    name: 'Rahul Sharma',
-    email: 'rahul.s@example.com',
-    phone: '+91 98111 22334',
-    avatar: '/matru-avatar.jpg',
-    rank: 'Active Partner',
-    cs_customer_id: 'CS20261011',
-    sponsor_member_id: 'mem_matru',
-    sponsor_code: 'CS123456',
-    sponsor_name: 'Matru Prasad Panda',
-    customer_status: 'active_subscriber',
-    seller_status: 'active',
-    referral_code: 'CS-RAHU01',
-    wallet_balance: 0,
-    total_earnings: 0,
-    joined_at: '2026-02-12T11:00:00Z',
-    kyc: {
-      legal_name: 'Rahul Sharma',
-      pan: 'BCDEF2345G',
-      aadhaar: 'XXXX-XXXX-4512',
-      bank_name: 'ICICI Bank',
-      bank_account_number: '102938475612',
-      bank_ifsc: 'ICIC0002345',
-      verification_status: 'verified',
-      agreement_accepted: true,
-      agreement_version: 'v2026.1',
-      documents: {
-        aadhaar: 'Uploaded',
-        pan: 'Uploaded',
-        addressProof: 'Uploaded',
-        bankAccount: 'Uploaded'
+        aadhaar: 'Not Uploaded',
+        pan: 'Not Uploaded',
+        addressProof: 'Not Uploaded',
+        bankAccount: 'Not Uploaded'
       }
     }
   }

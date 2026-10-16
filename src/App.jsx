@@ -18,7 +18,8 @@ function MainApp() {
     navigateToAdmin, 
     currentPage, 
     setCurrentPage,
-    currentMember 
+    currentMember,
+    isLoggedIn
   } = useMlm();
 
   // If URL is /admin or #admin, render dedicated Admin Portal
@@ -33,6 +34,22 @@ function MainApp() {
 
   // Normal User Web Experience
   const isDashboardView = ['dashboard', 'network', 'wallet', 'subscriptions', 'kyc', 'profile'].includes(currentPage);
+
+  // If not authenticated, ensure visitor stays on Public Home
+  if (isDashboardView && (!isLoggedIn || !currentMember)) {
+    return (
+      <div className="site-wrapper">
+        <Navbar />
+        <main className="site-content-wrapper">
+          <PublicHome />
+        </main>
+        <CheckoutModal />
+        <AuthModal />
+        <ReferralBanner />
+        <Toast />
+      </div>
+    );
+  }
 
   // If on Member Dashboard: Check if member is approved & active
   if (isDashboardView) {

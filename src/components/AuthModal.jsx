@@ -136,10 +136,10 @@ export default function AuthModal() {
       return;
     }
 
-    // 5. Strict Multi-Factor Sponsor Referral Code Validation
-    const cleanSponsor = (sponsorId || '').trim().toUpperCase();
+    // 5. Sponsor Referral Code (Defaults to Head Office Root CS123456 if left empty)
+    const cleanSponsor = (sponsorId || '').trim().toUpperCase() || 'CS123456';
     const sponsorCheck = validateReferralCode(cleanSponsor, email, mobile);
-    if (!sponsorCheck.valid) {
+    if (!sponsorCheck.valid && cleanSponsor !== 'CS123456') {
       setSponsorError(sponsorCheck.message);
       addToast('error', 'Sponsor Verification Failed', sponsorCheck.message);
       return;
@@ -207,7 +207,7 @@ export default function AuthModal() {
       return;
     }
 
-    const cleanSponsor = (sponsorId || '').trim().toUpperCase();
+    const cleanSponsor = (sponsorId || '').trim().toUpperCase() || 'CS123456';
     const sponsorCheck = validateReferralCode(cleanSponsor, email, mobile);
     const verifiedSponsor = sponsorCheck.valid ? sponsorCheck.member : null;
 
@@ -219,7 +219,7 @@ export default function AuthModal() {
       password,
       sponsorId: cleanSponsor,
       sponsorMemberId: verifiedSponsor?.member_id || cleanSponsor,
-      sponsorName: verifiedSponsor?.name || 'Authorized Partner',
+      sponsorName: verifiedSponsor?.name || 'CyberShield Head Office',
       isSeller
     });
 
@@ -274,7 +274,7 @@ export default function AuthModal() {
     <div className="modal-overlay">
       <div className="modal-box auth-modal-width">
         {/* Header */}
-        <div className="auth-modal-header">
+        <div className="auth-modal-header" style={{ position: 'relative' }}>
           <div className="brand-logo-text-small mb-2">
             <span className="brand-title">CyberShield</span>
             <span className="brand-subtitle">Security Network</span>
@@ -293,50 +293,10 @@ export default function AuthModal() {
               : 'Log in to access your partner dashboard, licenses, and payouts.'}
           </p>
 
-          <button onClick={() => setIsAuthModalOpen(false)} className="close-checkout-btn">
+          <button onClick={() => setIsAuthModalOpen(false)} className="auth-modal-close-btn" aria-label="Close modal">
             <X size={18} />
           </button>
         </div>
-
-        {/* Brevo API Key Quick Config Bar */}
-        <div className="brevo-status-bar">
-          <div className="brevo-status-info">
-            <span className="brevo-dot" style={{ background: getBrevoApiKey() ? '#10B981' : '#F59E0B' }} />
-            <span className="brevo-status-text">
-              {getBrevoApiKey() ? 'Brevo API: Live Email Delivery Active' : 'Brevo API: Ready for Key (Testing Fallback Active)'}
-            </span>
-          </div>
-          <button 
-            type="button" 
-            onClick={() => setShowBrevoConfig(!showBrevoConfig)}
-            className="brevo-config-link"
-          >
-            <Settings size={12} />
-            <span>{showBrevoConfig ? 'Close' : 'Set Brevo API'}</span>
-          </button>
-        </div>
-
-        {/* Brevo Config Drawer */}
-        {showBrevoConfig && (
-          <form onSubmit={handleSaveBrevoKey} className="brevo-config-drawer">
-            <label className="text-xs font-bold text-primary">Brevo (Sendinblue) API Key</label>
-            <div className="flex gap-2 mt-1">
-              <input
-                type="text"
-                value={brevoKeyInput}
-                onChange={(e) => setBrevoKeyInput(e.target.value)}
-                placeholder="xkeysib-..."
-                className="form-input-clean text-xs code-font flex-1"
-              />
-              <button type="submit" className="btn btn-primary btn-xs">
-                Save Key
-              </button>
-            </div>
-            <p className="text-muted font-xs mt-1 mb-0">
-              Paste your Brevo v3 API key to dispatch real emails directly to partner inboxes.
-            </p>
-          </form>
-        )}
 
         {/* Form Body */}
         <div className="auth-form-body">
@@ -376,7 +336,7 @@ export default function AuthModal() {
                 </div>
 
                 <div className="form-group-clean">
-                  <label className="form-label-clean">Email Address (Brevo OTP Verified)</label>
+                  <label className="form-label-clean">Email Address (OTP Verified)</label>
                   <input
                     type="email"
                     required
@@ -414,27 +374,30 @@ export default function AuthModal() {
                 <div className="form-group-clean">
                   <div className="flex-between items-center mb-1">
                     <label className="form-label-clean mb-0">
-                      Sponsor Referral Code <span style={{ color: '#EF4444' }} className="font-bold">*</span>
+                      Sponsor Referral Code
                     </label>
                     {activeReferral ? (
                       <span className="badge badge-green font-2xs font-bold">
                         ✓ Auto-filled from Referral
                       </span>
+                    ) : (sponsorId && sponsorId.trim()) ? (
+                      <span className="badge badge-blue font-2xs font-bold">
+                        Sponsor Specified
+                      </span>
                     ) : (
-                      <span className="badge badge-amber font-2xs font-bold">
-                        Mandatory
+                      <span className="badge font-2xs" style={{ background: '#F1F5F9', color: '#64748B' }}>
+                        Optional (Direct Head Office)
                       </span>
                     )}
                   </div>
                   <input
                     type="text"
-                    required
                     value={sponsorId}
                     onChange={(e) => {
                       setSponsorId(e.target.value.toUpperCase().trim());
                       setSponsorError('');
                     }}
-                    placeholder="Enter Sponsor Code (e.g. CS123456)"
+                    placeholder="Enter Sponsor Code or leave empty for Head Office Root"
                     className={`form-input-clean code-font font-bold ${
                       sponsorError 
                         ? 'input-border-red' 
@@ -446,20 +409,10 @@ export default function AuthModal() {
                     const clean = (sponsorId || '').trim().toUpperCase();
                     if (!clean) {
                       return (
-                        <div className="sponsor-required-hint mt-1">
-                          <AlertCircle size={13} className="text-amber shrink-0" />
-                          <span className="text-xs">
-                            Sponsor code is strictly mandatory.{' '}
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                setSponsorId('CS123456');
-                                setSponsorError('');
-                              }}
-                              className="text-cyan underline font-bold"
-                            >
-                              Use Head Office (CS123456)
-                            </button>
+                        <div className="sponsor-direct-hint mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37, 99, 235, 0.06)', border: '1px solid rgba(37, 99, 235, 0.2)', borderRadius: '8px', padding: '8px 12px' }}>
+                          <ShieldCheck size={16} style={{ color: '#2563EB', flexShrink: 0 }} />
+                          <span style={{ fontSize: '0.8rem', color: '#1E40AF', lineHeight: 1.4 }}>
+                            <strong>Direct Enrollment:</strong> No sponsor code? You will be registered directly under <strong>CyberShield Head Office Root (CS123456)</strong> with full partner distribution rights.
                           </span>
                         </div>
                       );
@@ -468,10 +421,10 @@ export default function AuthModal() {
                     const check = validateReferralCode ? validateReferralCode(clean, email, mobile) : null;
                     if (check && check.valid) {
                       return (
-                        <div className="sponsor-verified-pill mt-1">
-                          <ShieldCheck size={14} className="text-emerald shrink-0" />
-                          <span className="text-xs">
-                            Verified Active Sponsor: <strong className="text-white">{check.member?.name}</strong> <span className="code-font text-cyan">({check.member?.referral_code})</span>
+                        <div className="sponsor-verified-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '8px 12px' }}>
+                          <ShieldCheck size={16} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span style={{ fontSize: '0.8rem', color: '#065F46' }}>
+                            Verified Active Sponsor: <strong style={{ color: '#0F172A' }}>{check.member?.name}</strong> <span className="code-font" style={{ color: '#2563EB', fontWeight: 'bold' }}>({check.member?.referral_code})</span>
                           </span>
                         </div>
                       );
@@ -479,9 +432,9 @@ export default function AuthModal() {
 
                     if (check && check.reason === 'inactive') {
                       return (
-                        <div className="sponsor-warning-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', padding: '6px 10px' }}>
-                          <AlertCircle size={14} className="text-amber shrink-0" />
-                          <span className="text-xs text-amber">
+                        <div className="sponsor-warning-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '8px 12px' }}>
+                          <AlertCircle size={16} className="text-amber shrink-0" />
+                          <span style={{ fontSize: '0.8rem', color: '#B45309' }}>
                             Partner "{check.member?.name}" is pending plan activation and cannot sponsor new members yet.
                           </span>
                         </div>
@@ -490,9 +443,9 @@ export default function AuthModal() {
 
                     if (check && check.reason === 'self_referral') {
                       return (
-                        <div className="sponsor-error-pill mt-1">
-                          <AlertCircle size={14} className="text-red-400 shrink-0" />
-                          <span className="text-xs">
+                        <div className="sponsor-error-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '8px 12px' }}>
+                          <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
+                          <span style={{ fontSize: '0.8rem', color: '#991B1B' }}>
                             You cannot use your own referral code to sponsor yourself.
                           </span>
                         </div>
@@ -500,9 +453,9 @@ export default function AuthModal() {
                     }
 
                     return (
-                      <div className="sponsor-error-pill mt-1">
-                        <AlertCircle size={14} className="text-red-400 shrink-0" />
-                        <span className="text-xs">
+                      <div className="sponsor-error-pill mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '8px 12px' }}>
+                        <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.8rem', color: '#991B1B' }}>
                           {sponsorError || check?.message || `Sponsor code "${clean}" is not recognized.`}
                         </span>
                       </div>

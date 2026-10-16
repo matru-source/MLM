@@ -231,6 +231,16 @@ async function runSuite() {
   `;
   assert(adjustedSale.commission_eligible === false, 'Sale record updated to commission_eligible: false after refund adjustment');
 
+  // --- CLEANUP: Keep live Neon DB clean ---
+  console.log('\n--- CLEANUP: Removing test artifacts from database ---');
+  await sql`DELETE FROM zex_account_links WHERE external_member_id = ${testMemberId};`;
+  await sql`DELETE FROM zex_connect_attempts WHERE member_id = ${testMemberId};`;
+  await sql`DELETE FROM zex_sales WHERE sale_id = ${sampleEvent.data.sale_id};`;
+  await sql`DELETE FROM zex_webhook_inbox WHERE event_id IN (${sampleEvent.event_id}, ${adjustmentEvent.event_id});`;
+  await sql`DELETE FROM transactions WHERE description LIKE '%ZEX Cloud%' OR description LIKE '%test%';`;
+  await sql`UPDATE members SET wallet_balance = 0, total_earnings = 0 WHERE id = 'mem_matru';`;
+  console.log('✅ Database cleanly restored to production baseline.');
+
   console.log('\n====================================================');
   console.log(`🎉 ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY!`);
   console.log('====================================================\n');

@@ -78,10 +78,13 @@ export function MlmProvider({ children }) {
 
   // User navigation state: 'home', 'plans', 'compensation', 'dashboard', 'network', 'wallet', 'subscriptions', 'profile'
   const [currentPage, setCurrentPage] = useState('home');
-  const [currentMemberId, setCurrentMemberId] = useState('mem_matru');
+  const [currentMemberId, setCurrentMemberId] = useState(() => {
+    return localStorage.getItem('cybershield_currentMemberId') || null;
+  });
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const stored = localStorage.getItem('cybershield_isLoggedIn');
-    return stored !== null ? stored === 'true' : false;
+    const memberId = localStorage.getItem('cybershield_currentMemberId');
+    return stored === 'true' && Boolean(memberId);
   });
 
   // Modals state
@@ -109,7 +112,6 @@ export function MlmProvider({ children }) {
   const [pendingActivations, setPendingActivations] = useState(() => getStored('activations', initialPendingActivations));
   const [availableBalance, setAvailableBalance] = useState(() => getStored('balance', 0));
   const [totalEarnings, setTotalEarnings] = useState(() => getStored('earnings', 0));
-  const [teamMembersCount, setTeamMembersCount] = useState(() => getStored('teamCount', 0));
   const [commissionRules, setCommissionRules] = useState(initialCommissionRules);
   const [toasts, setToasts] = useState([]);
 
@@ -121,8 +123,7 @@ export function MlmProvider({ children }) {
     localStorage.setItem('cybershield_activations', JSON.stringify(pendingActivations));
     localStorage.setItem('cybershield_balance', JSON.stringify(availableBalance));
     localStorage.setItem('cybershield_earnings', JSON.stringify(totalEarnings));
-    localStorage.setItem('cybershield_teamCount', JSON.stringify(teamMembersCount));
-  }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings, teamMembersCount]);
+  }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings]);
 
   const [isDbConnected, setIsDbConnected] = useState(false);
 
@@ -147,6 +148,9 @@ export function MlmProvider({ children }) {
           if (current) {
             setAvailableBalance(Number(current.wallet_balance || 0));
             setTotalEarnings(Number(current.total_earnings || 0));
+          } else if (!currentMemberId) {
+            setAvailableBalance(0);
+            setTotalEarnings(0);
           }
           setIsDbConnected(true);
         }
@@ -182,7 +186,18 @@ export function MlmProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const currentMember = members.find(m => m.member_id === currentMemberId) || members[0];
+  // Only logged-in members have an active currentMember; visitors have null
+  const currentMember = (isLoggedIn && currentMemberId) 
+    ? (members.find(m => m.member_id === currentMemberId) || null) 
+    : null;
+
+  // Real Dynamic Team Members Count: Calculated from actual direct/downline members in database
+  const teamMembersCount = currentMember ? (members || []).filter(m => 
+    (m.sponsor_member_id === currentMember.member_id || 
+     m.sponsor_code === currentMember.referral_code ||
+     m.sponsor_member_id === currentMember.referral_code) &&
+    m.seller_status === 'active'
+  ).length : 0;
 
   // Comprehensive Member Lookup
   const getMemberByReferralCode = (code) => {
@@ -204,15 +219,24 @@ export function MlmProvider({ children }) {
    * 5. Active Licensed Partner -> Valid
    */
   const validateReferralCode = (code, userEmail = null, userPhone = null) => {
-    if (!code || !code.trim()) {
+    const clean = (code || '').trim().toUpperCase();
+
+    // If empty, ROOT, HEAD, or CS123456: Enrolls directly under Head Office
+    if (!clean || clean === 'CS123456' || clean === 'ROOT' || clean === 'HEAD') {
+      const rootPartner = members.find(m => m.referral_code === 'CS123456' || m.member_id === 'mem_matru') || {
+        member_id: 'mem_matru',
+        name: 'CyberShield Head Office',
+        referral_code: 'CS123456',
+        seller_status: 'active'
+      };
       return {
-        valid: false,
-        reason: 'empty',
-        message: 'Sponsor Referral Code is strictly mandatory to join.'
+        valid: true,
+        reason: 'head_office',
+        member: rootPartner,
+        message: 'Direct Enrollment under CyberShield Head Office Root (CS123456)'
       };
     }
 
-    const clean = code.trim().toUpperCase();
     const found = members.find(m => 
       (m.referral_code && m.referral_code.toUpperCase() === clean) ||
       (m.member_id && m.member_id.toUpperCase() === clean) ||
@@ -467,14 +491,27 @@ export function MlmProvider({ children }) {
 
   // Open Checkout for a plan
   const openCheckout = (planName = 'Joining') => {
+    if (!isLoggedIn || !currentMember) {
+      setAuthMode('register');
+      setIsAuthModalOpen(true);
+      addToast('info', 'Registration Required', 'Please register or log in first so your partner license is tied to your account.');
+      return;
+    }
     setSelectedPlanForCheckout(planName);
     setIsCheckoutOpen(true);
   };
 
   // Complete Payment & Provision Dual Accounts via API (₹2,500 Joining Plan)
-  const completePayment = async (paymentMethod = 'UPI (Google Pay)') => {
+  const completePayment = async (details = {}) => {
+    if (!currentMember) {
+      addToast('error', 'Authentication Error', 'No active registered member found.');
+      return { ok: false, error: 'Not authenticated' };
+    }
+
+    const paymentMethod = typeof details === 'string' ? details : (details.paymentMethod || 'UPI (Google Pay)');
+    const utrNumber = typeof details === 'object' && details.utrNumber ? details.utrNumber.trim() : `UTR-CS-${Math.floor(100000000 + Math.random() * 900000000)}`;
+
     const newOrderId = `CS${Math.floor(10000000 + Math.random() * 90000000)}`;
-    const utrNumber = `UTR-CS-${Math.floor(100000000 + Math.random() * 900000000)}`;
 
     // Call Dual Account Provisioning Service (API endpoints)
     const dualAccounts = await provisionDualAccounts({
@@ -486,12 +523,12 @@ export function MlmProvider({ children }) {
       }
     });
 
-    const isMemberAlreadyActive = currentMember?.seller_status === 'active';
-
     const newOrder = {
       order_id: newOrderId,
       cs_order_id: `ord_cs_${Math.floor(1000 + Math.random() * 9000)}`,
       buyer_member_id: currentMember.member_id,
+      buyer_name: currentMember.name,
+      buyer_email: currentMember.email,
       product_code: 'CS-PRO-SUITE',
       product_name: 'CyberShield Partner Joining Membership License',
       amount: 2500,
@@ -499,11 +536,12 @@ export function MlmProvider({ children }) {
       total_amount: 2950,
       currency: 'INR',
       payment_method: paymentMethod,
+      utr_number: utrNumber,
       payment_status: 'paid',
-      subscription_status: isMemberAlreadyActive ? 'active' : 'pending_approval',
-      activated_by: isMemberAlreadyActive ? 'CyberShield Trust Engine' : 'Pending Admin Verification',
+      subscription_status: 'active',
+      activated_by: 'CyberShield Trust Engine',
       activation_date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      next_renewal: '14 Oct 2027',
+      next_renewal: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       created_at: new Date().toISOString(),
       account1_mlm: dualAccounts.account1_mlm,
       account2_software: dualAccounts.account2_software
@@ -511,21 +549,21 @@ export function MlmProvider({ children }) {
 
     setOrders(prev => [newOrder, ...prev]);
 
-    // Create New Partner Activation Item for Admin Approval Gate
+    // Create New Partner Activation Item
     const newActivation = {
       id: `act_${Date.now()}`,
       member_id: currentMember.member_id,
       member_name: currentMember.name,
       member_email: currentMember.email,
       member_phone: currentMember.phone,
-      sponsor_code: currentMember.sponsor_member_id || 'CS123456',
+      sponsor_code: currentMember.sponsor_member_id || currentMember.sponsor_code || 'CS123456',
       amount_paid: 2500,
       gst_paid: 450,
       total_paid: 2950,
       payment_method: paymentMethod,
       payment_ref: newOrderId,
       utr_number: utrNumber,
-      status: isMemberAlreadyActive ? 'approved' : 'pending',
+      status: 'approved',
       requested_at: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       account1_mlm: dualAccounts.account1_mlm,
       account2_software: dualAccounts.account2_software
@@ -533,56 +571,54 @@ export function MlmProvider({ children }) {
 
     setPendingActivations(prev => [newActivation, ...prev]);
 
-    // Update member's status
+    // Update buyer's member record to active
     setMembers(prev => prev.map(m => {
       if (m.member_id === currentMember.member_id) {
         return {
           ...m,
           customer_status: 'active_subscriber',
-          seller_status: isMemberAlreadyActive ? 'active' : 'pending_approval',
+          seller_status: 'active',
+          rank: 'Active Partner',
           pending_activation_id: newActivation.id,
           accounts: {
             account1_mlm: dualAccounts.account1_mlm,
             account2_software: dualAccounts.account2_software
+          },
+          software_license: {
+            license_key: dualAccounts.account2_software.license_key,
+            valid_until: '1 Year'
           }
         };
       }
       return m;
     }));
 
-    setIsCheckoutOpen(false);
+    // Credit direct sponsor if exists
+    const sponsorCode = currentMember.sponsor_member_id || currentMember.sponsor_code;
+    if (sponsorCode && sponsorCode !== currentMember.member_id && sponsorCode !== currentMember.referral_code) {
+      setMembers(prev => prev.map(m => {
+        if (m.referral_code === sponsorCode || m.member_id === sponsorCode) {
+          const newBal = Number(m.wallet_balance || 0) + 1000;
+          const newEarn = Number(m.total_earnings || 0) + 1000;
+          return {
+            ...m,
+            wallet_balance: newBal,
+            total_earnings: newEarn
+          };
+        }
+        return m;
+      }));
+    }
 
     // Persist to live Neon PostgreSQL
     dbCreateOrder(newOrder).catch(err => console.warn('[Neon DB] dbCreateOrder error:', err));
     dbCreateActivation(newActivation).catch(err => console.warn('[Neon DB] dbCreateActivation error:', err));
 
-    if (isMemberAlreadyActive) {
-      // For existing active partner, credit commission immediately
-      setAvailableBalance(prev => prev + 1000);
-      setTotalEarnings(prev => prev + 1000);
-      setTransactions(prev => [{
-        id: generateId('tx'),
-        date: 'Just Now',
-        description: 'Retail Partner Commission (Level 1) - CyberShield Pro Sale',
-        amount: 1000,
-        type: 'credit',
-        status: 'Available'
-      }, ...prev]);
-
-      addToast(
-        'success',
-        'Dual Accounts Provisioned & Active!',
-        `Order #${newOrderId} authorized. Software License ${dualAccounts.account2_software.license_key} ready.`
-      );
-    } else {
-      addToast(
-        'success',
-        'Dual Accounts Provisioned via API!',
-        `Order #${newOrderId} received. Account 1 (MLM) and Account 2 (${dualAccounts.account2_software.license_key}) sent to Admin for activation verification.`
-      );
-    }
-
-    setCurrentPage('dashboard');
+    return {
+      ok: true,
+      order: newOrder,
+      dualAccounts
+    };
   };
 
   // Helper to query wallet metrics dynamically
@@ -810,9 +846,9 @@ export function MlmProvider({ children }) {
 
     setMembers(prev => [...prev, newMember]);
     setCurrentMemberId(newMemberId);
+    localStorage.setItem('cybershield_currentMemberId', newMemberId);
     setAvailableBalance(0);
     setTotalEarnings(0);
-    setTeamMembersCount(0);
     setIsLoggedIn(true);
     localStorage.setItem('cybershield_isLoggedIn', 'true');
     setIsAuthModalOpen(false);
@@ -967,6 +1003,7 @@ export function MlmProvider({ children }) {
     }
 
     setCurrentMemberId(found.member_id);
+    localStorage.setItem('cybershield_currentMemberId', found.member_id);
     setAvailableBalance(Number(found.wallet_balance || 0));
     setTotalEarnings(Number(found.total_earnings || 0));
     setIsLoggedIn(true);
@@ -979,6 +1016,8 @@ export function MlmProvider({ children }) {
   // Logout / Switch to Visitor mode
   const logout = () => {
     setIsLoggedIn(false);
+    setCurrentMemberId(null);
+    localStorage.removeItem('cybershield_currentMemberId');
     localStorage.setItem('cybershield_isLoggedIn', 'false');
     setCurrentPage('home');
     addToast('info', 'Signed Out', 'You are now viewing CyberShield Network as a visitor.');
@@ -987,8 +1026,14 @@ export function MlmProvider({ children }) {
   // Login as existing member (e.g. Matru)
   const loginAsMember = (memberId = 'mem_matru') => {
     setCurrentMemberId(memberId);
+    localStorage.setItem('cybershield_currentMemberId', memberId);
     setIsLoggedIn(true);
     localStorage.setItem('cybershield_isLoggedIn', 'true');
+    const found = members.find(m => m.member_id === memberId);
+    if (found) {
+      setAvailableBalance(Number(found.wallet_balance || 0));
+      setTotalEarnings(Number(found.total_earnings || 0));
+    }
     setCurrentPage('dashboard');
     addToast('success', 'Logged In', 'Welcome back to your CyberShield Partner Portal.');
   };
@@ -999,35 +1044,41 @@ export function MlmProvider({ children }) {
     setOrders(initialOrders);
     setTransactions(initialTransactions);
     setPayoutRequests(initialPayoutRequests);
-    setPendingActivations(initialPendingActivations);
+    setPendingActivations([]);
     setAvailableBalance(0);
     setTotalEarnings(0);
-    setTeamMembersCount(0);
-    setCurrentMemberId('mem_matru');
+    setCurrentMemberId(null);
     setIsLoggedIn(false);
     localStorage.setItem('cybershield_isLoggedIn', 'false');
     setCurrentPage('home');
-    addToast('info', 'Platform Reset', 'Reset to fresh production state (₹0 Balance, Visitor Mode).');
+    addToast('info', 'Platform Reset', 'Reset to fresh production state (Visitor Mode, ₹0 Balance).');
   };
 
-  // Derive dynamic monthly earnings from live transactions
+  // Derive dynamic monthly earnings from live member transactions
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const memberTransactions = currentMember 
+    ? transactions.filter(t => t.member_id === currentMember.member_id) 
+    : [];
+  const memberActivations = currentMember 
+    ? pendingActivations.filter(a => a.member_id === currentMember.member_id) 
+    : [];
+
   const dynamicEarningsMonthly = months.map(month => {
-    const monthTx = transactions.filter(t => t.type === 'credit' && t.date && t.date.includes(month));
+    const monthTx = memberTransactions.filter(t => t.type === 'credit' && t.date && t.date.includes(month));
     const total = monthTx.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     return { month, amount: total };
   });
 
-  // Derive dynamic recent activity from live transactions and activations
+  // Derive dynamic recent activity from live member transactions and activations
   const dynamicRecentActivity = [
-    ...transactions.slice(0, 5).map(t => ({
+    ...memberTransactions.slice(0, 5).map(t => ({
       id: t.id,
       type: t.amount > 0 ? 'earning' : 'payout',
       title: t.description,
       time: t.date || 'Just now',
       icon: t.amount > 0 ? 'Coins' : 'ArrowUpRight'
     })),
-    ...pendingActivations.slice(0, 3).map(a => ({
+    ...memberActivations.slice(0, 3).map(a => ({
       id: a.id,
       type: 'user',
       title: `Partner Activation: ${a.member_name} (${a.status})`,

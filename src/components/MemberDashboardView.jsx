@@ -665,13 +665,24 @@ export default function MemberDashboardView() {
                     <div className="tree-tier-box">
                       <div className="tier-header-label">Level 1 • Direct Active Partners ({Math.min(4, directReferralsList.length)} of {directReferralsList.length} shown)</div>
                       <div className="tree-tier tier-level-1">
-                        {directReferralsList.slice(0, 4).map(member => (
-                          <div key={member.id} className="tree-circle-node node-l1">
-                            <div className="node-inner-avatar">{member.initials}</div>
-                            <div className="node-label">{member.name.split(' ')[0]} {member.name.split(' ')[1]?.[0]}.</div>
-                            <div className="node-sub">Active Partner</div>
+                        {directReferralsList.length === 0 ? (
+                          <div style={{ padding: '16px 20px', background: 'rgba(241, 245, 249, 0.7)', borderRadius: '12px', border: '1px dashed #CBD5E1', textAlign: 'center', width: '100%', maxWidth: '340px', margin: '0 auto' }}>
+                            <span style={{ fontSize: '0.8rem', color: '#64748B', display: 'block', fontWeight: 600 }}>
+                              No direct partners yet
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
+                              Share your referral link to sponsor members and earn ₹1,000 Level 1 bonuses.
+                            </span>
                           </div>
-                        ))}
+                        ) : (
+                          directReferralsList.slice(0, 4).map(member => (
+                            <div key={member.id} className="tree-circle-node node-l1">
+                              <div className="node-inner-avatar">{member.initials}</div>
+                              <div className="node-label">{member.name.split(' ')[0]} {member.name.split(' ')[1]?.[0]}.</div>
+                              <div className="node-sub">Active Partner</div>
+                            </div>
+                          ))
+                        )}
 
                         {/* The "... More" Button */}
                         {directReferralsList.length > 4 && (
@@ -935,7 +946,23 @@ export default function MemberDashboardView() {
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.map((tx) => (
+                      {(() => {
+                        const myTransactions = transactions.filter(tx => tx.member_id === currentMember?.member_id);
+                        if (myTransactions.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="5" className="text-center py-8 text-muted" style={{ padding: '32px 16px' }}>
+                                <div style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '4px' }}>
+                                  No Transactions Recorded Yet
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                                  Share your distributor referral link to start earning multi-tier commission payouts.
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return myTransactions.map((tx) => (
                         <tr key={tx.id}>
                           <td className="text-muted font-xs">{tx.date}</td>
                           <td className="font-semibold">{tx.description}</td>
@@ -982,7 +1009,8 @@ export default function MemberDashboardView() {
                             )}
                           </td>
                         </tr>
-                      ))}
+                        ));
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -1187,101 +1215,117 @@ export default function MemberDashboardView() {
         )}
 
         {/* SUBVIEW 4: MY SUBSCRIPTIONS & ORDERS */}
-        {activeTab === 'subscriptions' && (
-          <div className="dash-sub-view">
-            {/* Active Subscription Card */}
-            <div className="active-sub-card card-white">
-              <div className="sub-card-header">
-                <div>
-                  <span className="badge badge-green mb-2">Active</span>
-                  <h3 className="sub-title-bold">CyberShield Partner Joining Membership</h3>
-                  <p className="text-muted text-sm">Official Authorized Member License • ₹2,500 Joining Plan</p>
+        {activeTab === 'subscriptions' && (() => {
+          const myLatestOrder = orders.find(o => o.buyer_member_id === currentMember?.member_id) || orders[0];
+          const orderNum = myLatestOrder?.order_id || (currentMember?.cs_customer_id ? `CS${currentMember.cs_customer_id}` : 'CS-ACTIVE');
+          const orderDate = myLatestOrder?.activation_date || new Date(currentMember?.joined_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          const renewalDate = myLatestOrder?.next_renewal || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+          return (
+            <div className="dash-sub-view">
+              {/* Active Subscription Card */}
+              <div className="active-sub-card card-white">
+                <div className="sub-card-header">
+                  <div>
+                    <span className={`badge ${currentMember?.seller_status === 'active' ? 'badge-green' : 'badge-amber'} mb-2`}>
+                      {currentMember?.seller_status === 'active' ? 'Active' : 'Pending Activation'}
+                    </span>
+                    <h3 className="sub-title-bold">CyberShield Partner Joining Membership</h3>
+                    <p className="text-muted text-sm">Official Authorized Member License • ₹2,500 Joining Plan</p>
+                  </div>
+                  <div className="sub-price-callout">
+                    <span className="text-muted text-xs">Amount Paid</span>
+                    <div className="text-primary-blue text-large font-bold">
+                      ₹{(myLatestOrder?.total_amount || 2950).toLocaleString('en-IN')}
+                    </div>
+                  </div>
                 </div>
-                <div className="sub-price-callout">
-                  <span className="text-muted text-xs">Amount Paid</span>
-                  <div className="text-primary-blue text-large font-bold">₹2,950</div>
+
+                <div className="sub-dates-row">
+                  <div className="date-item">
+                    <span className="text-muted text-xs">Start Date</span>
+                    <span className="font-semibold">{orderDate}</span>
+                  </div>
+                  <div className="date-item">
+                    <span className="text-muted text-xs">Next Renewal</span>
+                    <span className="font-semibold">{renewalDate}</span>
+                  </div>
+                  <div className="date-item">
+                    <span className="text-muted text-xs">Official Activation</span>
+                    <span className="text-success font-semibold">
+                      {currentMember?.seller_status === 'active' ? 'CyberShield Defense Engine (Active)' : 'Pending Verification'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="sub-actions-row">
+                  <button 
+                    onClick={() => addToast('info', 'Invoice Downloaded', `Invoice #${orderNum} generated.`)} 
+                    className="btn btn-secondary btn-sm"
+                  >
+                    <Download size={14} />
+                    <span>View Invoice</span>
+                  </button>
+                  <button 
+                    onClick={() => addToast('info', 'Subscription Status', currentMember?.seller_status === 'active' ? 'Your license is actively protecting endpoints.' : 'Pending activation.')} 
+                    className="btn btn-secondary btn-sm"
+                  >
+                    Manage
+                  </button>
+                  <button 
+                    onClick={() => addToast('warning', 'Cancellation policy', 'Cooling-off refund can be filed via support within 7 days.')} 
+                    className="btn btn-secondary btn-sm text-rose"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
 
-              <div className="sub-dates-row">
-                <div className="date-item">
-                  <span className="text-muted text-xs">Start Date</span>
-                  <span className="font-semibold">10 Oct 2026</span>
+              {/* Order Details & CyberShield Activation Status */}
+              <div className="order-details-card card-white">
+                <h3 className="chart-card-title mb-4">Latest Order & Activation Details</h3>
+                
+                <div className="order-specs-grid">
+                  <div className="spec-row">
+                    <span className="spec-label">Order Number:</span>
+                    <span className="spec-val font-semibold code-font">#{orderNum}</span>
+                  </div>
+                  <div className="spec-row">
+                    <span className="spec-label">Order Date:</span>
+                    <span className="spec-val">{orderDate}</span>
+                  </div>
+                  <div className="spec-row">
+                    <span className="spec-label">Payment Method:</span>
+                    <span className="spec-val">{myLatestOrder?.payment_method || 'UPI (Google Pay / PhonePe)'}</span>
+                  </div>
+                  <div className="spec-row">
+                    <span className="spec-label">Amount Paid:</span>
+                    <span className="spec-val font-bold">₹{(myLatestOrder?.total_amount || 2950).toLocaleString('en-IN')} (₹2,500 + 18% GST)</span>
+                  </div>
+                  <div className="spec-row">
+                    <span className="spec-label">Payment Status:</span>
+                    <span className={`badge ${currentMember?.seller_status === 'active' ? 'badge-green' : 'badge-amber'}`}>
+                      {myLatestOrder?.payment_status ? (myLatestOrder.payment_status.charAt(0).toUpperCase() + myLatestOrder.payment_status.slice(1)) : (currentMember?.seller_status === 'active' ? 'Paid' : 'Pending')}
+                    </span>
+                  </div>
+                  <div className="spec-row">
+                    <span className="spec-label">Subscription Status:</span>
+                    <span className={`badge ${currentMember?.seller_status === 'active' ? 'badge-green' : 'badge-amber'}`}>
+                      {currentMember?.seller_status === 'active' ? 'Active (Enterprise Cloud Protected)' : 'Pending'}
+                    </span>
+                  </div>
                 </div>
-                <div className="date-item">
-                  <span className="text-muted text-xs">Next Renewal</span>
-                  <span className="font-semibold">10 Nov 2026</span>
-                </div>
-                <div className="date-item">
-                  <span className="text-muted text-xs">Official Activation</span>
-                  <span className="text-success font-semibold">CyberShield Defense Engine</span>
-                </div>
-              </div>
 
-              <div className="sub-actions-row">
-                <button 
-                  onClick={() => addToast('info', 'Invoice Downloaded', 'Invoice #INV-CS20261010 generated.')} 
-                  className="btn btn-secondary btn-sm"
-                >
-                  <Download size={14} />
-                  <span>View Invoice</span>
-                </button>
-                <button 
-                  onClick={() => addToast('info', 'Subscription Active', 'Your license is actively protecting endpoints.')} 
-                  className="btn btn-secondary btn-sm"
-                >
-                  Manage
-                </button>
-                <button 
-                  onClick={() => addToast('warning', 'Cancellation policy', 'Cooling-off refund can be filed via support.')} 
-                  className="btn btn-secondary btn-sm text-rose"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-
-            {/* Order Details & CyberShield Activation Status */}
-            <div className="order-details-card card-white">
-              <h3 className="chart-card-title mb-4">Latest Order & Activation Details</h3>
-              
-              <div className="order-specs-grid">
-                <div className="spec-row">
-                  <span className="spec-label">Order Number:</span>
-                  <span className="spec-val font-semibold code-font">#CS20261010</span>
-                </div>
-                <div className="spec-row">
-                  <span className="spec-label">Order Date:</span>
-                  <span className="spec-val">10 Oct 2026, 11:30 AM</span>
-                </div>
-                <div className="spec-row">
-                  <span className="spec-label">Payment Method:</span>
-                  <span className="spec-val">UPI (Google Pay)</span>
-                </div>
-                <div className="spec-row">
-                  <span className="spec-label">Amount Paid:</span>
-                  <span className="spec-val font-bold">₹2,950 (₹2,500 + 18% GST)</span>
-                </div>
-                <div className="spec-row">
-                  <span className="spec-label">Payment Status:</span>
-                  <span className="badge badge-green">Paid</span>
-                </div>
-                <div className="spec-row">
-                  <span className="spec-label">Subscription Status:</span>
-                  <span className="badge badge-green">Active (Enterprise Cloud Protected)</span>
+                <div className="mt-4">
+                  <button 
+                    onClick={() => addToast('success', 'Invoice Downloaded', `CyberShield GST Tax Invoice #${orderNum} downloaded.`)} 
+                    className="btn btn-primary btn-sm"
+                  >
+                    <Download size={14} />
+                    <span>Download Official Tax Invoice</span>
+                  </button>
                 </div>
               </div>
-
-              <div className="mt-4">
-                <button 
-                  onClick={() => addToast('success', 'Invoice Downloaded', 'CyberShield GST Tax Invoice #CS20261010 downloaded.')} 
-                  className="btn btn-primary btn-sm"
-                >
-                  <Download size={14} />
-                  <span>Download Official Tax Invoice</span>
-                </button>
-              </div>
-            </div>
 
             {/* DUAL ACCOUNTS PROVISIONED VIA API CARD */}
             <div className="dual-accounts-showcase-card card-white mt-4 p-5">
@@ -1350,7 +1394,8 @@ export default function MemberDashboardView() {
               </div>
             </div>
           </div>
-        )}
+        );
+      })()}
 
         {/* SUBVIEW 5: PROFILE & KYC (Matching Screen 8) */}
         {activeTab === 'kyc' && (
@@ -1418,7 +1463,8 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">Full Name</label>
                     <input 
                       type="text" 
-                      defaultValue={currentMember?.name || 'Matru Prasad Panda'} 
+                      defaultValue={currentMember?.name || ''} 
+                      placeholder="Enter legal full name"
                       className="form-input-clean" 
                       required 
                     />
@@ -1428,7 +1474,8 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">Email Address</label>
                     <input 
                       type="email" 
-                      defaultValue={currentMember?.email || 'matru@gmail.com'} 
+                      defaultValue={currentMember?.email || ''} 
+                      placeholder="name@example.com"
                       className="form-input-clean" 
                       required 
                     />
@@ -1438,7 +1485,8 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">Mobile Number</label>
                     <input 
                       type="tel" 
-                      defaultValue={currentMember?.phone || '+91 9876543210'} 
+                      defaultValue={currentMember?.phone || ''} 
+                      placeholder="10-digit mobile number"
                       className="form-input-clean" 
                       required 
                     />
@@ -1448,14 +1496,15 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">Date of Birth</label>
                     <input 
                       type="text" 
-                      defaultValue="14 May 1996" 
+                      defaultValue={currentMember?.dob || ''} 
+                      placeholder="DD/MM/YYYY"
                       className="form-input-clean" 
                     />
                   </div>
 
                   <div className="form-group-clean">
                     <label className="form-label-clean">Gender</label>
-                    <select defaultValue="Male" className="form-input-clean">
+                    <select defaultValue={currentMember?.gender || 'Male'} className="form-input-clean">
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
@@ -1466,7 +1515,8 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">City & State</label>
                     <input 
                       type="text" 
-                      defaultValue="Bhubaneswar, Odisha" 
+                      defaultValue={currentMember?.city || ''} 
+                      placeholder="e.g. City, State"
                       className="form-input-clean" 
                     />
                   </div>
@@ -1475,7 +1525,8 @@ export default function MemberDashboardView() {
                     <label className="form-label-clean">Residential Address</label>
                     <input 
                       type="text" 
-                      defaultValue="Plot 42, Cyber Gateway Tech Zone, PIN: 751024" 
+                      defaultValue={currentMember?.address || ''} 
+                      placeholder="Enter flat / house no., street, PIN code"
                       className="form-input-clean" 
                     />
                   </div>
@@ -1552,10 +1603,12 @@ export default function MemberDashboardView() {
                       </div>
                     </div>
                     <div className="doc-actions-pill">
-                      <span className="badge badge-green">Uploaded ✓</span>
+                      <span className={`badge ${currentMember?.kyc?.documents?.addressProof === 'Uploaded' ? 'badge-green' : 'badge-neutral'}`}>
+                        {currentMember?.kyc?.documents?.addressProof === 'Uploaded' ? 'Uploaded ✓' : 'Pending'}
+                      </span>
                       <button 
                         type="button" 
-                        onClick={() => addToast('info', 'Address Verified', 'Address matching partner record.')}
+                        onClick={() => addToast('info', 'Address Verified', currentMember?.kyc?.documents?.addressProof === 'Uploaded' ? 'Address matching partner record.' : 'Please upload your address proof document.')}
                         className="btn-link-action"
                       >
                         View
@@ -1625,19 +1678,27 @@ export default function MemberDashboardView() {
                   <h5 className="font-bold text-base mb-2">Withholding Tax Certificates (Form 16A)</h5>
                   <p className="text-muted text-xs mb-4">Download quarterly tax deduction certificates for annual income tax filing.</p>
                   
-                  <div className="tax-cert-row">
-                    <div>
-                      <span className="font-semibold text-sm">FY 2026-27 (Quarter 2 - Jul to Sep)</span>
-                      <div className="text-muted text-xs">TDS Deducted: ₹50 • Challan #CIN99210</div>
+                  {payoutRequests.some(p => p.status === 'paid' && p.tds_amount > 0) ? (
+                    <div className="tax-cert-row">
+                      <div>
+                        <span className="font-semibold text-sm">FY 2026-27 (Quarter 2 - Jul to Sep)</span>
+                        <div className="text-muted text-xs">
+                          TDS Deducted: ₹{payoutRequests.filter(p => p.status === 'paid').reduce((s, p) => s + p.tds_amount, 0).toLocaleString('en-IN')} • Statutory Sec 194H
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => addToast('success', 'Form 16A', 'Form 16A TDS Certificate downloaded.')}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        <Download size={14} />
+                        <span>Download PDF</span>
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => addToast('success', 'Form 16A', 'Form 16A downloaded.')}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      <Download size={14} />
-                      <span>Download PDF</span>
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="p-3 bg-card-alt border-rounded text-xs text-muted">
+                      No statutory TDS deductions recorded yet. Quarterly Form 16A certificates are generated upon payout disbursals.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1656,7 +1717,7 @@ export default function MemberDashboardView() {
 
                   <h5 className="font-bold text-base mb-2">Direct Seller Contract Confirmation</h5>
                   <p className="text-muted text-sm leading-relaxed mb-4">
-                    Executed electronically between <strong>Matru Prasad Panda</strong> and <strong>CyberShield Network Direct Selling Entity</strong> on <strong>10 Oct 2026, 11:30 AM IST</strong>.
+                    Executed electronically between <strong>{currentMember?.name || 'Authorized Member'}</strong> and <strong>CyberShield Network Direct Selling Entity</strong> on <strong>{currentMember?.joined_at ? new Date(currentMember.joined_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Registration Date'}</strong>.
                   </p>
 
                   <div className="agreement-clauses-list">

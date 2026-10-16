@@ -16,7 +16,16 @@ import {
 } from 'lucide-react';
 
 export default function PublicHome() {
-  const { openCheckout, setIsAuthModalOpen, setAuthMode, commissionRules } = useMlm();
+  const { openCheckout, setIsAuthModalOpen, setAuthMode, commissionRules, isLoggedIn, currentMember } = useMlm();
+
+  const handleJoinClick = () => {
+    if (isLoggedIn && currentMember) {
+      openCheckout('Joining');
+    } else {
+      setAuthMode('register');
+      setIsAuthModalOpen(true);
+    }
+  };
 
   return (
     <div className="public-home-wrapper">
@@ -60,10 +69,7 @@ export default function PublicHome() {
           {/* CTA Buttons */}
           <div className="hero-cta-row">
             <button
-              onClick={() => {
-                setAuthMode('register');
-                setIsAuthModalOpen(true);
-              }}
+              onClick={handleJoinClick}
               className="btn btn-primary btn-lg"
             >
               <span>Join Now (₹2,500)</span>
@@ -71,11 +77,14 @@ export default function PublicHome() {
             </button>
 
             <button
-              onClick={() => openCheckout('Joining')}
+              onClick={() => {
+                const el = document.getElementById('plans-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
               className="btn btn-outline-blue btn-lg"
             >
               <Play size={16} fill="currentColor" />
-              <span>Watch Video</span>
+              <span>View Joining Plan</span>
             </button>
           </div>
 
@@ -254,7 +263,7 @@ export default function PublicHome() {
               </div>
 
               <button
-                onClick={() => openCheckout('Joining')}
+                onClick={handleJoinClick}
                 className="btn btn-primary btn-lg single-join-cta-btn"
               >
                 <span>Join Now for ₹2,500</span>
