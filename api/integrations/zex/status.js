@@ -10,7 +10,11 @@ export default async function handler(req, res) {
     const status = await getMemberZexStatus(memberId);
     return res.status(200).json({ ok: true, status });
   } catch (err) {
-    console.error('[ZEX Status] Error:', err);
-    return res.status(500).json({ error: 'Failed to query status' });
+    console.warn('[ZEX Status] Database unreachable, returning safe fallback status:', err.message);
+    return res.status(200).json({ 
+      ok: true, 
+      status: { linked: false, dbConnected: false }, 
+      warning: 'Database service is currently unconfigured or offline' 
+    });
   }
 }
