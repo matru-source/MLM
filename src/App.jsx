@@ -6,6 +6,7 @@ import MemberDashboardView from './components/MemberDashboardView';
 import AdminPortalView from './components/AdminPortalView';
 import CheckoutModal from './components/CheckoutModal';
 import AuthModal from './components/AuthModal';
+import ReferralBanner from './components/ReferralBanner';
 import Toast from './components/Toast';
 import { ShieldCheck, Lock, ExternalLink } from 'lucide-react';
 import './App.css';
@@ -109,9 +110,10 @@ function MainApp() {
         </footer>
       )}
 
-      {/* Modals */}
+      {/* Modals & Overlays */}
       <CheckoutModal />
       <AuthModal />
+      <ReferralBanner />
       <Toast />
     </div>
   );

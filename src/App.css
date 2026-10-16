@@ -4390,4 +4390,287 @@
   }
 }
 
+/* ==========================================================================
+   2-Minute Referral Invitation Floating Banner & Countdown
+   ========================================================================== */
+.referral-banner-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 99999;
+  max-width: 520px;
+  width: calc(100% - 48px);
+  animation: referralSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+}
+
+@keyframes referralSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.referral-banner-card {
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6), 0 0 30px rgba(56, 189, 248, 0.2);
+  overflow: hidden;
+  position: relative;
+}
+
+.referral-banner-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #38BDF8, #10B981, #6366F1);
+}
+
+.referral-banner-main {
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.referral-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.referral-avatar-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.referral-pulse-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 15px;
+  border: 1.5px solid rgba(16, 185, 129, 0.5);
+  animation: referralPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes referralPulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.2;
+    transform: scale(1.08);
+  }
+}
+
+.referral-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.referral-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.referral-pill-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #38BDF8;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.referral-timer-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 2px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono, monospace);
+}
+
+.referral-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #F8FAFC;
+  margin: 0 0 3px 0;
+  line-height: 1.3;
+}
+
+.referral-sponsor-name {
+  color: #38BDF8;
+  font-weight: 800;
+}
+
+.referral-subtitle {
+  font-size: 0.78rem;
+  color: #94A3B8;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.referral-code-highlight {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.referral-dot-sep {
+  color: #64748B;
+}
+
+.referral-status-active {
+  color: #10B981;
+  font-weight: 600;
+}
+
+.referral-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.referral-cta-btn {
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: #FFFFFF !important;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s ease;
+}
+
+.referral-cta-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
+}
+
+.referral-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94A3B8;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.referral-close-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+}
+
+.referral-progress-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  width: 100%;
+  overflow: hidden;
+}
+
+.referral-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10B981, #38BDF8);
+  transition: width 1s linear;
+}
+
+/* Sponsor Form Badges in AuthModal */
+.sponsor-verified-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 6px;
+  color: #10B981;
+}
+
+.sponsor-custom-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 6px;
+}
+
+/* Mobile Media Query for Referral Banner */
+@media (max-width: 600px) {
+  .referral-banner-container {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    width: calc(100% - 20px);
+    max-width: 100%;
+  }
+
+  .referral-banner-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .referral-actions {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .referral-cta-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+
 

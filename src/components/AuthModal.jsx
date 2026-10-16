@@ -28,6 +28,8 @@ export default function AuthModal() {
     registerUser, 
     setIsLoggedIn,
     openCheckout,
+    activeReferral,
+    getMemberByReferralCode,
     addToast
   } = useMlm();
   
@@ -37,8 +39,15 @@ export default function AuthModal() {
   const [email, setEmail] = useState('matru@gmail.com');
   const [mobile, setMobile] = useState('+91 9876543210');
   const [password, setPassword] = useState('••••••••••••');
-  const [sponsorId, setSponsorId] = useState('CS123456');
+  const [sponsorId, setSponsorId] = useState(() => activeReferral || 'CS123456');
   const [agreed, setAgreed] = useState(true);
+
+  // Sync sponsorId when activeReferral is captured or modal opens
+  useEffect(() => {
+    if (activeReferral) {
+      setSponsorId(activeReferral);
+    }
+  }, [activeReferral, isAuthModalOpen]);
 
   // OTP Verification State
   const [authStep, setAuthStep] = useState('form'); // 'form' | 'otp'
@@ -328,14 +337,46 @@ export default function AuthModal() {
                 </div>
 
                 <div className="form-group-clean">
-                  <label className="form-label-clean">Sponsor Code (Referral Link)</label>
+                  <div className="flex-between items-center mb-1">
+                    <label className="form-label-clean mb-0">Sponsor Referral Code</label>
+                    {activeReferral && (
+                      <span className="badge badge-blue font-2xs font-bold">
+                        ✓ Linked via Referral
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
+                    required
                     value={sponsorId}
-                    onChange={(e) => setSponsorId(e.target.value.toUpperCase())}
-                    placeholder="CS123456"
+                    onChange={(e) => setSponsorId(e.target.value.toUpperCase().trim())}
+                    placeholder="Enter Sponsor Code (e.g. CS123456)"
                     className="form-input-clean code-font text-primary-blue font-bold"
                   />
+                  {/* Real-time Verified Sponsor Indicator */}
+                  {(() => {
+                    const sponsor = getMemberByReferralCode ? getMemberByReferralCode(sponsorId) : null;
+                    if (sponsor) {
+                      return (
+                        <div className="sponsor-verified-pill mt-1">
+                          <ShieldCheck size={14} className="text-emerald shrink-0" />
+                          <span className="text-xs">
+                            Verified Sponsor: <strong className="text-white">{sponsor.name}</strong> <span className="code-font text-cyan">({sponsor.referral_code})</span>
+                          </span>
+                        </div>
+                      );
+                    }
+                    if (sponsorId && sponsorId.length >= 4) {
+                      return (
+                        <div className="sponsor-custom-pill mt-1">
+                          <span className="text-muted text-xs">
+                            Sponsor Code: <strong className="code-font text-primary">{sponsorId}</strong> (Will be linked upon activation)
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Statutory Agreement Checkbox */}

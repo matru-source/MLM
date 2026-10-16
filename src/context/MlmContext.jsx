@@ -159,6 +159,97 @@ export function MlmProvider({ children }) {
 
   const currentMember = members.find(m => m.member_id === currentMemberId) || members[0];
 
+  // Lookup member details by referral code, customer ID, or member ID
+  const getMemberByReferralCode = (code) => {
+    if (!code) return null;
+    const clean = code.trim().toUpperCase();
+    return members.find(m => 
+      (m.referral_code && m.referral_code.toUpperCase() === clean) ||
+      (m.member_id && m.member_id.toUpperCase() === clean) ||
+      (m.cs_customer_id && m.cs_customer_id.toUpperCase() === clean)
+    ) || null;
+  };
+
+  // Active referral code tracked from URL or storage
+  const [activeReferral, setActiveReferral] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlRef = params.get('ref') || params.get('sponsor') || params.get('r');
+      if (urlRef) {
+        const clean = urlRef.trim().toUpperCase();
+        sessionStorage.setItem('cybershield_referred_code', clean);
+        return clean;
+      }
+      return sessionStorage.getItem('cybershield_referred_code') || '';
+    } catch (e) {
+      return '';
+    }
+  });
+
+  // 120-Second Referral Floating Banner State
+  const [referralBanner, setReferralBanner] = useState({
+    visible: false,
+    sponsorCode: '',
+    sponsorName: '',
+    sponsorAvatar: null,
+    secondsRemaining: 120
+  });
+
+  // On mount and when members list is ready, inspect URL for ?ref=
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlRef = params.get('ref') || params.get('sponsor') || params.get('r');
+      if (urlRef) {
+        const cleanCode = urlRef.trim().toUpperCase();
+        setActiveReferral(cleanCode);
+        sessionStorage.setItem('cybershield_referred_code', cleanCode);
+
+        // Lookup sponsor real name
+        const found = members.find(m => 
+          (m.referral_code && m.referral_code.toUpperCase() === cleanCode) ||
+          (m.member_id && m.member_id.toUpperCase() === cleanCode) ||
+          (m.cs_customer_id && m.cs_customer_id.toUpperCase() === cleanCode)
+        );
+
+        const realName = found ? found.name : `Authorized Partner (${cleanCode})`;
+        const avatar = found ? found.avatar : null;
+
+        setReferralBanner({
+          visible: true,
+          sponsorCode: cleanCode,
+          sponsorName: realName,
+          sponsorAvatar: avatar,
+          secondsRemaining: 120
+        });
+      }
+    } catch (e) {
+      console.error('Error reading referral query param:', e);
+    }
+  }, [members]);
+
+  // 120-second depleting countdown timer (ticks down every 1 second)
+  useEffect(() => {
+    let interval = null;
+    if (referralBanner.visible && referralBanner.secondsRemaining > 0) {
+      interval = setInterval(() => {
+        setReferralBanner(prev => {
+          if (prev.secondsRemaining <= 1) {
+            return { ...prev, visible: false, secondsRemaining: 0 };
+          }
+          return { ...prev, secondsRemaining: prev.secondsRemaining - 1 };
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [referralBanner.visible, referralBanner.secondsRemaining]);
+
+  const dismissReferralBanner = () => {
+    setReferralBanner(prev => ({ ...prev, visible: false }));
+  };
+
   // Calculate pending withdrawals total for current member
   const pendingPayoutsTotal = payoutRequests
     .filter(r => r.member_id === currentMember?.member_id && r.status === 'pending')
@@ -621,6 +712,11 @@ export function MlmProvider({ children }) {
       toasts,
       addToast,
       removeToast,
+      referralBanner,
+      dismissReferralBanner,
+      activeReferral,
+      setActiveReferral,
+      getMemberByReferralCode,
       resetAllData
     }}>
       {children}
