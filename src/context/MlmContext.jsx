@@ -780,7 +780,7 @@ export function MlmProvider({ children }) {
   };
 
   // 1. User Requests Withdrawal (Immediately locks funds to prevent double-spending)
-  const requestWithdrawal = (amount) => {
+  const requestWithdrawal = (amount, overrideBankDetails = null) => {
     const numAmount = Number(amount);
     if (!currentMember) {
       addToast('error', 'Authentication Error', 'No active registered partner found.');
@@ -808,15 +808,31 @@ export function MlmProvider({ children }) {
       return false;
     }
 
+    const bankName = (overrideBankDetails?.bank_name || currentMember?.kyc?.bank_name || 'Commercial Bank').trim();
+    const bankAccount = (overrideBankDetails?.bank_account_number || currentMember?.kyc?.bank_account_number || '').trim();
+    const bankIfsc = (overrideBankDetails?.bank_ifsc || currentMember?.kyc?.bank_ifsc || '').trim().toUpperCase();
+    const legalName = (overrideBankDetails?.legal_name || currentMember?.kyc?.legal_name || currentMember.name).trim();
+    const memberPan = (overrideBankDetails?.pan || currentMember?.kyc?.pan || '').trim().toUpperCase();
+
     // Require linked bank account before requesting withdrawal
-    if (!currentMember?.kyc?.bank_account_number || !currentMember?.kyc?.bank_ifsc) {
-      addToast('error', 'Bank Details Required', 'Please link your Bank Account & IFSC under Profile > KYC before requesting a payout.');
+    if (!bankAccount || !bankIfsc) {
+      addToast('error', 'Bank Details Required', 'Please enter your Bank Account Number & IFSC before requesting a payout.');
       return false;
+    }
+
+    // If bank details were provided during withdrawal, update KYC record
+    if (overrideBankDetails) {
+      submitKyc(currentMember.member_id || currentMember.id, {
+        bank_name: bankName,
+        bank_account_number: bankAccount,
+        bank_ifsc: bankIfsc,
+        legal_name: legalName,
+        pan: memberPan
+      });
     }
 
     // Section 206AA statutory compliance: 5% TDS under Sec 194H if valid PAN furnished, 20% if no PAN or invalid
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-    const memberPan = (currentMember?.kyc?.pan || '').trim().toUpperCase();
     const hasValidPan = panRegex.test(memberPan);
     const tdsRate = hasValidPan ? 0.05 : 0.20;
     const tdsSection = hasValidPan ? 'Section 194H (5%)' : 'Section 206AA (20% - No PAN)';
@@ -839,10 +855,10 @@ export function MlmProvider({ children }) {
       status: 'pending', // 'pending' | 'paid' | 'rejected'
       request_date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       bank_details: {
-        bank_name: currentMember.kyc.bank_name || 'Commercial Bank',
-        account_number: currentMember.kyc.bank_account_number,
-        ifsc: currentMember.kyc.bank_ifsc,
-        account_holder: currentMember.kyc.legal_name || currentMember.name
+        bank_name: bankName,
+        account_number: bankAccount,
+        ifsc: bankIfsc,
+        account_holder: legalName
       },
       admin_payment: {
         paid_at: null,

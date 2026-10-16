@@ -76,6 +76,21 @@ export default function MemberDashboardView() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedReceiptModal, setSelectedReceiptModal] = useState(null);
 
+  // Quick settlement bank details for withdrawal modal
+  const [quickBankName, setQuickBankName] = useState(currentMember?.kyc?.bank_name || '');
+  const [quickAccount, setQuickAccount] = useState(currentMember?.kyc?.bank_account_number || '');
+  const [quickIfsc, setQuickIfsc] = useState(currentMember?.kyc?.bank_ifsc || '');
+  const [quickPan, setQuickPan] = useState(currentMember?.kyc?.pan || '');
+
+  useEffect(() => {
+    if (currentMember?.kyc) {
+      if (currentMember.kyc.bank_name) setQuickBankName(currentMember.kyc.bank_name);
+      if (currentMember.kyc.bank_account_number) setQuickAccount(currentMember.kyc.bank_account_number);
+      if (currentMember.kyc.bank_ifsc) setQuickIfsc(currentMember.kyc.bank_ifsc);
+      if (currentMember.kyc.pan) setQuickPan(currentMember.kyc.pan);
+    }
+  }, [currentMember?.kyc]);
+
   useEffect(() => {
     if (currentPage === 'profile' || currentPage === 'kyc') {
       setActiveTab('kyc');
@@ -89,7 +104,23 @@ export default function MemberDashboardView() {
   const handleWithdraw = (e) => {
     e.preventDefault();
     const amount = Number(withdrawAmount);
-    if (requestWithdrawal(amount)) {
+
+    let overrideBank = null;
+    if (!currentMember?.kyc?.bank_account_number) {
+      if (!quickAccount.trim() || !quickIfsc.trim()) {
+        addToast('error', 'Bank Details Required', 'Please enter your settlement Bank Account Number and IFSC Code to receive the payout.');
+        return;
+      }
+      overrideBank = {
+        bank_name: quickBankName.trim() || 'Bank',
+        bank_account_number: quickAccount.trim(),
+        bank_ifsc: quickIfsc.trim().toUpperCase(),
+        legal_name: currentMember?.name,
+        pan: quickPan.trim().toUpperCase() || currentMember?.kyc?.pan || ''
+      };
+    }
+
+    if (requestWithdrawal(amount, overrideBank)) {
       setWithdrawModalOpen(false);
       setWithdrawAmount('');
     }
@@ -1137,12 +1168,12 @@ export default function MemberDashboardView() {
                           <div className="font-bold text-sm text-primary">
                             {currentMember?.kyc?.bank_account_number 
                               ? `${currentMember.kyc.bank_name || 'Bank'} ••••${currentMember.kyc.bank_account_number.slice(-4)}`
-                              : 'Bank Account Not Linked'}
+                              : 'Bank Settlement Account Required'}
                           </div>
                           <div className="text-muted font-xs">
                             {currentMember?.kyc?.bank_account_number 
                               ? `IFSC: ${currentMember.kyc.bank_ifsc} • Beneficiary: ${currentMember.kyc.legal_name || currentMember.name}`
-                              : 'Please link your settlement bank account in KYC before requesting a payout.'}
+                              : 'Documents verified! Enter your settlement bank account number & IFSC below to receive IMPS payouts.'}
                           </div>
                         </div>
                       </div>
@@ -1150,6 +1181,76 @@ export default function MemberDashboardView() {
                         {currentMember?.kyc?.bank_account_number ? 'KYC Verified ✓' : 'Action Required'}
                       </span>
                     </div>
+
+                    {/* Quick Inline Bank Entry If Missing */}
+                    {!currentMember?.kyc?.bank_account_number && (
+                      <div className="p-3 bg-card-alt border-rounded mt-3" style={{ border: '1px solid #fde68a', background: '#fffbeb' }}>
+                        <div className="font-bold text-xs text-amber-900 mb-2 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Building size={14} className="text-amber-600 inline" />
+                            <span>Direct Payout Settlement Account:</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setWithdrawModalOpen(false);
+                              setActiveTab('kyc');
+                              setKycTab('tax');
+                            }}
+                            className="text-primary-blue text-xs font-semibold hover:underline"
+                          >
+                            Profile Settings &rarr;
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs text-muted block mb-0.5">Bank Name *</label>
+                            <input
+                              type="text"
+                              value={quickBankName}
+                              onChange={(e) => setQuickBankName(e.target.value)}
+                              placeholder="e.g. HDFC Bank, SBI, ICICI"
+                              className="form-input-clean text-xs py-1.5"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted block mb-0.5">Account Number *</label>
+                            <input
+                              type="text"
+                              value={quickAccount}
+                              onChange={(e) => setQuickAccount(e.target.value)}
+                              placeholder="Enter account number"
+                              className="form-input-clean text-xs py-1.5 code-font"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted block mb-0.5">IFSC Code *</label>
+                            <input
+                              type="text"
+                              value={quickIfsc}
+                              onChange={(e) => setQuickIfsc(e.target.value.toUpperCase())}
+                              placeholder="e.g. HDFC0001234"
+                              maxLength={11}
+                              className="form-input-clean text-xs py-1.5 code-font uppercase"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted block mb-0.5">PAN Card Number (Optional - 5% TDS)</label>
+                            <input
+                              type="text"
+                              value={quickPan}
+                              onChange={(e) => setQuickPan(e.target.value.toUpperCase())}
+                              placeholder="e.g. ABCDE1234F"
+                              maxLength={10}
+                              className="form-input-clean text-xs py-1.5 code-font uppercase"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Available Balance Callout & Quick Chips */}
                     <div className="withdraw-balance-row">
@@ -1716,7 +1817,20 @@ export default function MemberDashboardView() {
                         <div>
                           <div className="doc-title">PAN Card (Form 16A / Section 194H)</div>
                           <div className="doc-sub">
-                            {currentMember?.kyc?.documents?.pan || (currentMember?.kyc?.pan ? `PAN: ${currentMember.kyc.pan}` : 'Mandatory tax ID document')}
+                            {currentMember?.kyc?.pan ? (
+                              <span className="text-primary-blue font-semibold code-font">PAN: {currentMember.kyc.pan}</span>
+                            ) : (
+                              <span>
+                                {currentMember?.kyc?.documents?.pan || 'Mandatory tax ID document'} •{' '}
+                                <button
+                                  type="button"
+                                  onClick={() => setKycTab('tax')}
+                                  className="text-primary-blue hover:underline font-semibold"
+                                >
+                                  Link PAN Number &rarr;
+                                </button>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1774,7 +1888,22 @@ export default function MemberDashboardView() {
                         <div>
                           <div className="doc-title">Bank Passbook / Cancelled Cheque</div>
                           <div className="doc-sub">
-                            {currentMember?.kyc?.documents?.bankAccount || (currentMember?.kyc?.bank_account_number ? `A/C ending in ••••${currentMember.kyc.bank_account_number.slice(-4)}` : 'Proof of bank payout settlement account')}
+                            {currentMember?.kyc?.bank_account_number ? (
+                              <span className="text-primary-blue font-semibold">
+                                {currentMember.kyc.bank_name || 'Bank'} • A/C: ••••{currentMember.kyc.bank_account_number.slice(-4)} • IFSC: {currentMember.kyc.bank_ifsc}
+                              </span>
+                            ) : (
+                              <span>
+                                {currentMember?.kyc?.documents?.bankAccount || 'Proof of payout account'} •{' '}
+                                <button
+                                  type="button"
+                                  onClick={() => setKycTab('tax')}
+                                  className="text-primary-blue hover:underline font-semibold"
+                                >
+                                  Link A/C & IFSC Number &rarr;
+                                </button>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
