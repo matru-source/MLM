@@ -49,6 +49,7 @@ export default function MemberDashboardView() {
     payoutRequests,
     pendingPayoutsTotal,
     requestWithdrawal,
+    isDbConnected,
     logout,
     addToast
   } = useMlm();
@@ -203,7 +204,15 @@ export default function MemberDashboardView() {
             />
             <div className="topbar-user-meta">
               <span className="topbar-name">{currentMember?.name || 'Matru Prasad Panda'}</span>
-              <span className="badge badge-amber">{currentMember?.rank || 'Silver Partner'}</span>
+              <div className="flex-center gap-1" style={{ justifyContent: 'flex-start' }}>
+                <span className="badge badge-amber">{currentMember?.rank || 'Silver Partner'}</span>
+                {isDbConnected && (
+                  <span className="badge badge-green font-xs flex-center gap-1" style={{ padding: '2px 6px', fontSize: '10px' }} title="Connected to live Neon PostgreSQL database">
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
+                    Neon Live
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </header>

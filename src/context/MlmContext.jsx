@@ -10,6 +10,21 @@ import {
 } from '../data/initialData';
 import { generateId } from '../utils/cryptoSim';
 import { provisionDualAccounts } from '../services/accountProvisioningService';
+import {
+  dbFetchMembers,
+  dbRegisterMember,
+  dbFetchActivations,
+  dbCreateActivation,
+  dbApproveActivation,
+  dbRejectActivation,
+  dbFetchPayoutRequests,
+  dbCreatePayoutRequest,
+  dbApprovePayout,
+  dbRejectPayout,
+  dbFetchOrders,
+  dbCreateOrder,
+  dbFetchTransactions
+} from '../services/neonDbService';
 
 const MlmContext = createContext(null);
 
@@ -144,6 +159,52 @@ export function MlmProvider({ children }) {
     localStorage.setItem('cybershield_earnings', JSON.stringify(totalEarnings));
     localStorage.setItem('cybershield_teamCount', JSON.stringify(teamMembersCount));
   }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings, teamMembersCount]);
+
+  const [isDbConnected, setIsDbConnected] = useState(false);
+
+  // Live Neon PostgreSQL Synchronization
+  useEffect(() => {
+    let active = true;
+    async function loadNeonData() {
+      try {
+        const [mRes, aRes, pRes, oRes, tRes] = await Promise.all([
+          dbFetchMembers(),
+          dbFetchActivations(),
+          dbFetchPayoutRequests(),
+          dbFetchOrders(),
+          dbFetchTransactions()
+        ]);
+
+        if (!active) return;
+
+        if (mRes.ok && mRes.data && mRes.data.length > 0) {
+          setMembers(mRes.data);
+          const current = mRes.data.find(m => m.member_id === currentMemberId);
+          if (current) {
+            setAvailableBalance(Number(current.wallet_balance || 0));
+            setTotalEarnings(Number(current.total_earnings || 0));
+          }
+          setIsDbConnected(true);
+        }
+        if (aRes.ok && aRes.data && aRes.data.length > 0) {
+          setPendingActivations(aRes.data);
+        }
+        if (pRes.ok && pRes.data && pRes.data.length > 0) {
+          setPayoutRequests(pRes.data);
+        }
+        if (oRes.ok && oRes.data && oRes.data.length > 0) {
+          setOrders(oRes.data);
+        }
+        if (tRes.ok && tRes.data && tRes.data.length > 0) {
+          setTransactions(tRes.data);
+        }
+      } catch (err) {
+        console.warn('[Neon Sync] Background sync warning:', err);
+      }
+    }
+    loadNeonData();
+    return () => { active = false; };
+  }, [currentMemberId]);
 
   const addToast = (type, title, message) => {
     const id = generateId('tst');
@@ -342,6 +403,10 @@ export function MlmProvider({ children }) {
 
     setIsCheckoutOpen(false);
 
+    // Persist to live Neon PostgreSQL
+    dbCreateOrder(newOrder).catch(err => console.warn('[Neon DB] dbCreateOrder error:', err));
+    dbCreateActivation(newActivation).catch(err => console.warn('[Neon DB] dbCreateActivation error:', err));
+
     if (isMemberAlreadyActive) {
       // For existing active partner, credit commission immediately
       setAvailableBalance(prev => prev + 1000);
@@ -416,6 +481,9 @@ export function MlmProvider({ children }) {
     // Add to payout requests (reaches Admin directly)
     setPayoutRequests(prev => [newPayout, ...prev]);
 
+    // Persist to live Neon PostgreSQL
+    dbCreatePayoutRequest(newPayout).catch(err => console.warn('[Neon DB] dbCreatePayoutRequest error:', err));
+
     // Record transaction with Pending status (money is not deducted yet!)
     setTransactions(prev => [{
       id: generateId('tx'),
@@ -473,6 +541,20 @@ export function MlmProvider({ children }) {
       return t;
     }));
 
+    // Persist payout approval and balance deduction to live Neon PostgreSQL
+    dbApprovePayout(payoutId, {
+      utrNumber: finalUtr,
+      screenshotUrl: receiptUrl,
+      adminNotes,
+      paymentMode
+    }).then(res => {
+      if (res.ok) {
+        dbFetchMembers().then(mRes => {
+          if (mRes.ok && mRes.data) setMembers(mRes.data);
+        });
+      }
+    }).catch(err => console.warn('[Neon DB] dbApprovePayout error:', err));
+
     addToast('success', 'Payout Disbursed & Verified!', `₹${req.net_payable.toLocaleString('en-IN')} sent to ${req.member_name}. Receipt recorded.`);
     return true;
   };
@@ -506,6 +588,9 @@ export function MlmProvider({ children }) {
       }
       return t;
     }));
+
+    // Persist rejection to live Neon PostgreSQL
+    dbRejectPayout(payoutId, reason).catch(err => console.warn('[Neon DB] dbRejectPayout error:', err));
 
     addToast('info', 'Payout Request Rejected', `Request #${payoutId} marked as rejected. No funds deducted.`);
     return true;
@@ -557,6 +642,9 @@ export function MlmProvider({ children }) {
     setIsLoggedIn(true);
     localStorage.setItem('cybershield_isLoggedIn', 'true');
     setIsAuthModalOpen(false);
+
+    // Persist to live Neon PostgreSQL
+    dbRegisterMember(newMember).catch(err => console.warn('[Neon DB] dbRegisterMember error:', err));
 
     addToast('success', 'Email Verified & Account Created!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
   };
@@ -616,6 +704,15 @@ export function MlmProvider({ children }) {
       status: 'Available'
     }, ...prev]);
 
+    // Persist activation approval, software license unlock and commission to live Neon PostgreSQL
+    dbApproveActivation(activationId).then(res => {
+      if (res.ok) {
+        dbFetchMembers().then(mRes => {
+          if (mRes.ok && mRes.data) setMembers(mRes.data);
+        });
+      }
+    }).catch(err => console.warn('[Neon DB] dbApproveActivation error:', err));
+
     addToast('success', 'Dual Accounts Activated!', `Partner ${act.member_name} approved. MLM ID & Software License (${act.account2_software?.license_key || ''}) unlocked!`);
     return true;
   };
@@ -637,8 +734,37 @@ export function MlmProvider({ children }) {
       return m;
     }));
 
+    // Persist rejection to live Neon PostgreSQL
+    dbRejectActivation(activationId, reason).catch(err => console.warn('[Neon DB] dbRejectActivation error:', err));
+
     addToast('warning', 'Activation Rejected', `Partner activation rejected: ${reason}`);
     return true;
+  };
+
+  // Login as existing member by email or ID
+  const loginUserByEmail = ({ email, password }) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const found = members.find(m => 
+      (m.email && m.email.toLowerCase() === cleanEmail) ||
+      (m.member_id && m.member_id.toLowerCase() === cleanEmail) ||
+      (m.cs_customer_id && m.cs_customer_id.toLowerCase() === cleanEmail)
+    );
+    if (found) {
+      setCurrentMemberId(found.member_id);
+      setAvailableBalance(Number(found.wallet_balance || 0));
+      setTotalEarnings(Number(found.total_earnings || 0));
+      setIsLoggedIn(true);
+      localStorage.setItem('cybershield_isLoggedIn', 'true');
+      setCurrentPage('dashboard');
+      addToast('success', 'Welcome Back!', `Logged in as ${found.name}.`);
+      return true;
+    } else {
+      setIsLoggedIn(true);
+      localStorage.setItem('cybershield_isLoggedIn', 'true');
+      setCurrentPage('dashboard');
+      addToast('success', 'Logged In', 'Welcome to your partner dashboard.');
+      return true;
+    }
   };
 
   // Logout / Switch to Visitor mode
@@ -724,6 +850,8 @@ export function MlmProvider({ children }) {
       activeReferral,
       setActiveReferral,
       getMemberByReferralCode,
+      loginUserByEmail,
+      isDbConnected,
       resetAllData
     }}>
       {children}

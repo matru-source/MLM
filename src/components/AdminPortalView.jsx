@@ -35,6 +35,7 @@ export default function AdminPortalView() {
     rejectMemberActivation,
     approvePayout,
     rejectPayout,
+    isDbConnected,
     addToast 
   } = useMlm();
 
@@ -191,7 +192,13 @@ export default function AdminPortalView() {
           </div>
           <div>
             <h1 className="admin-title-text">CyberShield Network — Admin Operations</h1>
-            <span className="admin-badge-role">Operations, Payouts & Compliance Desk</span>
+            <div className="flex-center gap-2 mt-1" style={{ justifyContent: 'flex-start' }}>
+              <span className="admin-badge-role">Operations, Payouts & Compliance Desk</span>
+              <span className={`badge ${isDbConnected ? 'badge-green' : 'badge-amber'} flex-center gap-1 font-xs`} style={{ padding: '3px 8px' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: isDbConnected ? '#10B981' : '#F59E0B', display: 'inline-block' }}></span>
+                {isDbConnected ? 'Live Neon PostgreSQL Connected' : 'Syncing Neon Database...'}
+              </span>
+            </div>
           </div>
         </div>
 

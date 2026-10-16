@@ -30,6 +30,7 @@ export default function AuthModal() {
     openCheckout,
     activeReferral,
     getMemberByReferralCode,
+    loginUserByEmail,
     addToast
   } = useMlm();
   
@@ -206,9 +207,13 @@ export default function AuthModal() {
   // Handle Login submission
   const handleLoginSubmit = (e) => {
     e.preventDefault();
-    setIsLoggedIn(true);
+    if (loginUserByEmail) {
+      loginUserByEmail({ email, password });
+    } else {
+      setIsLoggedIn(true);
+      addToast('success', 'Welcome Back!', 'Logged in as Partner.');
+    }
     setIsAuthModalOpen(false);
-    addToast('success', 'Welcome Back!', 'Logged in as Partner.');
   };
 
   // Save Brevo API Key
