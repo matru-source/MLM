@@ -883,7 +883,7 @@ export default function AdminPortalView() {
                       data: {
                         order_id: "CS-ORD-94821",
                         member_id: simulatedMemberId,
-                        member_email: members.find(m => m.member_id === simulatedMemberId)?.email || "matruprasadpanda497@gmail.com",
+                        member_email: members.find(m => m.member_id === simulatedMemberId)?.email || "partner@cybershield.in",
                         product_code: "CS-PRO-SUITE",
                         amount: 2500,
                         gst: 450,

@@ -13,8 +13,8 @@ export const initialCommissionRules = [
 export const initialMembers = [
   {
     member_id: 'mem_matru',
-    name: 'Matru Prasad Panda',
-    email: 'matruprasadpanda497@gmail.com',
+    name: 'CyberShield Head Office',
+    email: 'headoffice@cybershield.in',
     phone: '+91 9876543210',
     avatar: '/matru-avatar.jpg',
     rank: 'Head Office Partner',
@@ -28,20 +28,20 @@ export const initialMembers = [
     total_earnings: 0,
     joined_at: '2026-01-10T10:00:00Z',
     kyc: {
-      legal_name: 'Matru Prasad Panda',
+      legal_name: 'CyberShield Head Office',
       pan: '',
       aadhaar: '',
       bank_name: '',
       bank_account_number: '',
       bank_ifsc: '',
-      verification_status: 'pending_documents',
+      verification_status: 'verified',
       agreement_accepted: true,
       agreement_version: 'v2026.1',
       documents: {
-        aadhaar: 'Not Uploaded',
-        pan: 'Not Uploaded',
-        addressProof: 'Not Uploaded',
-        bankAccount: 'Not Uploaded'
+        aadhaar: 'Verified',
+        pan: 'Verified',
+        addressProof: 'Verified',
+        bankAccount: 'Verified'
       }
     }
   }

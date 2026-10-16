@@ -197,7 +197,7 @@ export function MlmProvider({ children }) {
   const [authMode, setAuthMode] = useState('register'); // 'register' | 'login'
 
   // Automatic cache version invalidator: Purges legacy test orders/activations
-  const DATA_VERSION = 'v2026_clean_live_prod_2';
+  const DATA_VERSION = 'v2026_reset_clean_slate_v3';
   if (typeof window !== 'undefined' && localStorage.getItem('cybershield_schema_version') !== DATA_VERSION) {
     localStorage.removeItem('cybershield_orders');
     localStorage.removeItem('cybershield_activations');
@@ -206,6 +206,8 @@ export function MlmProvider({ children }) {
     localStorage.removeItem('cybershield_members');
     localStorage.removeItem('cybershield_balance');
     localStorage.removeItem('cybershield_earnings');
+    localStorage.removeItem('cybershield_currentMemberId');
+    localStorage.removeItem('cybershield_isLoggedIn');
     localStorage.setItem('cybershield_schema_version', DATA_VERSION);
   }
 
