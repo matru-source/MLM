@@ -16,7 +16,8 @@ import {
   FileText,
   UserCheck,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Clock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { downloadTaxInvoice } from '../utils/downloadHelpers';
@@ -86,13 +87,10 @@ export default function CheckoutModal() {
       return;
     }
 
-    // Validation for UPI
-    if (selectedMethod === 'UPI') {
-      const cleanUtr = utrNumber.trim();
-      if (!cleanUtr || cleanUtr.length < 8) {
-        setUtrError('Please enter the 12-digit UPI UTR / Transaction Reference Number from your payment app.');
-        return;
-      }
+    const cleanUtr = (utrNumber || '').trim();
+    if (!cleanUtr || cleanUtr.length < 8) {
+      setUtrError('Please enter the 12-digit UPI Transaction Reference Number (UTR) from your payment app.');
+      return;
     }
 
     setIsProcessing(true);
@@ -101,22 +99,20 @@ export default function CheckoutModal() {
     try {
       const result = await completePayment({
         paymentMethod: selectedMethod === 'UPI' ? 'UPI (Google Pay / PhonePe)' : selectedMethod,
-        utrNumber: utrNumber.trim() || `UTR-CS-${Math.floor(100000000000 + Math.random() * 900000000000)}`
+        utrNumber: cleanUtr
       });
 
       if (result && result.ok) {
         setPaymentResult(result);
         setStep('confirmed');
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-        addToast('success', 'Payment Verified!', '₹2,950 Joining Fee recorded. Dual accounts provisioned.');
+        addToast('success', 'Payment Submitted for Verification', '₹2,950 Joining application submitted. Awaiting Admin bank statement check.');
       } else {
-        addToast('error', 'Payment Failed', result?.error || 'Could not verify transaction.');
+        const errorMsg = result?.error || 'Could not verify transaction reference.';
+        setUtrError(errorMsg);
+        addToast('error', 'Payment Submission Failed', errorMsg);
       }
     } catch (err) {
+      setUtrError(err.message);
       addToast('error', 'Transaction Error', err.message);
     } finally {
       setIsProcessing(false);
@@ -480,15 +476,15 @@ export default function CheckoutModal() {
           <div className="p-6">
             {/* Header Box */}
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                <CheckCircle2 size={36} style={{ color: '#10B981' }} />
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <Clock size={36} style={{ color: '#D97706' }} />
               </div>
-              <span className="badge badge-green font-xs font-bold mb-2">Payment Confirmed & Verified</span>
+              <span className="badge badge-amber font-xs font-bold mb-2">Awaiting Admin Bank Verification</span>
               <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0F172A', margin: '4px 0' }}>
-                Welcome to CyberShield Network!
+                Payment Reference Submitted!
               </h2>
               <p style={{ color: '#64748B', fontSize: '0.875rem', maxWidth: '480px', margin: '0 auto' }}>
-                Your payment of <strong>₹2,950</strong> was received successfully. Dual accounts have been provisioned and linked to your profile.
+                Your payment submission for <strong>₹2,950</strong> has been received with UTR reference <strong>{paymentResult?.order?.utr_number}</strong>. Our accounts desk verifies incoming bank credits before activating full distributor privileges.
               </p>
             </div>
 
@@ -499,26 +495,26 @@ export default function CheckoutModal() {
                   <FileText size={18} className="text-primary-blue" />
                   <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0F172A' }}>Official Tax Invoice & Order Details</span>
                 </div>
-                <span className="badge badge-green font-xs font-bold">PAID ✓</span>
+                <span className="badge badge-amber font-xs font-bold">PENDING VERIFICATION ⏳</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', fontSize: '0.85rem' }}>
                 <div>
                   <span style={{ color: '#64748B', fontSize: '0.75rem', display: 'block' }}>Order Reference</span>
                   <span className="code-font font-bold text-primary-blue">
-                    #{paymentResult?.order?.order_id || 'CS-ACTIVE'}
+                    #{paymentResult?.order?.order_id || 'CS-PENDING'}
                   </span>
                 </div>
                 <div>
                   <span style={{ color: '#64748B', fontSize: '0.75rem', display: 'block' }}>Payment Method</span>
                   <span style={{ fontWeight: 600 }}>
-                    {paymentResult?.order?.payment_method || 'UPI (Google Pay)'}
+                    {paymentResult?.order?.payment_method || 'UPI (Google Pay / PhonePe)'}
                   </span>
                 </div>
                 <div>
                   <span style={{ color: '#64748B', fontSize: '0.75rem', display: 'block' }}>UTR / Reference No.</span>
                   <span className="code-font font-semibold" style={{ fontSize: '0.8rem' }}>
-                    {paymentResult?.order?.utr_number || 'UTR-CS-VERIFIED'}
+                    {paymentResult?.order?.utr_number || 'UTR-CS-PENDING'}
                   </span>
                 </div>
                 <div>
@@ -533,7 +529,7 @@ export default function CheckoutModal() {
             {/* Dual Accounts Provisioned Box */}
             <div style={{ marginBottom: '24px' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-                Dual Accounts Provisioned via Official API
+                Dual Accounts Pre-Configured via Official API
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -551,20 +547,20 @@ export default function CheckoutModal() {
                     <strong className="code-font text-primary-blue">{currentMember.referral_code}</strong>
                   </div>
                   <div style={{ fontSize: '0.82rem' }}>
-                    <span style={{ color: '#64748B' }}>Commission Matrix: </span>
-                    <strong className="text-success">6-Tier Active ✓</strong>
+                    <span style={{ color: '#64748B' }}>Status: </span>
+                    <strong className="text-amber">Pending Admin Verification ⏳</strong>
                   </div>
                 </div>
 
                 {/* Account 2: Software License */}
-                <div style={{ background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: '12px', padding: '14px' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803D', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <div style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '14px' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Account 2: Cyber Defense License
                   </div>
                   <div style={{ fontSize: '0.82rem', marginBottom: '4px' }}>
                     <span style={{ color: '#64748B' }}>License Key: </span>
-                    <strong className="code-font text-success font-bold" style={{ fontSize: '0.75rem' }}>
-                      {paymentResult?.dualAccounts?.account2_software?.license_key || currentMember.software_license?.license_key || `CS-PRO-${currentMember.referral_code}`}
+                    <strong className="code-font text-muted" style={{ fontSize: '0.75rem' }}>
+                      Locked (Unlocks Upon Bank Verification)
                     </strong>
                   </div>
                   <div style={{ fontSize: '0.82rem', marginBottom: '4px' }}>
@@ -600,7 +596,7 @@ export default function CheckoutModal() {
                 className="btn btn-primary"
                 style={{ flex: 1.5, fontWeight: 700 }}
               >
-                <span>Enter Partner Dashboard</span>
+                <span>Track Verification Status</span>
                 <ArrowRight size={16} />
               </button>
             </div>

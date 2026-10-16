@@ -562,19 +562,38 @@ export function MlmProvider({ children }) {
     setIsCheckoutOpen(true);
   };
 
-  // Complete Payment & Provision Dual Accounts via API (₹2,500 Joining Plan)
+  // Complete Payment & Submit Joining Application for Admin Verification
   const completePayment = async (details = {}) => {
     if (!currentMember) {
       addToast('error', 'Authentication Error', 'No active registered member found.');
       return { ok: false, error: 'Not authenticated' };
     }
 
-    const paymentMethod = typeof details === 'string' ? details : (details.paymentMethod || 'UPI (Google Pay)');
-    const utrNumber = typeof details === 'object' && details.utrNumber ? details.utrNumber.trim() : `UTR-CS-${Math.floor(100000000 + Math.random() * 900000000)}`;
+    const paymentMethod = typeof details === 'string' ? details : (details.paymentMethod || 'UPI (Google Pay / PhonePe)');
+    const rawUtr = typeof details === 'object' && details.utrNumber ? details.utrNumber.trim() : '';
+
+    if (!rawUtr || rawUtr.length < 8) {
+      return { 
+        ok: false, 
+        error: 'Please enter a valid 12-digit UPI Transaction Reference Number (UTR) from your banking app.' 
+      };
+    }
+
+    const cleanUtr = rawUtr.toUpperCase();
+
+    // 1. Prevent Duplicate UTR Numbers across all orders and activations
+    const isDuplicate = orders.some(o => o.utr_number && o.utr_number.trim().toUpperCase() === cleanUtr) ||
+                        pendingActivations.some(a => a.utr_number && a.utr_number.trim().toUpperCase() === cleanUtr);
+    if (isDuplicate) {
+      return { 
+        ok: false, 
+        error: `Duplicate Bank Reference: UTR "${cleanUtr}" has already been used for another account. Please enter your unique payment reference.` 
+      };
+    }
 
     const newOrderId = `CS${Math.floor(10000000 + Math.random() * 90000000)}`;
 
-    // Call Dual Account Provisioning Service (API endpoints)
+    // Generate Dual Account configurations
     const dualAccounts = await provisionDualAccounts({
       memberDetails: currentMember,
       paymentDetails: {
@@ -597,10 +616,10 @@ export function MlmProvider({ children }) {
       total_amount: 2950,
       currency: 'INR',
       payment_method: paymentMethod,
-      utr_number: utrNumber,
-      payment_status: 'paid',
-      subscription_status: 'active',
-      activated_by: 'CyberShield Trust Engine',
+      utr_number: cleanUtr,
+      payment_status: 'pending_verification',
+      subscription_status: 'pending_approval',
+      activated_by: 'Awaiting Admin Bank Credit Verification',
       activation_date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       next_renewal: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       created_at: new Date().toISOString(),
@@ -610,7 +629,7 @@ export function MlmProvider({ children }) {
 
     setOrders(prev => [newOrder, ...prev]);
 
-    // Create New Partner Activation Item
+    // Create New Partner Activation Item in PENDING status (Reaches Admin Desk for bank statement verification)
     const newActivation = {
       id: `act_${Date.now()}`,
       member_id: currentMember.member_id,
@@ -623,8 +642,8 @@ export function MlmProvider({ children }) {
       total_paid: 2950,
       payment_method: paymentMethod,
       payment_ref: newOrderId,
-      utr_number: utrNumber,
-      status: 'approved',
+      utr_number: cleanUtr,
+      status: 'pending', // PENDING: Will ONLY activate when Admin verifies bank credit
       requested_at: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       account1_mlm: dualAccounts.account1_mlm,
       account2_software: dualAccounts.account2_software
@@ -632,53 +651,31 @@ export function MlmProvider({ children }) {
 
     setPendingActivations(prev => [newActivation, ...prev]);
 
-    // Update buyer's member record to active
+    // Keep member in pending_approval state (Locks referral link & dashboard until Admin approves)
     setMembers(prev => prev.map(m => {
       if (m.member_id === currentMember.member_id) {
         return {
           ...m,
-          customer_status: 'active_subscriber',
-          seller_status: 'active',
-          rank: 'Active Partner',
-          pending_activation_id: newActivation.id,
-          accounts: {
-            account1_mlm: dualAccounts.account1_mlm,
-            account2_software: dualAccounts.account2_software
-          },
-          software_license: {
-            license_key: dualAccounts.account2_software.license_key,
-            valid_until: '1 Year'
-          }
+          customer_status: 'registered',
+          seller_status: 'pending_approval',
+          rank: 'Partner (Pending Admin Approval)',
+          pending_activation_id: newActivation.id
         };
       }
       return m;
     }));
 
-    // Credit direct sponsor if exists
-    const sponsorCode = currentMember.sponsor_member_id || currentMember.sponsor_code;
-    if (sponsorCode && sponsorCode !== currentMember.member_id && sponsorCode !== currentMember.referral_code) {
-      setMembers(prev => prev.map(m => {
-        if (m.referral_code === sponsorCode || m.member_id === sponsorCode) {
-          const newBal = Number(m.wallet_balance || 0) + 1000;
-          const newEarn = Number(m.total_earnings || 0) + 1000;
-          return {
-            ...m,
-            wallet_balance: newBal,
-            total_earnings: newEarn
-          };
-        }
-        return m;
-      }));
-    }
-
-    // Persist to live Neon PostgreSQL
+    // Persist to Neon PostgreSQL
     dbCreateOrder(newOrder).catch(err => console.warn('[Neon DB] dbCreateOrder error:', err));
     dbCreateActivation(newActivation).catch(err => console.warn('[Neon DB] dbCreateActivation error:', err));
 
     return {
       ok: true,
       order: newOrder,
-      dualAccounts
+      activation: newActivation,
+      dualAccounts,
+      status: 'pending_approval',
+      message: 'Payment reference submitted. Your account will be activated once the bank credit is verified.'
     };
   };
 
@@ -696,15 +693,32 @@ export function MlmProvider({ children }) {
     };
   };
 
-  // 1. User Requests Withdrawal (Status becomes Pending; money is NOT deducted until Admin pays)
+  // 1. User Requests Withdrawal (Immediately locks funds to prevent double-spending)
   const requestWithdrawal = (amount) => {
     const numAmount = Number(amount);
-    if (numAmount > availableBalance) {
-      addToast('error', 'Insufficient Balance', `You only have ₹${availableBalance.toLocaleString('en-IN')} available.`);
+    if (!currentMember) {
+      addToast('error', 'Authentication Error', 'No active registered partner found.');
       return false;
     }
-    if (numAmount < 500) {
+
+    if (isNaN(numAmount) || numAmount < 500) {
       addToast('error', 'Minimum Limit', 'Minimum withdrawal amount is ₹500.');
+      return false;
+    }
+
+    // Calculate all active pending/in-flight withdrawals for this member
+    const activePendingTotal = payoutRequests
+      .filter(p => p.member_id === currentMember.member_id && p.status === 'pending')
+      .reduce((acc, p) => acc + Number(p.amount || 0), 0);
+
+    const unencumberedBalance = Math.max(0, availableBalance - activePendingTotal);
+
+    if (numAmount > availableBalance || numAmount > unencumberedBalance) {
+      addToast(
+        'error', 
+        'Insufficient Balance', 
+        `Available unencumbered balance is ₹${unencumberedBalance.toLocaleString('en-IN')}. Active pending requests: ₹${activePendingTotal.toLocaleString('en-IN')}.`
+      );
       return false;
     }
 
@@ -744,24 +758,36 @@ export function MlmProvider({ children }) {
       }
     };
 
+    // IMMEDIATELY LOCK & DEDUCT FUNDS FROM AVAILABLE BALANCE TO PREVENT DOUBLE-SPENDING
+    setAvailableBalance(prev => Math.max(0, prev - numAmount));
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === currentMember.member_id) {
+        return {
+          ...m,
+          wallet_balance: Math.max(0, Number(m.wallet_balance || 0) - numAmount)
+        };
+      }
+      return m;
+    }));
+
     // Add to payout requests (reaches Admin directly)
     setPayoutRequests(prev => [newPayout, ...prev]);
 
-    // Persist to live Neon PostgreSQL
-    dbCreatePayoutRequest(newPayout).catch(err => console.warn('[Neon DB] dbCreatePayoutRequest error:', err));
-
-    // Record transaction with Pending status (money is not deducted yet!)
+    // Record transaction with Reserved/Locked status in ledger
     setTransactions(prev => [{
       id: generateId('tx'),
       payoutId: newPayoutId,
       date: 'Just Now',
-      description: `Bank Withdrawal Request to ${currentMember.kyc.bank_name || 'Bank'} (••••${currentMember.kyc.bank_account_number.slice(-4)}) - Pending Verification`,
+      description: `Bank Withdrawal Request to ${currentMember.kyc.bank_name || 'Bank'} (••••${currentMember.kyc.bank_account_number.slice(-4)}) - Funds Reserved`,
       amount: -numAmount,
       type: 'debit',
-      status: 'Pending'
+      status: 'Reserved'
     }, ...prev]);
 
-    addToast('success', 'Withdrawal Request Submitted!', `₹${numAmount.toLocaleString('en-IN')} (Net ₹${netPayable.toLocaleString('en-IN')}) sent to Finance Admin. Status is Pending until manual bank disbursement.`);
+    // Persist atomic deduction & payout request to live Neon PostgreSQL
+    dbCreatePayoutRequest(newPayout).catch(err => console.warn('[Neon DB] dbCreatePayoutRequest error:', err));
+
+    addToast('success', 'Withdrawal Request Submitted & Balance Locked!', `₹${numAmount.toLocaleString('en-IN')} (Net ₹${netPayable.toLocaleString('en-IN')}) reserved and sent to Finance Admin.`);
     return true;
   };
 
@@ -770,7 +796,7 @@ export function MlmProvider({ children }) {
     return requestWithdrawal(finalAmount);
   };
 
-  // 2. Admin Manually Pays & Attaches Screenshot -> Money is deducted from user's balance
+  // 2. Admin Manually Pays & Attaches Screenshot -> Finalizes disbursement
   const approvePayout = ({ payoutId, utrNumber, receiptUrl, paymentMode, adminNotes }) => {
     const req = payoutRequests.find(p => p.id === payoutId);
     if (!req) return false;
@@ -795,12 +821,9 @@ export function MlmProvider({ children }) {
       return p;
     }));
 
-    // Money is now officially deducted from member's balance!
-    setAvailableBalance(prev => Math.max(0, prev - req.amount));
-
-    // Update transactions ledger
+    // Funds were already atomically locked on submission; update transactions ledger to Paid
     setTransactions(prev => prev.map(t => {
-      if (t.payoutId === payoutId || (t.status === 'Pending' && t.amount === -req.amount)) {
+      if (t.payoutId === payoutId || (t.status === 'Reserved' && t.amount === -req.amount)) {
         return {
           ...t,
           status: 'Paid',
@@ -812,7 +835,7 @@ export function MlmProvider({ children }) {
       return t;
     }));
 
-    // Persist payout approval and balance deduction to live Neon PostgreSQL
+    // Persist payout approval to live Neon PostgreSQL
     dbApprovePayout(payoutId, {
       utrNumber: finalUtr,
       screenshotUrl: receiptUrl,
@@ -830,7 +853,7 @@ export function MlmProvider({ children }) {
     return true;
   };
 
-  // 3. Admin Rejects Payout (No deduction)
+  // 3. Admin Rejects Payout -> Restores locked funds back to user balance
   const rejectPayout = ({ payoutId, reason }) => {
     const req = payoutRequests.find(p => p.id === payoutId);
     if (!req) return false;
@@ -849,7 +872,28 @@ export function MlmProvider({ children }) {
       return p;
     }));
 
-    setTransactions(prev => prev.map(t => {
+    // RESTORE RESERVED FUNDS back to partner balance upon rejection
+    setAvailableBalance(prev => prev + req.amount);
+    setMembers(prev => prev.map(m => {
+      if (m.member_id === req.member_id) {
+        return {
+          ...m,
+          wallet_balance: Number(m.wallet_balance || 0) + req.amount
+        };
+      }
+      return m;
+    }));
+
+    // Record restoration in transaction ledger
+    setTransactions(prev => [{
+      id: generateId('tx'),
+      payoutId: payoutId,
+      date: 'Just Now',
+      description: `Withdrawal Request #${payoutId} Rejected - ₹${req.amount.toLocaleString('en-IN')} Restored to Balance (${reason || 'KYC/Bank Mismatch'})`,
+      amount: req.amount,
+      type: 'credit',
+      status: 'Available'
+    }, ...prev.map(t => {
       if (t.payoutId === payoutId) {
         return {
           ...t,
@@ -858,12 +902,12 @@ export function MlmProvider({ children }) {
         };
       }
       return t;
-    }));
+    })]);
 
-    // Persist rejection to live Neon PostgreSQL
+    // Persist rejection and fund restoration to live Neon PostgreSQL
     dbRejectPayout(payoutId, reason).catch(err => console.warn('[Neon DB] dbRejectPayout error:', err));
 
-    addToast('info', 'Payout Request Rejected', `Request #${payoutId} marked as rejected. No funds deducted.`);
+    addToast('info', 'Payout Request Rejected & Funds Restored', `Request #${payoutId} rejected. ₹${req.amount.toLocaleString('en-IN')} returned to partner balance.`);
     return true;
   };
 

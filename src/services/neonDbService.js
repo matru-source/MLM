@@ -174,6 +174,26 @@ export async function dbFetchActivations() {
 export async function dbCreateActivation(act) {
   if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
+    // 1. Prevent duplicate UTR replay attacks across activations and orders
+    if (act.utr_number && act.utr_number.trim()) {
+      const cleanUtr = act.utr_number.trim().toUpperCase();
+      const dupCheck = await sql`
+        SELECT id FROM (
+          SELECT id, utr_number FROM activations WHERE id != ${act.id}
+          UNION ALL
+          SELECT order_id as id, utr_number FROM orders WHERE order_id != ${act.payment_ref || ''}
+        ) combined
+        WHERE UPPER(utr_number) = ${cleanUtr}
+        LIMIT 1;
+      `;
+      if (dupCheck.length > 0) {
+        return { 
+          ok: false, 
+          error: `Duplicate UTR Error: Transaction reference "${cleanUtr}" has already been submitted.` 
+        };
+      }
+    }
+
     const rows = await sql`
       INSERT INTO activations (
         id, member_id, member_name, member_email, member_phone,
@@ -204,7 +224,7 @@ export async function dbCreateActivation(act) {
       RETURNING *;
     `;
 
-    // Update member status to 'pending_approval'
+    // Update member status to 'pending_approval' (awaits Admin bank verification)
     await sql`
       UPDATE members 
       SET 
@@ -298,15 +318,13 @@ export async function dbApproveActivation(activationId) {
       visitedUplines.add(upline.id);
 
       const tier = tierRates[i];
-      const newBal = Number(upline.wallet_balance || 0) + tier.rate;
-      const newEarnings = Number(upline.total_earnings || 0) + tier.rate;
 
-      // Credit upline wallet in Neon DB
+      // Atomic in-place balance and earnings increment (concurrency-safe, eliminates lost updates)
       await sql`
         UPDATE members
         SET 
-          wallet_balance = ${newBal},
-          total_earnings = ${newEarnings}
+          wallet_balance = COALESCE(wallet_balance, 0) + ${tier.rate},
+          total_earnings = COALESCE(total_earnings, 0) + ${tier.rate}
         WHERE id = ${upline.id};
       `;
 
@@ -437,6 +455,22 @@ export async function dbFetchPayoutRequests() {
 export async function dbCreatePayoutRequest(payout) {
   if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
+    // 1. Atomically reserve and lock withdrawal amount from member balance
+    // Prevents double-spending: subsequent requests cannot exceed actual balance.
+    const lockResult = await sql`
+      UPDATE members
+      SET wallet_balance = wallet_balance - ${payout.amount}
+      WHERE id = ${payout.member_id} AND wallet_balance >= ${payout.amount}
+      RETURNING wallet_balance;
+    `;
+
+    if (lockResult.length === 0) {
+      return { 
+        ok: false, 
+        error: 'Insufficient available balance. Pending requests have already reserved your funds.' 
+      };
+    }
+
     const rows = await sql`
       INSERT INTO payout_requests (
         id, member_id, member_name, member_email, avatar,
@@ -462,7 +496,7 @@ export async function dbCreatePayoutRequest(payout) {
       )
       RETURNING *;
     `;
-    return { ok: true, data: rows[0] };
+    return { ok: true, data: rows[0], remainingBalance: lockResult[0].wallet_balance };
   } catch (err) {
     console.error('[Neon DB] dbCreatePayoutRequest error:', err);
     return { ok: false, error: err.message };
@@ -501,14 +535,8 @@ export async function dbApprovePayout(payoutId, { utrNumber, screenshotUrl, admi
       WHERE id = ${payoutId};
     `;
 
-    // Deduct member balance
-    await sql`
-      UPDATE members
-      SET wallet_balance = GREATEST(0, COALESCE(wallet_balance, 0)::numeric - ${Number(p.amount)})
-      WHERE id = ${p.member_id};
-    `;
-
-    // Update transactions ledger
+    // Funds were already atomically locked and deducted upon withdrawal request.
+    // Update transactions ledger with confirmed disbursement
     const txId = `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     await sql`
       INSERT INTO transactions (
@@ -535,11 +563,26 @@ export async function dbApprovePayout(payoutId, { utrNumber, screenshotUrl, admi
 }
 
 /**
- * 10. Admin Rejects Payout in Neon PostgreSQL
+ * 10. Admin Rejects Payout in Neon PostgreSQL & Restores Locked Funds
  */
 export async function dbRejectPayout(payoutId, reason = 'KYC/Bank Mismatch') {
   if (!sql) return { ok: false, error: 'Database connection not configured' };
   try {
+    const pRows = await sql`
+      SELECT member_id, amount, status FROM payout_requests WHERE id = ${payoutId} LIMIT 1;
+    `;
+    if (pRows.length === 0) return { ok: false, error: 'Payout request not found' };
+    const p = pRows[0];
+
+    // Atomically restore reserved funds if request was pending
+    if (p.status === 'pending') {
+      await sql`
+        UPDATE members
+        SET wallet_balance = COALESCE(wallet_balance, 0) + ${Number(p.amount)}
+        WHERE id = ${p.member_id};
+      `;
+    }
+
     await sql`
       UPDATE payout_requests
       SET 
@@ -555,6 +598,29 @@ export async function dbRejectPayout(payoutId, reason = 'KYC/Bank Mismatch') {
   } catch (err) {
     console.error('[Neon DB] dbRejectPayout error:', err);
     return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * 10b. Helper: Check if a Bank UTR Number has already been submitted
+ */
+export async function dbCheckUtrExists(utr) {
+  if (!sql || !utr) return false;
+  try {
+    const clean = utr.trim().toUpperCase();
+    const rows = await sql`
+      SELECT id FROM (
+        SELECT id, utr_number FROM activations
+        UNION ALL
+        SELECT order_id as id, utr_number FROM orders
+      ) combined
+      WHERE UPPER(utr_number) = ${clean}
+      LIMIT 1;
+    `;
+    return rows.length > 0;
+  } catch (err) {
+    console.warn('[Neon DB] dbCheckUtrExists warning:', err);
+    return false;
   }
 }
 

@@ -217,15 +217,13 @@ export async function processVerifiedWebhook(event) {
             visitedUplines.add(upline.id);
 
             const tier = tierRates[i];
-            const newBal = Number(upline.wallet_balance || 0) + tier.rate;
-            const newEarnings = Number(upline.total_earnings || 0) + tier.rate;
 
-            // Credit upline wallet
+            // Atomic in-place balance and earnings increment (concurrency-safe, eliminates lost updates)
             await sql`
               UPDATE members
               SET 
-                wallet_balance = ${newBal},
-                total_earnings = ${newEarnings}
+                wallet_balance = COALESCE(wallet_balance, 0) + ${tier.rate},
+                total_earnings = COALESCE(total_earnings, 0) + ${tier.rate}
               WHERE id = ${upline.id};
             `;
 
