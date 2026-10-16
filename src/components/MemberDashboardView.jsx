@@ -45,6 +45,7 @@ export default function MemberDashboardView() {
     recentActivity,
     transactions,
     orders,
+    members = [],
     payoutRequests,
     pendingPayoutsTotal,
     requestWithdrawal,
@@ -384,21 +385,54 @@ export default function MemberDashboardView() {
 
         {/* SUBVIEW 2: MY NETWORK (Unilevel Tree + Real-Time Calculation Column) */}
         {activeTab === 'network' && (() => {
-          // Direct Referrals list (Matru's direct downline)
-          const directReferralsList = [
-            { id: 'ref_1', name: 'Rahul Sharma', email: 'rahul.s@example.com', initials: 'RS', rank: 'Active Seller', date: '12 Feb 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_2', name: 'Priya Patel', email: 'priya.p@example.com', initials: 'PP', rank: 'Active Seller', date: '18 Feb 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_3', name: 'Amit Kumar', email: 'amit.k@example.com', initials: 'AK', rank: 'Active Seller', date: '01 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_4', name: 'Ananya Roy', email: 'ananya@example.com', initials: 'AR', rank: 'Active Seller', date: '05 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_5', name: 'Vikram Singh', email: 'vikram.s@example.com', initials: 'VS', rank: 'Customer', date: '14 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_6', name: 'Neha Gupta', email: 'neha.g@example.com', initials: 'NG', rank: 'Active Seller', date: '22 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_7', name: 'Rohan Mishra', email: 'rohan.m@example.com', initials: 'RM', rank: 'Customer', date: '28 Mar 2026', commission: 1000, status: 'Active' },
-            { id: 'ref_8', name: 'Sneha Joshi', email: 'sneha.j@example.com', initials: 'SJ', rank: 'Active Seller', date: '04 Apr 2026', commission: 1000, status: 'Active' },
+          // Base verified active referrals (Matru's verified active partners)
+          const baseActiveReferrals = [
+            { id: 'mem_rahul', name: 'Rahul Sharma', email: 'rahul.s@example.com', initials: 'RS', rank: 'Active Partner', date: '12 Feb 2026', commission: 1000, status: 'Active' },
+            { id: 'mem_priya', name: 'Priya Patel', email: 'priya.p@example.com', initials: 'PP', rank: 'Active Partner', date: '18 Feb 2026', commission: 1000, status: 'Active' },
+            { id: 'mem_amit', name: 'Amit Kumar', email: 'amit.k@example.com', initials: 'AK', rank: 'Active Partner', date: '01 Mar 2026', commission: 1000, status: 'Active' },
+            { id: 'mem_ananya', name: 'Ananya Roy', email: 'ananya@example.com', initials: 'AR', rank: 'Active Partner', date: '05 Mar 2026', commission: 1000, status: 'Active' },
+            { id: 'ref_5', name: 'Vikram Singh', email: 'vikram.s@example.com', initials: 'VS', rank: 'Customer Partner', date: '14 Mar 2026', commission: 1000, status: 'Active' },
+            { id: 'ref_6', name: 'Neha Gupta', email: 'neha.g@example.com', initials: 'NG', rank: 'Active Partner', date: '22 Mar 2026', commission: 1000, status: 'Active' },
+            { id: 'ref_7', name: 'Rohan Mishra', email: 'rohan.m@example.com', initials: 'RM', rank: 'Customer Partner', date: '28 Mar 2026', commission: 1000, status: 'Active' },
+            { id: 'ref_8', name: 'Sneha Joshi', email: 'sneha.j@example.com', initials: 'SJ', rank: 'Active Partner', date: '04 Apr 2026', commission: 1000, status: 'Active' },
           ];
 
-          // 6 Levels Network Calculation Data
+          // Newly approved members who match current sponsor AND have seller_status === 'active'
+          const dynamicApprovedReferrals = (members || [])
+            .filter(m => 
+              (m.sponsor_member_id === currentMember?.member_id || 
+               m.sponsor_member_id === currentMember?.referral_code || 
+               m.sponsor_code === currentMember?.referral_code) &&
+              m.seller_status === 'active' &&
+              !baseActiveReferrals.some(b => b.id === m.member_id || b.email === m.email) &&
+              m.member_id !== currentMember?.member_id
+            )
+            .map(m => ({
+              id: m.member_id,
+              name: m.name,
+              email: m.email,
+              initials: m.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+              rank: m.rank || 'Active Partner',
+              date: new Date(m.joined_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+              commission: 1000,
+              status: 'Active'
+            }));
+
+          // STRICT FILTER: Only ACTIVE approved partners are counted or shown in hierarchy
+          const directReferralsList = [...baseActiveReferrals, ...dynamicApprovedReferrals];
+
+          // Any members who registered via this sponsor but have NOT completed payment or are awaiting Admin approval
+          const pendingOrUnpaidReferrals = (members || []).filter(m => 
+            (m.sponsor_member_id === currentMember?.member_id || 
+             m.sponsor_member_id === currentMember?.referral_code || 
+             m.sponsor_code === currentMember?.referral_code) &&
+            m.seller_status !== 'active' &&
+            m.member_id !== currentMember?.member_id
+          );
+
+          // 6 Levels Network Calculation Data: Level 1 strictly matches active approved count
           const networkLevelData = [
-            { level: 1, count: 4, rate: 1000, label: 'Direct Referrals' },
+            { level: 1, count: directReferralsList.length, rate: 1000, label: 'Direct Referrals (Level 1)' },
             { level: 2, count: 14, rate: 300, label: '2nd Generation' },
             { level: 3, count: 28, rate: 150, label: '3rd Generation' },
             { level: 4, count: 45, rate: 50, label: '4th Generation' },
@@ -415,14 +449,38 @@ export default function MemberDashboardView() {
                 <div>
                   <h3 className="section-title-large">My Network</h3>
                   <p className="section-subtitle">
-                    6-Level Unilevel tree with real-time retail sales calculation matrix ({totalNetworkMembers} total members)
+                    6-Level Unilevel tree with real-time retail sales calculation matrix ({totalNetworkMembers} active partners)
                   </p>
                 </div>
                 <div className="network-head-badges">
                   <span className="badge badge-green">Direct Selling Compliant</span>
-                  <span className="badge badge-blue">6-Tier Unilevel</span>
+                  <span className="badge badge-blue">Active Members Only</span>
                 </div>
               </div>
+
+              {/* Informational Callout: Unpaid / Pending Referrals Barred from Hierarchy */}
+              {pendingOrUnpaidReferrals.length > 0 && (
+                <div className="pending-referrals-excluded-card mb-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={18} className="text-amber shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-sm text-amber-900">
+                        {pendingOrUnpaidReferrals.length} Pending Referral(s) Excluded from Active Hierarchy
+                      </div>
+                      <p className="text-xs text-amber-800 mb-0">
+                        Under Direct Selling rules, referrals who have not completed their ₹2,500 plan payment or are pending Admin approval are strictly barred from your level genealogy, team count, and commission earnings.
+                      </p>
+                      <div className="pending-ref-chips-row mt-2">
+                        {pendingOrUnpaidReferrals.map(p => (
+                          <span key={p.member_id} className="pending-ref-chip">
+                            ⏳ {p.name} ({p.seller_status === 'pending_payment' ? 'Awaiting Payment' : 'Pending Admin Verification'})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="network-split-layout">
                 {/* LEFT COLUMN: Visual Unilevel Tree */}
@@ -446,29 +504,31 @@ export default function MemberDashboardView() {
 
                     {/* Level 1: 4 Direct Referrals + "... More" Button */}
                     <div className="tree-tier-box">
-                      <div className="tier-header-label">Level 1 • Direct Referrals (4 shown)</div>
+                      <div className="tier-header-label">Level 1 • Direct Active Partners ({Math.min(4, directReferralsList.length)} of {directReferralsList.length} shown)</div>
                       <div className="tree-tier tier-level-1">
                         {directReferralsList.slice(0, 4).map(member => (
                           <div key={member.id} className="tree-circle-node node-l1">
                             <div className="node-inner-avatar">{member.initials}</div>
                             <div className="node-label">{member.name.split(' ')[0]} {member.name.split(' ')[1]?.[0]}.</div>
-                            <div className="node-sub">Direct</div>
+                            <div className="node-sub">Active Partner</div>
                           </div>
                         ))}
 
                         {/* The "... More" Button */}
-                        <button 
-                          type="button"
-                          onClick={() => setIsDirectReferralsModalOpen(true)}
-                          className="tree-circle-node node-l1 tree-more-btn"
-                          title="View all directly referred members"
-                        >
-                          <div className="more-btn-circle">
-                            <MoreHorizontal size={22} />
-                          </div>
-                          <div className="node-label text-primary-blue">+4 More</div>
-                          <div className="node-sub">View All</div>
-                        </button>
+                        {directReferralsList.length > 4 && (
+                          <button 
+                            type="button"
+                            onClick={() => setIsDirectReferralsModalOpen(true)}
+                            className="tree-circle-node node-l1 tree-more-btn"
+                            title="View all directly referred active partners"
+                          >
+                            <div className="more-btn-circle">
+                              <MoreHorizontal size={22} />
+                            </div>
+                            <div className="node-label text-primary-blue">+{directReferralsList.length - 4} More</div>
+                            <div className="node-sub">View All ({directReferralsList.length})</div>
+                          </button>
+                        )}
                       </div>
                     </div>
 
