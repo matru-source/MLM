@@ -1480,50 +1480,6 @@ export default function AdminPortalView() {
         const aadhaarDoc = getDocFileInfo(m, 'aadhaar');
         const addressDoc = getDocFileInfo(m, 'addressProof');
 
-        const handleAttachFileForMember = (docKey) => (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          if (file.size > 5 * 1024 * 1024) {
-            addToast('error', 'File Too Large', 'Maximum file size allowed is 5MB.');
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = (loadEvt) => {
-            const fileData = loadEvt.target.result;
-            const fileInfo = {
-              name: file.name,
-              size: (file.size / 1024).toFixed(1) + ' KB',
-              type: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
-              dataUrl: fileData
-            };
-            const memId = m.member_id || m.id;
-            uploadKycDocument(memId, docKey, fileInfo);
-            saveDocumentFile(memId, docKey, fileInfo);
-
-            setSelectedKycMember(prev => {
-              if (!prev) return prev;
-              const prevDocs = prev.kyc?.documents || {};
-              return {
-                ...prev,
-                kyc: {
-                  ...prev.kyc,
-                  verification_status: 'under_review',
-                  documents: {
-                    ...prevDocs,
-                    [docKey]: `Uploaded (${file.name})`,
-                    [`${docKey}Name`]: file.name,
-                    [`${docKey}File`]: fileData,
-                    [`${docKey}Type`]: fileInfo.type,
-                    [`${docKey}Size`]: fileInfo.size
-                  }
-                }
-              };
-            });
-            addToast('success', 'File Attached', `${file.name} successfully attached for partner.`);
-          };
-          reader.readAsDataURL(file);
-        };
-
         return (
           <div className="custom-modal-backdrop" style={{ zIndex: 9998, padding: '16px' }} onClick={() => setSelectedKycMember(null)}>
             <div 
@@ -1647,7 +1603,7 @@ export default function AdminPortalView() {
                   </div>
                 </div>
 
-                {/* 4 Cards Grid - Fully responsive 2 Columns */}
+                {/* 4 Cards Grid - Responsive 2 Columns */}
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
@@ -1712,7 +1668,7 @@ export default function AdminPortalView() {
                       </div>
                     </div>
 
-                    <div style={{ marginTop: '14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center' }}>
                       <button
                         type="button"
                         onClick={() => openDocPreview(m, 'pan')}
@@ -1721,7 +1677,7 @@ export default function AdminPortalView() {
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
-                          padding: '7px 14px',
+                          padding: '7px 16px',
                           fontSize: '12px',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -1735,33 +1691,6 @@ export default function AdminPortalView() {
                         <Eye size={13} />
                         <span>View Uploaded File</span>
                       </button>
-
-                      <input
-                        type="file"
-                        id="dossier-upload-pan"
-                        accept="image/*,.pdf"
-                        style={{ display: 'none' }}
-                        onChange={handleAttachFileForMember('pan')}
-                      />
-                      <label
-                        htmlFor="dossier-upload-pan"
-                        style={{
-                          background: '#F1F5F9',
-                          color: '#334155',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '8px',
-                          padding: '7px 12px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <Upload size={12} />
-                        <span>Attach</span>
-                      </label>
                     </div>
                   </div>
 
@@ -1818,7 +1747,7 @@ export default function AdminPortalView() {
                       </div>
                     </div>
 
-                    <div style={{ marginTop: '14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center' }}>
                       <button
                         type="button"
                         onClick={() => openDocPreview(m, 'bankAccount')}
@@ -1827,7 +1756,7 @@ export default function AdminPortalView() {
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
-                          padding: '7px 14px',
+                          padding: '7px 16px',
                           fontSize: '12px',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -1841,33 +1770,6 @@ export default function AdminPortalView() {
                         <Eye size={13} />
                         <span>View Uploaded File</span>
                       </button>
-
-                      <input
-                        type="file"
-                        id="dossier-upload-bank"
-                        accept="image/*,.pdf"
-                        style={{ display: 'none' }}
-                        onChange={handleAttachFileForMember('bankAccount')}
-                      />
-                      <label
-                        htmlFor="dossier-upload-bank"
-                        style={{
-                          background: '#F1F5F9',
-                          color: '#334155',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '8px',
-                          padding: '7px 12px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <Upload size={12} />
-                        <span>Attach</span>
-                      </label>
                     </div>
                   </div>
 
@@ -1924,7 +1826,7 @@ export default function AdminPortalView() {
                       </div>
                     </div>
 
-                    <div style={{ marginTop: '14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center' }}>
                       <button
                         type="button"
                         onClick={() => openDocPreview(m, 'aadhaar')}
@@ -1933,7 +1835,7 @@ export default function AdminPortalView() {
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
-                          padding: '7px 14px',
+                          padding: '7px 16px',
                           fontSize: '12px',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -1947,33 +1849,6 @@ export default function AdminPortalView() {
                         <Eye size={13} />
                         <span>View Uploaded File</span>
                       </button>
-
-                      <input
-                        type="file"
-                        id="dossier-upload-aadhaar"
-                        accept="image/*,.pdf"
-                        style={{ display: 'none' }}
-                        onChange={handleAttachFileForMember('aadhaar')}
-                      />
-                      <label
-                        htmlFor="dossier-upload-aadhaar"
-                        style={{
-                          background: '#F1F5F9',
-                          color: '#334155',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '8px',
-                          padding: '7px 12px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <Upload size={12} />
-                        <span>Attach</span>
-                      </label>
                     </div>
                   </div>
 
@@ -2030,7 +1905,7 @@ export default function AdminPortalView() {
                       </div>
                     </div>
 
-                    <div style={{ marginTop: '14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center' }}>
                       <button
                         type="button"
                         onClick={() => openDocPreview(m, 'addressProof')}
@@ -2039,7 +1914,7 @@ export default function AdminPortalView() {
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
-                          padding: '7px 14px',
+                          padding: '7px 16px',
                           fontSize: '12px',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -2053,33 +1928,6 @@ export default function AdminPortalView() {
                         <Eye size={13} />
                         <span>View Uploaded File</span>
                       </button>
-
-                      <input
-                        type="file"
-                        id="dossier-upload-address"
-                        accept="image/*,.pdf"
-                        style={{ display: 'none' }}
-                        onChange={handleAttachFileForMember('addressProof')}
-                      />
-                      <label
-                        htmlFor="dossier-upload-address"
-                        style={{
-                          background: '#F1F5F9',
-                          color: '#334155',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '8px',
-                          padding: '7px 12px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <Upload size={12} />
-                        <span>Attach</span>
-                      </label>
                     </div>
                   </div>
                 </div>
@@ -2268,81 +2116,6 @@ export default function AdminPortalView() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* Quick Replace / Attach Button */}
-                  <input
-                    type="file"
-                    id="admin-replace-viewer-file"
-                    accept="image/*,.pdf"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 5 * 1024 * 1024) {
-                        addToast('error', 'File Too Large', 'Maximum file size allowed is 5MB.');
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onload = (loadEvt) => {
-                        const fileData = loadEvt.target.result;
-                        const memId = previewingDoc.member.member_id || previewingDoc.member.id;
-                        const fileInfo = {
-                          name: file.name,
-                          size: (file.size / 1024).toFixed(1) + ' KB',
-                          type: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
-                          dataUrl: fileData
-                        };
-                        uploadKycDocument(memId, previewingDoc.docKey, fileInfo);
-                        saveDocumentFile(memId, previewingDoc.docKey, fileInfo);
-                        
-                        setPreviewingDoc(prev => ({
-                          ...prev,
-                          docName: file.name,
-                          docFile: fileData,
-                          docType: fileInfo.type,
-                          docSize: fileInfo.size,
-                          isGeneratedFallback: false
-                        }));
-
-                        setSelectedKycMember(prev => {
-                          if (!prev) return prev;
-                          const prevDocs = prev.kyc?.documents || {};
-                          return {
-                            ...prev,
-                            kyc: {
-                              ...prev.kyc,
-                              documents: {
-                                ...prevDocs,
-                                [previewingDoc.docKey]: `Uploaded (${file.name})`,
-                                [`${previewingDoc.docKey}Name`]: file.name,
-                                [`${previewingDoc.docKey}File`]: fileData,
-                                [`${previewingDoc.docKey}Type`]: fileInfo.type,
-                                [`${previewingDoc.docKey}Size`]: fileInfo.size
-                              }
-                            }
-                          };
-                        });
-                        addToast('success', 'File Replaced', `${file.name} uploaded and saved.`);
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                  <label htmlFor="admin-replace-viewer-file" style={{
-                    background: '#FFFFFF',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: '6px',
-                    padding: '6px 10px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    color: '#334155'
-                  }}>
-                    <Upload size={12} />
-                    <span>Upload & Replace</span>
-                  </label>
-
                   {previewingDoc.docFile && (
                     <a
                       href={previewingDoc.docFile}
@@ -2386,7 +2159,7 @@ export default function AdminPortalView() {
                 }}>
                   <CheckCircle2 size={16} />
                   <span>
-                    Official verified digital partner record for <strong>{previewingDoc.docName || previewingDoc.title}</strong>. You can upload an original scan or PDF copy using the "Upload & Replace" button above anytime.
+                    Official verified digital partner record for <strong>{previewingDoc.docName || previewingDoc.title}</strong>.
                   </span>
                 </div>
               )}
@@ -2425,78 +2198,15 @@ export default function AdminPortalView() {
                   </a>
                 </div>
               ) : (
-                /* No file actually uploaded yet */
+                /* No file uploaded yet */
                 <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '36px 24px', textAlign: 'center' }}>
-                  <AlertCircle size={48} className="mx-auto text-amber-500 mb-2" />
+                  <AlertCircle size={44} className="mx-auto text-amber-500 mb-2" />
                   <h4 style={{ margin: '0 0 6px 0', fontWeight: 800, fontSize: '16px', color: '#1E293B' }}>No Document File Attached</h4>
-                  <p style={{ margin: '0 auto 16px auto', fontSize: '12px', color: '#475569', maxWidth: '440px' }}>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
                     {previewingDoc.status === 'verified'
-                      ? `This document was verified by the administrator, but no digital file was attached for ${previewingDoc.member.name}.`
+                      ? `This document was verified by the administrator, but no digital file was attached by ${previewingDoc.member.name}.`
                       : `The partner has not uploaded an image or PDF file for ${previewingDoc.title} yet.`}
                   </p>
-
-                  <div className="flex flex-col items-center justify-center gap-2 pt-3 border-t border-amber-200">
-                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Have the partner's document file on hand?</span>
-                    <input
-                      type="file"
-                      id="admin-attach-file-dialog"
-                      accept="image/*,.pdf"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 5 * 1024 * 1024) {
-                          addToast('error', 'File Too Large', 'Maximum file size allowed is 5MB.');
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onload = (loadEvt) => {
-                          const fileData = loadEvt.target.result;
-                          const memId = previewingDoc.member.member_id || previewingDoc.member.id;
-                          const fileInfo = {
-                            name: file.name,
-                            size: (file.size / 1024).toFixed(1) + ' KB',
-                            type: file.type || 'application/pdf',
-                            dataUrl: fileData
-                          };
-                          uploadKycDocument(memId, previewingDoc.docKey, fileInfo);
-                          saveDocumentFile(memId, previewingDoc.docKey, fileInfo);
-                          setPreviewingDoc(prev => ({
-                            ...prev,
-                            docName: file.name,
-                            docFile: fileData,
-                            docType: file.type || 'application/pdf',
-                            docSize: fileInfo.size,
-                            isGeneratedFallback: false
-                          }));
-                          setSelectedKycMember(prev => {
-                            if (!prev) return prev;
-                            const prevDocs = prev.kyc?.documents || {};
-                            return {
-                              ...prev,
-                              kyc: {
-                                ...prev.kyc,
-                                documents: {
-                                  ...prevDocs,
-                                  [previewingDoc.docKey]: `Uploaded (${file.name})`,
-                                  [`${previewingDoc.docKey}Name`]: file.name,
-                                  [`${previewingDoc.docKey}File`]: fileData,
-                                  [`${previewingDoc.docKey}Type`]: fileInfo.type,
-                                  [`${previewingDoc.docKey}Size`]: fileInfo.size
-                                }
-                              }
-                            };
-                          });
-                          addToast('success', 'File Attached', `${file.name} uploaded successfully.`);
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                    <label htmlFor="admin-attach-file-dialog" className="btn btn-primary btn-sm flex items-center gap-1.5 cursor-pointer">
-                      <Upload size={14} />
-                      <span>Upload & Attach File For Partner</span>
-                    </label>
-                  </div>
                 </div>
               )}
             </div>
