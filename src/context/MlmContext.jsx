@@ -31,6 +31,7 @@ import {
   dbFetchZexLinkStatus
 } from '../services/neonDbService';
 import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
+import { saveDocumentFile, getDocumentFile } from '../utils/documentStorage';
 
 const MlmContext = createContext(null);
 
@@ -235,13 +236,35 @@ export function MlmProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
-    localStorage.setItem('cybershield_members', JSON.stringify(members));
-    localStorage.setItem('cybershield_orders', JSON.stringify(orders));
-    localStorage.setItem('cybershield_txs', JSON.stringify(transactions));
-    localStorage.setItem('cybershield_payouts', JSON.stringify(payoutRequests));
-    localStorage.setItem('cybershield_activations', JSON.stringify(pendingActivations));
-    localStorage.setItem('cybershield_balance', JSON.stringify(availableBalance));
-    localStorage.setItem('cybershield_earnings', JSON.stringify(totalEarnings));
+    try {
+      localStorage.setItem('cybershield_members', JSON.stringify(members));
+    } catch (e) {
+      // If quota exceeded due to large base64 file data, save sanitized members without heavy dataUrls
+      try {
+        const sanitized = members.map(m => {
+          if (!m.kyc?.documents) return m;
+          const cleanDocs = { ...m.kyc.documents };
+          Object.keys(cleanDocs).forEach(k => {
+            if (k.endsWith('File') && typeof cleanDocs[k] === 'string' && cleanDocs[k].length > 10000) {
+              delete cleanDocs[k]; // large file data stays preserved in IndexedDB/memory
+            }
+          });
+          return { ...m, kyc: { ...m.kyc, documents: cleanDocs } };
+        });
+        localStorage.setItem('cybershield_members', JSON.stringify(sanitized));
+      } catch (err2) {
+        console.warn('[Storage] Quota exceeded, saved in memory/IndexedDB');
+      }
+    }
+
+    try {
+      localStorage.setItem('cybershield_orders', JSON.stringify(orders));
+      localStorage.setItem('cybershield_txs', JSON.stringify(transactions));
+      localStorage.setItem('cybershield_payouts', JSON.stringify(payoutRequests));
+      localStorage.setItem('cybershield_activations', JSON.stringify(pendingActivations));
+      localStorage.setItem('cybershield_balance', JSON.stringify(availableBalance));
+      localStorage.setItem('cybershield_earnings', JSON.stringify(totalEarnings));
+    } catch (e) {}
   }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings]);
 
   const [isDbConnected, setIsDbConnected] = useState(false);
@@ -263,7 +286,41 @@ export function MlmProvider({ children }) {
             member_id: m.member_id || m.id,
             id: m.member_id || m.id
           }));
-          setMembers(normalizedMembers);
+
+          setMembers(prevMembers => {
+            return normalizedMembers.map(m => {
+              const prev = prevMembers.find(p => p.id === m.id || p.member_id === m.member_id);
+              const prevDocs = prev?.kyc?.documents || {};
+              const liveDocs = m.kyc?.documents || {};
+              const mergedDocs = { ...liveDocs };
+
+              const docKeys = ['pan', 'aadhaar', 'bankAccount', 'addressProof'];
+              docKeys.forEach(k => {
+                const memDoc = getDocumentFile(m.member_id || m.id, k);
+                if (!mergedDocs[`${k}File`]) {
+                  mergedDocs[`${k}File`] = prevDocs[`${k}File`] || memDoc?.dataUrl || null;
+                }
+                if (!mergedDocs[`${k}Name`]) {
+                  mergedDocs[`${k}Name`] = prevDocs[`${k}Name`] || memDoc?.name || null;
+                }
+                if (!mergedDocs[`${k}Type`]) {
+                  mergedDocs[`${k}Type`] = prevDocs[`${k}Type`] || memDoc?.type || null;
+                }
+                if (!mergedDocs[`${k}Size`]) {
+                  mergedDocs[`${k}Size`] = prevDocs[`${k}Size`] || memDoc?.size || null;
+                }
+              });
+
+              return {
+                ...m,
+                kyc: {
+                  ...m.kyc,
+                  documents: mergedDocs
+                }
+              };
+            });
+          });
+
           setIsDbConnected(true);
           const current = normalizedMembers.find(m => m.member_id === currentMemberId);
           if (current) {
@@ -1086,23 +1143,23 @@ export function MlmProvider({ children }) {
 
   // Submit / Update Member KYC & Payout Bank Details
   const submitKyc = (memberId, kycDetails) => {
-    const existingMember = members.find(m => m.member_id === memberId) || currentMember;
+    const existingMember = members.find(m => m.member_id === memberId || m.id === memberId) || currentMember;
     const existingKyc = existingMember?.kyc || {};
     const existingDocs = existingKyc.documents || {};
 
     const submittedDocs = kycDetails.documents || {};
     const documents = {
-      aadhaar: submittedDocs.aadhaar || existingDocs.aadhaar || 'Pending Upload',
-      aadhaarName: submittedDocs.aadhaarName || existingDocs.aadhaarName || 'Aadhaar_Card.jpg',
-      pan: submittedDocs.pan || existingDocs.pan || 'Pending Upload',
-      panName: submittedDocs.panName || existingDocs.panName || 'PAN_Card.jpg',
-      addressProof: submittedDocs.addressProof || existingDocs.addressProof || 'Pending Upload',
-      bankAccount: submittedDocs.bankAccount || existingDocs.bankAccount || 'Pending Upload',
-      bankAccountName: submittedDocs.bankAccountName || existingDocs.bankAccountName || 'Bank_Proof.jpg'
+      ...existingDocs,
+      ...submittedDocs,
+      aadhaar: submittedDocs.aadhaar !== undefined ? submittedDocs.aadhaar : (existingDocs.aadhaar || 'Pending Upload'),
+      pan: submittedDocs.pan !== undefined ? submittedDocs.pan : (existingDocs.pan || 'Pending Upload'),
+      addressProof: submittedDocs.addressProof !== undefined ? submittedDocs.addressProof : (existingDocs.addressProof || 'Pending Upload'),
+      bankAccount: submittedDocs.bankAccount !== undefined ? submittedDocs.bankAccount : (existingDocs.bankAccount || 'Pending Upload')
     };
 
     // Real document validation: Require uploaded documents rather than instant auto-approval on plain text
-    const uploadedDocs = Object.entries(documents).filter(([_, val]) => 
+    const uploadedDocs = Object.entries(documents).filter(([key, val]) => 
+      !key.endsWith('File') && !key.endsWith('Name') && !key.endsWith('Type') && !key.endsWith('Size') &&
       val && val !== 'Pending Upload' && val !== 'Not Uploaded' && val !== 'Pending'
     );
     const hasDocuments = uploadedDocs.length > 0;
@@ -1115,7 +1172,7 @@ export function MlmProvider({ children }) {
       bank_name: kycDetails.bank_name !== undefined ? (kycDetails.bank_name || '') : (existingKyc.bank_name || ''),
       bank_account_number: kycDetails.bank_account_number !== undefined ? (kycDetails.bank_account_number || '').trim() : (existingKyc.bank_account_number || ''),
       bank_ifsc: kycDetails.bank_ifsc !== undefined ? (kycDetails.bank_ifsc || '').toUpperCase().trim() : (existingKyc.bank_ifsc || ''),
-      verification_status: verificationStatus,
+      verification_status: existingKyc.verification_status === 'verified' ? 'verified' : verificationStatus,
       agreement_accepted: true,
       agreement_version: 'v2026.1',
       documents: documents,
@@ -1123,11 +1180,18 @@ export function MlmProvider({ children }) {
     };
 
     setMembers(prev => prev.map(m => {
-      if (m.member_id === memberId) {
+      if (m.member_id === memberId || m.id === memberId) {
         return { ...m, kyc: updatedKyc };
       }
       return m;
     }));
+
+    setCurrentMember(prev => {
+      if (prev && (prev.member_id === memberId || prev.id === memberId)) {
+        return { ...prev, kyc: updatedKyc };
+      }
+      return prev;
+    });
 
     // Persist to live Neon PostgreSQL
     dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
@@ -1172,6 +1236,13 @@ export function MlmProvider({ children }) {
       [`${docType}Type`]: fileInfo?.type || existingDocs[`${docType}Type`] || null,
       [`${docType}Size`]: fileInfo?.size || existingDocs[`${docType}Size`] || null
     };
+
+    // Cache locally in robust documentStore (Memory + IndexedDB + LocalStorage)
+    try {
+      saveDocumentFile(memberId, docType, fileInfo);
+    } catch (e) {
+      console.warn('[KYC Cache] saveDocumentFile warning:', e);
+    }
 
     const updatedKyc = {
       ...existingKyc,

@@ -1,7 +1,12 @@
 import { neon } from '@neondatabase/serverless';
 
 export const config = {
-  runtime: 'nodejs'
+  runtime: 'nodejs',
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb'
+    }
+  }
 };
 
 function getSql() {
