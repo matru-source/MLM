@@ -1765,11 +1765,16 @@ export default function MemberDashboardView() {
                   addToast('error', 'File Too Large', 'Maximum file size allowed is 5MB.');
                   return;
                 }
-                uploadKycDocument(currentMember.member_id, docKey, {
-                  name: file.name,
-                  size: (file.size / 1024).toFixed(1) + ' KB',
-                  type: file.type
-                });
+                const reader = new FileReader();
+                reader.onload = (loadEvt) => {
+                  uploadKycDocument(currentMember.member_id || currentMember.id, docKey, {
+                    name: file.name,
+                    size: (file.size / 1024).toFixed(1) + ' KB',
+                    type: file.type,
+                    dataUrl: loadEvt.target.result
+                  });
+                };
+                reader.readAsDataURL(file);
               };
 
               const aadhaarStatus = checkDocStatus(currentMember?.kyc?.documents?.aadhaar);

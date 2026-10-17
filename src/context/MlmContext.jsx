@@ -1166,7 +1166,11 @@ export function MlmProvider({ children }) {
     const docLabel = fileInfo?.name ? `Uploaded (${fileInfo.name})` : 'Uploaded';
     const updatedDocs = {
       ...existingDocs,
-      [docType]: docLabel
+      [docType]: docLabel,
+      [`${docType}Name`]: fileInfo?.name || existingDocs[`${docType}Name`] || 'Document.pdf',
+      [`${docType}File`]: fileInfo?.dataUrl || existingDocs[`${docType}File`] || null,
+      [`${docType}Type`]: fileInfo?.type || existingDocs[`${docType}Type`] || 'application/pdf',
+      [`${docType}Size`]: fileInfo?.size || existingDocs[`${docType}Size`] || '120 KB'
     };
 
     const updatedKyc = {
@@ -1194,8 +1198,11 @@ export function MlmProvider({ children }) {
       if (m.member_id === memberId) {
         const kyc = m.kyc || {};
         const verifiedDocs = {};
-        Object.keys(kyc.documents || {}).forEach(k => {
-          verifiedDocs[k] = 'Verified ✓';
+        const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
+        primaryDocKeys.forEach(k => {
+          if (kyc.documents?.[k]) {
+            verifiedDocs[k] = 'Verified ✓';
+          }
         });
         const updatedKyc = {
           ...kyc,
