@@ -1159,7 +1159,7 @@ export function MlmProvider({ children }) {
 
   // Upload an individual KYC document (Aadhaar, PAN, Address Proof, Bank Proof)
   const uploadKycDocument = (memberId, docType, fileInfo) => {
-    const existingMember = members.find(m => m.member_id === memberId) || currentMember;
+    const existingMember = members.find(m => m.member_id === memberId || m.id === memberId) || currentMember;
     const existingKyc = existingMember?.kyc || {};
     const existingDocs = existingKyc.documents || {};
 
@@ -1167,10 +1167,10 @@ export function MlmProvider({ children }) {
     const updatedDocs = {
       ...existingDocs,
       [docType]: docLabel,
-      [`${docType}Name`]: fileInfo?.name || existingDocs[`${docType}Name`] || 'Document.pdf',
+      [`${docType}Name`]: fileInfo?.name || existingDocs[`${docType}Name`] || null,
       [`${docType}File`]: fileInfo?.dataUrl || existingDocs[`${docType}File`] || null,
-      [`${docType}Type`]: fileInfo?.type || existingDocs[`${docType}Type`] || 'application/pdf',
-      [`${docType}Size`]: fileInfo?.size || existingDocs[`${docType}Size`] || '120 KB'
+      [`${docType}Type`]: fileInfo?.type || existingDocs[`${docType}Type`] || null,
+      [`${docType}Size`]: fileInfo?.size || existingDocs[`${docType}Size`] || null
     };
 
     const updatedKyc = {
@@ -1181,11 +1181,18 @@ export function MlmProvider({ children }) {
     };
 
     setMembers(prev => prev.map(m => {
-      if (m.member_id === memberId) {
+      if (m.member_id === memberId || m.id === memberId) {
         return { ...m, kyc: updatedKyc };
       }
       return m;
     }));
+
+    setCurrentMember(prev => {
+      if (prev && (prev.member_id === memberId || prev.id === memberId)) {
+        return { ...prev, kyc: updatedKyc };
+      }
+      return prev;
+    });
 
     dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
     addToast('success', 'Document Uploaded', `${docType.toUpperCase()} file uploaded. Status updated to Under Review.`);
@@ -1195,7 +1202,7 @@ export function MlmProvider({ children }) {
   // Admin Approves Partner KYC
   const approveKyc = (memberId) => {
     setMembers(prev => prev.map(m => {
-      if (m.member_id === memberId) {
+      if (m.member_id === memberId || m.id === memberId) {
         const kyc = m.kyc || {};
         const verifiedDocs = {};
         const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
@@ -1215,13 +1222,37 @@ export function MlmProvider({ children }) {
       }
       return m;
     }));
+
+    setCurrentMember(prev => {
+      if (prev && (prev.member_id === memberId || prev.id === memberId)) {
+        const kyc = prev.kyc || {};
+        const verifiedDocs = {};
+        const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
+        primaryDocKeys.forEach(k => {
+          if (kyc.documents?.[k]) {
+            verifiedDocs[k] = 'Verified ✓';
+          }
+        });
+        return {
+          ...prev,
+          kyc: {
+            ...kyc,
+            verification_status: 'verified',
+            documents: { ...kyc.documents, ...verifiedDocs },
+            verified_at: new Date().toISOString()
+          }
+        };
+      }
+      return prev;
+    });
+
     addToast('success', 'KYC Approved', 'Partner KYC and documents successfully verified.');
   };
 
   // Admin Rejects Partner KYC
   const rejectKyc = (memberId, reason = 'Document quality unclear') => {
     setMembers(prev => prev.map(m => {
-      if (m.member_id === memberId) {
+      if (m.member_id === memberId || m.id === memberId) {
         const updatedKyc = {
           ...(m.kyc || {}),
           verification_status: 'rejected',
@@ -1232,6 +1263,21 @@ export function MlmProvider({ children }) {
       }
       return m;
     }));
+
+    setCurrentMember(prev => {
+      if (prev && (prev.member_id === memberId || prev.id === memberId)) {
+        return {
+          ...prev,
+          kyc: {
+            ...(prev.kyc || {}),
+            verification_status: 'rejected',
+            rejection_reason: reason
+          }
+        };
+      }
+      return prev;
+    });
+
     addToast('error', 'KYC Rejected', `Partner KYC rejected: ${reason}`);
   };
 
