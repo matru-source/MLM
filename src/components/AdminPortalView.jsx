@@ -675,43 +675,65 @@ export default function AdminPortalView() {
                           {hasPanText ? (
                             <div>
                               <span className="font-semibold">{m.kyc.pan}</span>
-                              {panDoc.hasFile ? (
-                                <div className="mt-1">
-                                  <div className="text-xs text-primary-blue font-medium truncate max-w-[160px]">{panDoc.fileName || 'PAN Document'}</div>
-                                  <button
-                                    type="button"
-                                    onClick={() => openDocPreview(m, 'pan')}
-                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-0.5 py-0.5 px-1.5"
-                                    title="View uploaded PAN card file"
-                                  >
-                                    <Eye size={11} />
-                                    <span>View File</span>
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="text-xs text-muted">No File Uploaded</div>
-                              )}
-                            </div>
-                          ) : panDoc.hasFile ? (
-                            <div>
-                              <div className="text-xs font-semibold text-primary-blue truncate max-w-[160px]">{panDoc.fileName || 'PAN Document'}</div>
-                              <span className="badge badge-amber text-xs font-normal mt-0.5 inline-block">File Uploaded • Text Pending</span>
-                              <div>
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <span className="text-xs text-muted truncate max-w-[130px]">{panDoc.hasFile ? panDoc.fileName : 'No File'}</span>
                                 <button
                                   type="button"
                                   onClick={() => openDocPreview(m, 'pan')}
-                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-1 py-0.5 px-1.5"
-                                  title="View uploaded PAN card file"
+                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                  title="View PAN Card document"
                                 >
                                   <Eye size={11} />
-                                  <span>View File</span>
+                                  <span>View</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : panDoc.hasFile ? (
+                            <div>
+                              <div className="text-xs font-semibold text-primary-blue truncate max-w-[150px]">{panDoc.fileName}</div>
+                              <span className="badge badge-amber text-xs font-normal mt-0.5 inline-block">File Uploaded</span>
+                              <div className="mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openDocPreview(m, 'pan')}
+                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                  title="View PAN Card document"
+                                >
+                                  <Eye size={11} />
+                                  <span>View</span>
                                 </button>
                               </div>
                             </div>
                           ) : isVerified ? (
-                            <span className="badge badge-green text-xs">Verified ✓</span>
+                            <div>
+                              <span className="badge badge-green text-xs">Verified ✓</span>
+                              <div className="mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openDocPreview(m, 'pan')}
+                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                  title="View PAN document status"
+                                >
+                                  <Eye size={11} />
+                                  <span>View</span>
+                                </button>
+                              </div>
+                            </div>
                           ) : (
-                            <span className="text-muted italic">Not Submitted</span>
+                            <div>
+                              <span className="text-muted italic text-xs">Not Submitted</span>
+                              <div className="mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openDocPreview(m, 'pan')}
+                                  className="btn btn-secondary btn-xs flex items-center gap-0.5 py-0.5 px-1.5 text-muted"
+                                  title="Inspect PAN status"
+                                >
+                                  <Eye size={10} />
+                                  <span>Inspect</span>
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </td>
                         <td>
@@ -719,83 +741,101 @@ export default function AdminPortalView() {
                             <div>
                               <span className="font-semibold">{m.kyc.bank_name} (••••{m.kyc.bank_account_number.slice(-4)})</span>
                               {m.kyc.bank_ifsc && <div className="text-xs text-muted">IFSC: {m.kyc.bank_ifsc}</div>}
-                              {bankDoc.hasFile ? (
-                                <div className="mt-1">
-                                  <div className="text-xs text-primary-blue font-medium truncate max-w-[160px]">{bankDoc.fileName || 'Passbook File'}</div>
-                                  <button
-                                    type="button"
-                                    onClick={() => openDocPreview(m, 'bankAccount')}
-                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-0.5 py-0.5 px-1.5"
-                                    title="View uploaded bank passbook file"
-                                  >
-                                    <Eye size={11} />
-                                    <span>View File</span>
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="text-xs text-muted">No Passbook Uploaded</div>
-                              )}
-                            </div>
-                          ) : bankDoc.hasFile ? (
-                            <div>
-                              <div className="text-xs font-semibold text-primary-blue truncate max-w-[160px]">{bankDoc.fileName || 'Passbook File'}</div>
-                              <span className="badge badge-amber text-xs font-normal mt-0.5 inline-block">File Uploaded • Details Pending</span>
-                              <div>
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <span className="text-xs text-muted truncate max-w-[130px]">{bankDoc.hasFile ? bankDoc.fileName : 'No File'}</span>
                                 <button
                                   type="button"
                                   onClick={() => openDocPreview(m, 'bankAccount')}
-                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-1 py-0.5 px-1.5"
-                                  title="View uploaded bank passbook file"
+                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                  title="View Bank Passbook document"
                                 >
                                   <Eye size={11} />
-                                  <span>View File</span>
+                                  <span>View</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : bankDoc.hasFile ? (
+                            <div>
+                              <div className="text-xs font-semibold text-primary-blue truncate max-w-[150px]">{bankDoc.fileName}</div>
+                              <span className="badge badge-amber text-xs font-normal mt-0.5 inline-block">File Uploaded</span>
+                              <div className="mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openDocPreview(m, 'bankAccount')}
+                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                  title="View Bank Passbook document"
+                                >
+                                  <Eye size={11} />
+                                  <span>View</span>
                                 </button>
                               </div>
                             </div>
                           ) : isVerified ? (
-                            <span className="badge badge-green text-xs">Verified ✓</span>
+                            <div>
+                              <span className="badge badge-green text-xs">Verified ✓</span>
+                              <div className="mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openDocPreview(m, 'bankAccount')}
+                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                  title="View bank passbook status"
+                                >
+                                  <Eye size={11} />
+                                  <span>View</span>
+                                </button>
+                              </div>
+                            </div>
                           ) : (
-                            <span className="text-muted italic">Pending Bank Setup</span>
+                            <div>
+                              <span className="text-muted italic text-xs">Pending Bank Setup</span>
+                              <div className="mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openDocPreview(m, 'bankAccount')}
+                                  className="btn btn-secondary btn-xs flex items-center gap-0.5 py-0.5 px-1.5 text-muted"
+                                  title="Inspect Bank status"
+                                >
+                                  <Eye size={10} />
+                                  <span>Inspect</span>
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </td>
                         <td>
                           <div className="text-xs flex items-center justify-between gap-1">
                             <div>
                               <span className="text-muted">Aadhaar: </span>
-                              <span className={aadhaarDoc.hasFile ? 'text-primary-blue font-semibold' : 'text-muted'}>
+                              <span className={aadhaarDoc.hasFile ? 'text-primary-blue font-semibold' : docs.aadhaar?.includes('Verified') ? 'text-success font-semibold' : 'text-muted'}>
                                 {aadhaarDoc.hasFile ? (aadhaarDoc.fileName || 'Uploaded') : (docs.aadhaar?.includes('Verified') ? 'Verified ✓' : 'Not Uploaded')}
                               </span>
                             </div>
-                            {aadhaarDoc.hasFile && (
-                              <button
-                                type="button"
-                                onClick={() => openDocPreview(m, 'aadhaar')}
-                                className="btn btn-outline-blue btn-xs flex items-center gap-0.5 py-0.5 px-1.5"
-                                title="View uploaded Aadhaar card file"
-                              >
-                                <Eye size={10} />
-                                <span>View</span>
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => openDocPreview(m, 'aadhaar')}
+                              className="btn btn-outline-blue btn-xs flex items-center gap-0.5 py-0.5 px-1.5"
+                              title="View Aadhaar Card document"
+                            >
+                              <Eye size={10} />
+                              <span>View</span>
+                            </button>
                           </div>
-                          <div className="text-xs flex items-center justify-between gap-1 mt-1">
+                          <div className="text-xs flex items-center justify-between gap-1 mt-1.5">
                             <div>
                               <span className="text-muted">Address: </span>
-                              <span className={addressDoc.hasFile ? 'text-primary-blue font-semibold' : 'text-muted'}>
+                              <span className={addressDoc.hasFile ? 'text-primary-blue font-semibold' : docs.addressProof?.includes('Verified') ? 'text-success font-semibold' : 'text-muted'}>
                                 {addressDoc.hasFile ? (addressDoc.fileName || 'Uploaded') : (docs.addressProof?.includes('Verified') ? 'Verified ✓' : 'Not Uploaded')}
                               </span>
                             </div>
-                            {addressDoc.hasFile && (
-                              <button
-                                type="button"
-                                onClick={() => openDocPreview(m, 'addressProof')}
-                                className="btn btn-outline-blue btn-xs flex items-center gap-0.5 py-0.5 px-1.5"
-                                title="View uploaded Address proof file"
-                              >
-                                <Eye size={10} />
-                                <span>View</span>
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => openDocPreview(m, 'addressProof')}
+                              className="btn btn-outline-blue btn-xs flex items-center gap-0.5 py-0.5 px-1.5"
+                              title="View Address Proof document"
+                            >
+                              <Eye size={10} />
+                              <span>View</span>
+                            </button>
                           </div>
                         </td>
                         <td>
@@ -1457,16 +1497,15 @@ export default function AdminPortalView() {
                         File: {panDoc.hasFile ? (panDoc.fileName || 'Attached') : 'No file uploaded'}
                       </div>
                     </div>
-                    {panDoc.hasFile && (
-                      <button
-                        type="button"
-                        onClick={() => openDocPreview(m, 'pan')}
-                        className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-3 self-start"
-                      >
-                        <Eye size={12} />
-                        <span>View Uploaded File</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openDocPreview(m, 'pan')}
+                      className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-3 self-start"
+                      title="View PAN Card document"
+                    >
+                      <Eye size={12} />
+                      <span>{panDoc.hasFile ? 'View Uploaded File' : 'View Document'}</span>
+                    </button>
                   </div>
 
                   <div className="card-alt p-3 border-rounded flex flex-col justify-between">
@@ -1478,16 +1517,15 @@ export default function AdminPortalView() {
                         File: {bankDoc.hasFile ? (bankDoc.fileName || 'Attached') : 'No file uploaded'}
                       </div>
                     </div>
-                    {bankDoc.hasFile && (
-                      <button
-                        type="button"
-                        onClick={() => openDocPreview(m, 'bankAccount')}
-                        className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-3 self-start"
-                      >
-                        <Eye size={12} />
-                        <span>View Uploaded File</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openDocPreview(m, 'bankAccount')}
+                      className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-3 self-start"
+                      title="View Bank Passbook document"
+                    >
+                      <Eye size={12} />
+                      <span>{bankDoc.hasFile ? 'View Uploaded File' : 'View Document'}</span>
+                    </button>
                   </div>
 
                   <div className="card-alt p-3 border-rounded flex flex-col justify-between">
@@ -1497,16 +1535,15 @@ export default function AdminPortalView() {
                         {aadhaarDoc.hasFile ? (aadhaarDoc.fileName || 'Attached') : (docs.aadhaar?.includes('Verified') ? 'Verified ✓' : 'Not Uploaded')}
                       </div>
                     </div>
-                    {aadhaarDoc.hasFile && (
-                      <button
-                        type="button"
-                        onClick={() => openDocPreview(m, 'aadhaar')}
-                        className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-3 self-start"
-                      >
-                        <Eye size={12} />
-                        <span>View Uploaded File</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openDocPreview(m, 'aadhaar')}
+                      className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-3 self-start"
+                      title="View Aadhaar Card document"
+                    >
+                      <Eye size={12} />
+                      <span>{aadhaarDoc.hasFile ? 'View Uploaded File' : 'View Document'}</span>
+                    </button>
                   </div>
 
                   <div className="card-alt p-3 border-rounded flex flex-col justify-between">
@@ -1516,16 +1553,15 @@ export default function AdminPortalView() {
                         {addressDoc.hasFile ? (addressDoc.fileName || 'Attached') : (docs.addressProof?.includes('Verified') ? 'Verified ✓' : 'Not Uploaded')}
                       </div>
                     </div>
-                    {addressDoc.hasFile && (
-                      <button
-                        type="button"
-                        onClick={() => openDocPreview(m, 'addressProof')}
-                        className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-3 self-start"
-                      >
-                        <Eye size={12} />
-                        <span>View Uploaded File</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openDocPreview(m, 'addressProof')}
+                      className="btn btn-outline-blue btn-xs flex items-center gap-1 mt-3 self-start"
+                      title="View Address Proof document"
+                    >
+                      <Eye size={12} />
+                      <span>{addressDoc.hasFile ? 'View Uploaded File' : 'View Document'}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1685,18 +1721,55 @@ export default function AdminPortalView() {
                   )}
                 </>
               ) : (
-                /* No file actually uploaded */
-                <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '36px 24px', textAlign: 'center' }}>
-                  <AlertCircle size={44} className="mx-auto text-amber-500 mb-3" />
-                  <h4 className="font-bold text-base text-slate-800 mb-1">No File Uploaded</h4>
-                  <p className="text-xs text-slate-600 max-w-md mx-auto">
-                    The partner has not uploaded a file for <strong>{previewingDoc.title}</strong> yet.
+                /* No file actually uploaded yet */
+                <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '32px 24px', textAlign: 'center' }}>
+                  <AlertCircle size={44} className="mx-auto text-amber-500 mb-2" />
+                  <h4 className="font-bold text-base text-slate-800 mb-1">No Document File Attached</h4>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto mb-4">
+                    {previewingDoc.status === 'verified'
+                      ? `This document was verified by the administrator, but no digital file was uploaded by ${previewingDoc.member.name}.`
+                      : `The partner has not uploaded an image or PDF file for ${previewingDoc.title} yet.`}
                   </p>
-                  {previewingDoc.docName && (
-                    <div className="mt-2 text-xs text-muted">
-                      Previous file reference: <code className="text-primary-blue font-semibold">{previewingDoc.docName}</code>
-                    </div>
-                  )}
+
+                  <div className="flex flex-col items-center justify-center gap-2 pt-3 border-t border-amber-200">
+                    <span className="text-xs text-slate-500 font-medium">Have the partner's document file on hand?</span>
+                    <input
+                      type="file"
+                      id="admin-attach-file-dialog"
+                      accept="image/*,.pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 5 * 1024 * 1024) {
+                          addToast('error', 'File Too Large', 'Maximum file size allowed is 5MB.');
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = (loadEvt) => {
+                          const fileData = loadEvt.target.result;
+                          uploadKycDocument(previewingDoc.member.member_id || previewingDoc.member.id, previewingDoc.docKey, {
+                            name: file.name,
+                            size: (file.size / 1024).toFixed(1) + ' KB',
+                            type: file.type || 'application/pdf',
+                            dataUrl: fileData
+                          });
+                          setPreviewingDoc(prev => ({
+                            ...prev,
+                            docName: file.name,
+                            docFile: fileData,
+                            docType: file.type || 'application/pdf',
+                            docSize: (file.size / 1024).toFixed(1) + ' KB'
+                          }));
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    <label htmlFor="admin-attach-file-dialog" className="btn btn-primary btn-sm flex items-center gap-1.5 cursor-pointer">
+                      <Upload size={14} />
+                      <span>Upload & Attach File For Partner</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
