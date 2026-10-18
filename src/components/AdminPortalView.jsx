@@ -673,8 +673,28 @@ export default function AdminPortalView() {
                     const aadhaarDoc = getDocFileInfo(m, 'aadhaar');
                     const addressDoc = getDocFileInfo(m, 'addressProof');
 
-                    const hasAnySubmissions = hasPanText || hasBankText || panDoc.hasFile || bankDoc.hasFile || aadhaarDoc.hasFile || addressDoc.hasFile;
-                    const status = m.kyc?.verification_status || (hasAnySubmissions ? 'under_review' : 'pending_documents');
+                    // Check if partner has uploaded any real documents
+                    const hasAnyUploadedDoc = Boolean(
+                      panDoc.hasFile || 
+                      bankDoc.hasFile || 
+                      aadhaarDoc.hasFile || 
+                      addressDoc.hasFile ||
+                      docs.panFile ||
+                      docs.bankAccountFile ||
+                      docs.aadhaarFile ||
+                      docs.addressProofFile ||
+                      docs.panName ||
+                      docs.bankAccountName ||
+                      docs.aadhaarName ||
+                      docs.addressProofName ||
+                      (typeof docs.pan === 'string' && docs.pan.startsWith('Uploaded')) ||
+                      (typeof docs.aadhaar === 'string' && docs.aadhaar.startsWith('Uploaded')) ||
+                      (typeof docs.bankAccount === 'string' && docs.bankAccount.startsWith('Uploaded')) ||
+                      (typeof docs.addressProof === 'string' && docs.addressProof.startsWith('Uploaded'))
+                    );
+
+                    const hasAnySubmissions = hasPanText || hasBankText || hasAnyUploadedDoc;
+                    const status = m.kyc?.verification_status || (hasAnyUploadedDoc ? 'under_review' : 'pending_documents');
                     const isVerified = status === 'verified';
                     const isUnderReview = status === 'under_review';
 
@@ -867,7 +887,7 @@ export default function AdminPortalView() {
                             >
                               Details
                             </button>
-                            {!isVerified && (
+                            {hasAnyUploadedDoc && !isVerified && (
                               <button 
                                 type="button"
                                 onClick={() => approveKyc(m.member_id || m.id)}
@@ -877,7 +897,7 @@ export default function AdminPortalView() {
                                 Approve
                               </button>
                             )}
-                            {!isVerified && (
+                            {hasAnyUploadedDoc && !isVerified && (
                               <button 
                                 type="button"
                                 onClick={() => rejectKyc(m.member_id || m.id, 'Document illegible or mismatched')}
@@ -1473,6 +1493,24 @@ export default function AdminPortalView() {
         const bankDoc = getDocFileInfo(m, 'bankAccount');
         const aadhaarDoc = getDocFileInfo(m, 'aadhaar');
         const addressDoc = getDocFileInfo(m, 'addressProof');
+        const hasAnyUploadedDoc = Boolean(
+          panDoc.hasFile || 
+          bankDoc.hasFile || 
+          aadhaarDoc.hasFile || 
+          addressDoc.hasFile ||
+          docs.panFile ||
+          docs.bankAccountFile ||
+          docs.aadhaarFile ||
+          docs.addressProofFile ||
+          docs.panName ||
+          docs.bankAccountName ||
+          docs.aadhaarName ||
+          docs.addressProofName ||
+          (typeof docs.pan === 'string' && docs.pan.startsWith('Uploaded')) ||
+          (typeof docs.aadhaar === 'string' && docs.aadhaar.startsWith('Uploaded')) ||
+          (typeof docs.bankAccount === 'string' && docs.bankAccount.startsWith('Uploaded')) ||
+          (typeof docs.addressProof === 'string' && docs.addressProof.startsWith('Uploaded'))
+        );
 
         return (
           <div className="custom-modal-backdrop" style={{ zIndex: 9998, padding: '16px' }} onClick={() => setSelectedKycMember(null)}>
@@ -1981,51 +2019,57 @@ export default function AdminPortalView() {
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {!isVerified && (
-                    <>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          rejectKyc(m.member_id || m.id, 'Document illegible or mismatched');
-                          setSelectedKycMember(null);
-                        }} 
-                        style={{
-                          background: '#FEF2F2',
-                          border: '1px solid #FECACA',
-                          color: '#DC2626',
-                          padding: '8px 16px',
-                          borderRadius: '8px',
-                          fontWeight: 700,
-                          fontSize: '13px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Reject KYC
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          approveKyc(m.member_id || m.id);
-                          setSelectedKycMember(null);
-                        }} 
-                        style={{
-                          background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
-                          border: 'none',
-                          color: '#FFFFFF',
-                          padding: '8px 22px',
-                          borderRadius: '8px',
-                          fontWeight: 700,
-                          fontSize: '13px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
-                        }}
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>Approve Partner KYC</span>
-                      </button>
-                    </>
+                    hasAnyUploadedDoc ? (
+                      <>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            rejectKyc(m.member_id || m.id, 'Document illegible or mismatched');
+                            setSelectedKycMember(null);
+                          }} 
+                          style={{
+                            background: '#FEF2F2',
+                            border: '1px solid #FECACA',
+                            color: '#DC2626',
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Reject KYC
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            approveKyc(m.member_id || m.id);
+                            setSelectedKycMember(null);
+                          }} 
+                          style={{
+                            background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                            border: 'none',
+                            color: '#FFFFFF',
+                            padding: '8px 22px',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
+                          }}
+                        >
+                          <CheckCircle2 size={16} />
+                          <span>Approve Partner KYC</span>
+                        </button>
+                      </>
+                    ) : (
+                      <span className="badge badge-neutral text-xs py-1.5 px-3">
+                        Awaiting Document Upload
+                      </span>
+                    )
                   )}
                 </div>
               </div>
@@ -2234,7 +2278,7 @@ export default function AdminPortalView() {
                     <span>Download File</span>
                   </a>
                 )}
-                {previewingDoc.status !== 'verified' && (
+                {previewingDoc.hasFile && previewingDoc.status !== 'verified' && (
                   <button
                     type="button"
                     onClick={() => {

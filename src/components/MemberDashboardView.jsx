@@ -39,6 +39,7 @@ import {
   Lock
 } from 'lucide-react';
 import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
+import { getDocumentFile } from '../utils/documentStorage';
 
 export default function MemberDashboardView() {
   const { 
@@ -1632,9 +1633,9 @@ export default function MemberDashboardView() {
                 {(() => {
                   const status = currentMember?.kyc?.verification_status;
                   if (status === 'verified') return <span className="badge badge-green ml-2">KYC Verified ✓</span>;
-                  if (status === 'under_review') return <span className="badge badge-blue ml-2">KYC Under Review</span>;
+                  if (status === 'under_review') return <span className="badge badge-amber ml-2">KYC Under Verification</span>;
                   if (status === 'rejected') return <span className="badge badge-rose ml-2">KYC Rejected</span>;
-                  return <span className="badge badge-amber ml-2">KYC Documents Pending</span>;
+                  return <span className="badge badge-neutral ml-2">KYC Documents Pending</span>;
                 })()}
               </div>
             </div>
@@ -1748,39 +1749,128 @@ export default function MemberDashboardView() {
 
             {/* TAB 2: KYC DOCUMENTS */}
             {kycTab === 'documents' && (() => {
-              const checkDocStatus = (docVal) => {
-                if (!docVal || docVal === 'Pending' || docVal === 'Pending Upload' || docVal === 'Not Uploaded') {
-                  return { label: 'Pending Upload', badge: 'badge-neutral', isUploaded: false, isVerified: false };
+              // Helper to resolve the uploaded file name
+              const getDocFileName = (docKey) => {
+                const docs = currentMember?.kyc?.documents || {};
+                if (docs[`${docKey}Name`]) return docs[`${docKey}Name`];
+                const memDoc = getDocumentFile(currentMember?.member_id || currentMember?.id, docKey);
+                if (memDoc?.name) return memDoc.name;
+                const rawVal = docs[docKey];
+                if (typeof rawVal === 'string' && rawVal.startsWith('Uploaded (')) {
+                  return rawVal.replace('Uploaded (', '').replace(/\)$/, '');
                 }
-                if (currentMember?.kyc?.verification_status === 'verified' || docVal.includes('Verified')) {
-                  return { label: 'Verified ✓', badge: 'badge-green', isUploaded: true, isVerified: true };
-                }
-                return { label: 'Under Review', badge: 'badge-amber', isUploaded: true, isVerified: false };
+                return null;
               };
 
-              const handleDocUpload = (docKey) => (e) => {
+              // Helper to check status of an individual document
+              const checkDocStatus = (docKey) => {
+                const docs = currentMember?.kyc?.documents || {};
+                const docVal = docs[docKey];
+                const fileName = getDocFileName(docKey);
+                const fileData = docs[`${docKey}File`] || getDocumentFile(currentMember?.member_id || currentMember?.id, docKey)?.dataUrl;
+                
+                const hasFile = Boolean(fileName || fileData || (typeof docVal === 'string' && docVal.startsWith('Uploaded')));
+                const isPending = !docVal || docVal === 'Pending' || docVal === 'Pending Upload' || docVal === 'Not Uploaded';
+
+                if (!hasFile && isPending) {
+                  return { label: 'Pending Upload', badge: 'badge-neutral', isUploaded: false, isVerified: false, fileName: null };
+                }
+
+                const overallStatus = currentMember?.kyc?.verification_status;
+                const docStatus = docs[`${docKey}Status`];
+                const isDocVerifiedText = docVal === 'Verified ✓' || docVal === 'Verified';
+
+                // Re-verification rule: only verified if overall is verified AND this document has not been replaced/re-uploaded
+                if (overallStatus === 'verified' && docStatus !== 'under_review' && isDocVerifiedText) {
+                  return { label: 'Verified ✓', badge: 'badge-green', isUploaded: true, isVerified: true, fileName };
+                }
+
+                return { label: 'Under Verification', badge: 'badge-amber', isUploaded: true, isVerified: false, fileName };
+              };
+
+              // Client-side image compression to guarantee smooth DB sync without exceeding payload limits
+              const compressImageForUpload = (file) => {
+                return new Promise((resolve) => {
+                  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve({
+                      name: file.name,
+                      size: (file.size / 1024).toFixed(1) + ' KB',
+                      type: file.type || 'application/pdf',
+                      dataUrl: e.target.result
+                    });
+                    reader.onerror = () => resolve(null);
+                    reader.readAsDataURL(file);
+                    return;
+                  }
+
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                      try {
+                        const maxDim = 1280;
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > maxDim || height > maxDim) {
+                          if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                          } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                          }
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+                        const compressedSizeKb = Math.round((compressedDataUrl.length * 0.75) / 1024);
+                        resolve({
+                          name: file.name,
+                          size: `${compressedSizeKb} KB`,
+                          type: 'image/jpeg',
+                          dataUrl: compressedDataUrl
+                        });
+                      } catch (err) {
+                        resolve({
+                          name: file.name,
+                          size: (file.size / 1024).toFixed(1) + ' KB',
+                          type: file.type,
+                          dataUrl: e.target.result
+                        });
+                      }
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = e.target.result;
+                  };
+                  reader.onerror = () => resolve(null);
+                  reader.readAsDataURL(file);
+                });
+              };
+
+              const handleDocUpload = (docKey) => async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                if (file.size > 5 * 1024 * 1024) {
-                  addToast('error', 'File Too Large', 'Maximum file size allowed is 5MB.');
+                if (file.size > 8 * 1024 * 1024) {
+                  addToast('error', 'File Too Large', 'Maximum file size allowed is 8MB.');
                   return;
                 }
-                const reader = new FileReader();
-                reader.onload = (loadEvt) => {
-                  uploadKycDocument(currentMember.member_id || currentMember.id, docKey, {
-                    name: file.name,
-                    size: (file.size / 1024).toFixed(1) + ' KB',
-                    type: file.type,
-                    dataUrl: loadEvt.target.result
-                  });
-                };
-                reader.readAsDataURL(file);
+                const processed = await compressImageForUpload(file);
+                if (!processed || !processed.dataUrl) {
+                  addToast('error', 'Upload Failed', 'Failed to read document file.');
+                  return;
+                }
+                uploadKycDocument(currentMember.member_id || currentMember.id, docKey, processed);
+                e.target.value = ''; // Reset input to allow re-uploading same file
               };
 
-              const aadhaarStatus = checkDocStatus(currentMember?.kyc?.documents?.aadhaar);
-              const panStatus = checkDocStatus(currentMember?.kyc?.documents?.pan);
-              const addressStatus = checkDocStatus(currentMember?.kyc?.documents?.addressProof);
-              const bankStatus = checkDocStatus(currentMember?.kyc?.documents?.bankAccount);
+              const aadhaarStatus = checkDocStatus('aadhaar');
+              const panStatus = checkDocStatus('pan');
+              const addressStatus = checkDocStatus('addressProof');
+              const bankStatus = checkDocStatus('bankAccount');
 
               return (
                 <div className="tab-pane-content">
@@ -1793,7 +1883,14 @@ export default function MemberDashboardView() {
                       <div className="doc-info">
                         <FileText size={20} className="text-primary-blue" />
                         <div>
-                          <div className="doc-title">Aadhaar Card</div>
+                          <div className="doc-title" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <span>Aadhaar Card</span>
+                            {aadhaarStatus.fileName && (
+                              <span className="file-name-pill" title={aadhaarStatus.fileName}>
+                                📄 {aadhaarStatus.fileName}
+                              </span>
+                            )}
+                          </div>
                           <div className="doc-sub">
                             {currentMember?.kyc?.documents?.aadhaar || 'Identity & Address verification document'}
                           </div>
@@ -1822,8 +1919,15 @@ export default function MemberDashboardView() {
                       <div className="doc-info">
                         <FileText size={20} className="text-primary-blue" />
                         <div>
-                          <div className="doc-title">PAN Card (Form 16A / Section 194H)</div>
-                          <div className="doc-sub">
+                          <div className="doc-title" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <span>PAN Card (Form 16A / Section 194H)</span>
+                            {panStatus.fileName && (
+                              <span className="file-name-pill" title={panStatus.fileName}>
+                                📄 {panStatus.fileName}
+                              </span>
+                            )}
+                          </div>
+                          <div className="doc-sub" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                             {currentMember?.kyc?.pan ? (
                               <span className="text-primary-blue font-semibold code-font">PAN: {currentMember.kyc.pan}</span>
                             ) : (
@@ -1836,6 +1940,11 @@ export default function MemberDashboardView() {
                                 >
                                   Link PAN Number &rarr;
                                 </button>
+                              </span>
+                            )}
+                            {panStatus.fileName && (
+                              <span className="file-name-pill" title={panStatus.fileName}>
+                                📄 {panStatus.fileName}
                               </span>
                             )}
                           </div>
@@ -1864,7 +1973,14 @@ export default function MemberDashboardView() {
                       <div className="doc-info">
                         <FileText size={20} className="text-primary-blue" />
                         <div>
-                          <div className="doc-title">Address Proof</div>
+                          <div className="doc-title" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <span>Address Proof</span>
+                            {addressStatus.fileName && (
+                              <span className="file-name-pill" title={addressStatus.fileName}>
+                                📄 {addressStatus.fileName}
+                              </span>
+                            )}
+                          </div>
                           <div className="doc-sub">
                             {currentMember?.kyc?.documents?.addressProof || 'Electricity bill / Utility / Rent agreement'}
                           </div>
@@ -1893,8 +2009,15 @@ export default function MemberDashboardView() {
                       <div className="doc-info">
                         <FileText size={20} className="text-primary-blue" />
                         <div>
-                          <div className="doc-title">Bank Passbook / Cancelled Cheque</div>
-                          <div className="doc-sub">
+                          <div className="doc-title" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <span>Bank Passbook / Cancelled Cheque</span>
+                            {bankStatus.fileName && (
+                              <span className="file-name-pill" title={bankStatus.fileName}>
+                                📄 {bankStatus.fileName}
+                              </span>
+                            )}
+                          </div>
+                          <div className="doc-sub" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                             {currentMember?.kyc?.bank_account_number ? (
                               <span className="text-primary-blue font-semibold">
                                 {currentMember.kyc.bank_name || 'Bank'} • A/C: ••••{currentMember.kyc.bank_account_number.slice(-4)} • IFSC: {currentMember.kyc.bank_ifsc}
@@ -1909,6 +2032,11 @@ export default function MemberDashboardView() {
                                 >
                                   Link A/C & IFSC Number &rarr;
                                 </button>
+                              </span>
+                            )}
+                            {bankStatus.fileName && (
+                              <span className="file-name-pill" title={bankStatus.fileName}>
+                                📄 {bankStatus.fileName}
                               </span>
                             )}
                           </div>

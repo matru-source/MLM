@@ -1165,6 +1165,16 @@ export function MlmProvider({ children }) {
     const hasDocuments = uploadedDocs.length > 0;
     const verificationStatus = hasDocuments ? 'under_review' : 'pending_documents';
 
+    // If member changes PAN or Bank account, require re-verification
+    const isChangingCriticalData = (
+      (kycDetails.pan !== undefined && kycDetails.pan !== existingKyc.pan) ||
+      (kycDetails.bank_account_number !== undefined && kycDetails.bank_account_number !== existingKyc.bank_account_number) ||
+      (kycDetails.bank_ifsc !== undefined && kycDetails.bank_ifsc !== existingKyc.bank_ifsc)
+    );
+    const finalVerificationStatus = isChangingCriticalData 
+      ? (hasDocuments ? 'under_review' : 'pending_documents') 
+      : (existingKyc.verification_status === 'verified' ? 'verified' : verificationStatus);
+
     const updatedKyc = {
       ...existingKyc,
       legal_name: kycDetails.legal_name || existingKyc.legal_name || existingMember?.name,
@@ -1172,7 +1182,8 @@ export function MlmProvider({ children }) {
       bank_name: kycDetails.bank_name !== undefined ? (kycDetails.bank_name || '') : (existingKyc.bank_name || ''),
       bank_account_number: kycDetails.bank_account_number !== undefined ? (kycDetails.bank_account_number || '').trim() : (existingKyc.bank_account_number || ''),
       bank_ifsc: kycDetails.bank_ifsc !== undefined ? (kycDetails.bank_ifsc || '').toUpperCase().trim() : (existingKyc.bank_ifsc || ''),
-      verification_status: existingKyc.verification_status === 'verified' ? 'verified' : verificationStatus,
+      verification_status: finalVerificationStatus,
+      verified_at: isChangingCriticalData ? null : existingKyc.verified_at,
       agreement_accepted: true,
       agreement_version: 'v2026.1',
       documents: documents,
@@ -1231,6 +1242,7 @@ export function MlmProvider({ children }) {
     const updatedDocs = {
       ...existingDocs,
       [docType]: docLabel,
+      [`${docType}Status`]: 'under_review',
       [`${docType}Name`]: fileInfo?.name || existingDocs[`${docType}Name`] || null,
       [`${docType}File`]: fileInfo?.dataUrl || existingDocs[`${docType}File`] || null,
       [`${docType}Type`]: fileInfo?.type || existingDocs[`${docType}Type`] || null,
@@ -1244,10 +1256,12 @@ export function MlmProvider({ children }) {
       console.warn('[KYC Cache] saveDocumentFile warning:', e);
     }
 
+    // When ANY document is uploaded or re-uploaded, status MUST be under_review (requires admin re-approval)
     const updatedKyc = {
       ...existingKyc,
       documents: updatedDocs,
       verification_status: 'under_review',
+      verified_at: null,
       submitted_at: new Date().toISOString()
     };
 
@@ -1266,7 +1280,7 @@ export function MlmProvider({ children }) {
     });
 
     dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
-    addToast('success', 'Document Uploaded', `${docType.toUpperCase()} file uploaded. Status updated to Under Review.`);
+    addToast('success', 'Document Uploaded', `${docType.toUpperCase()} uploaded. Status updated to Under Review.`);
     return true;
   };
 
@@ -1275,17 +1289,19 @@ export function MlmProvider({ children }) {
     setMembers(prev => prev.map(m => {
       if (m.member_id === memberId || m.id === memberId) {
         const kyc = m.kyc || {};
-        const verifiedDocs = {};
+        const docs = kyc.documents || {};
+        const verifiedDocs = { ...docs };
         const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
         primaryDocKeys.forEach(k => {
-          if (kyc.documents?.[k]) {
+          if (docs[k] || docs[`${k}File`] || docs[`${k}Name`]) {
             verifiedDocs[k] = 'Verified ✓';
+            verifiedDocs[`${k}Status`] = 'verified';
           }
         });
         const updatedKyc = {
           ...kyc,
           verification_status: 'verified',
-          documents: { ...kyc.documents, ...verifiedDocs },
+          documents: verifiedDocs,
           verified_at: new Date().toISOString()
         };
         dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
@@ -1297,11 +1313,13 @@ export function MlmProvider({ children }) {
     setCurrentMember(prev => {
       if (prev && (prev.member_id === memberId || prev.id === memberId)) {
         const kyc = prev.kyc || {};
-        const verifiedDocs = {};
+        const docs = kyc.documents || {};
+        const verifiedDocs = { ...docs };
         const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
         primaryDocKeys.forEach(k => {
-          if (kyc.documents?.[k]) {
+          if (docs[k] || docs[`${k}File`] || docs[`${k}Name`]) {
             verifiedDocs[k] = 'Verified ✓';
+            verifiedDocs[`${k}Status`] = 'verified';
           }
         });
         return {
@@ -1309,7 +1327,7 @@ export function MlmProvider({ children }) {
           kyc: {
             ...kyc,
             verification_status: 'verified',
-            documents: { ...kyc.documents, ...verifiedDocs },
+            documents: verifiedDocs,
             verified_at: new Date().toISOString()
           }
         };
