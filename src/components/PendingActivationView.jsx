@@ -171,7 +171,7 @@ export default function PendingActivationView() {
                 🔒 Member Profile & Personal Referral Link are Currently Locked
               </h4>
               <p className="locked-banner-desc">
-                Under Direct Selling compliance guidelines, your distributor referral code and 6-tier hierarchy will be <strong>unlocked automatically</strong> once CyberShield Administration verifies your bank credit.
+                Under Direct Selling compliance guidelines, your distributor referral code and 10-tier hierarchy will be <strong>unlocked automatically</strong> once CyberShield Administration verifies your bank credit.
               </p>
             </div>
           </div>
@@ -193,7 +193,7 @@ export default function PendingActivationView() {
 
             <h3 className="pending-ac-title">Account 1: Partner MLM Account</h3>
             <p className="pending-ac-desc">
-              Direct selling license, 6-tier matrix placement, and commission wallet.
+              Direct selling license, 10-tier matrix placement, and commission wallet.
             </p>
 
             <div className="pending-ac-specs">

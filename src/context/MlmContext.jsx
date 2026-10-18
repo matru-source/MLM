@@ -1572,16 +1572,16 @@ export function MlmProvider({ children }) {
       return o;
     }));
 
-    // Credit multi-tier retail partner commissions across all 6 upline levels (₹1000, ₹300, ₹150, ₹50, ₹25, ₹25)
+    // Credit multi-tier retail partner commissions across all 10 upline levels (Total: ₹1,600 / 64% of ₹2,500)
     const activatedMember = members.find(m => m.member_id === act.member_id || m.id === act.member_id);
-    const rates = [1000, 300, 150, 50, 25, 25];
+    const rates = [1000, 300, 150, 50, 25, 25, 25, 10, 10, 5];
     const newTransactions = [];
     const creditsByMemberId = {};
 
     let currentUplineTarget = activatedMember;
     const visited = new Set([act.member_id]);
 
-    for (let level = 1; level <= 6; level++) {
+    for (let level = 1; level <= 10; level++) {
       if (!currentUplineTarget) break;
 
       const sponsorRef = (

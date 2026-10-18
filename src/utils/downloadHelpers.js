@@ -172,7 +172,7 @@ export function downloadTaxInvoice({ order, member }) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
-  doc.text('1-Yr Enterprise Security Suite + 6-Tier Direct Selling Authorization Rights', margin + 14, rowY + 5);
+  doc.text('1-Yr Enterprise Security Suite + 10-Tier Direct Selling Authorization Rights', margin + 14, rowY + 5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
@@ -232,7 +232,7 @@ export function downloadTaxInvoice({ order, member }) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(51, 65, 85);
-  doc.text(`Account 1 (Direct Selling): Partner ID: ${distributorId}  |  6-Tier Tree Authorization Active`, margin + 5, provY + 12);
+  doc.text(`Account 1 (Direct Selling): Partner ID: ${distributorId}  |  10-Tier Tree Authorization Active`, margin + 5, provY + 12);
   doc.text(`Account 2 (Software License): Key: ${licenseKey}  |  5 Endpoint Seats Provisioned`, margin + 5, provY + 17);
 
   // Statutory Footer

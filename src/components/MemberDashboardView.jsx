@@ -762,7 +762,7 @@ export default function MemberDashboardView() {
                       <span className="badge badge-purple font-xs">Official API</span>
                     </div>
                     <p className="chart-card-sub m-0 mt-1">
-                      Session-bound cryptographic link for real-time 6-tier unilevel commission distribution
+                      Session-bound cryptographic link for real-time 10-tier unilevel commission distribution
                     </p>
                   </div>
                 </div>
@@ -817,12 +817,12 @@ export default function MemberDashboardView() {
                         <div className="text-xs text-muted mb-1">Real-Time Commission Hook</div>
                         <div className="text-success font-sm font-bold flex-align gap-1">
                           <CheckCircle2 size={14} />
-                          <span>Active (6-Tier Payouts)</span>
+                          <span>Active (10-Tier Payouts)</span>
                         </div>
                       </div>
                     </div>
                     <div className="zex-live-stream-note mt-3 p-2 bg-card-alt border-rounded text-xs text-muted flex-between">
-                      <span>⚡ Webhook stream active at <code className="code-font">/api/integrations/zex/webhook</code>. Qualifying subscription sales trigger instant credits across upline tiers (₹1000 / ₹300 / ₹150 / ₹50 / ₹25 / ₹25).</span>
+                      <span>⚡ Webhook stream active at <code className="code-font">/api/integrations/zex/webhook</code>. Qualifying subscription sales trigger instant credits across 10 upline tiers (₹1000 / ₹300 / ₹150 / ₹50 / ₹25 / ₹25 / ₹25 / ₹10 / ₹10 / ₹5).</span>
                       <span className="text-success font-bold">100% Synced</span>
                     </div>
                   </div>
@@ -856,9 +856,9 @@ export default function MemberDashboardView() {
           </div>
         )}
 
-        {/* SUBVIEW 2: MY NETWORK (Dynamic 6-Tier Unilevel Tree + Real-Time Calculation Column) */}
+        {/* SUBVIEW 2: MY NETWORK (Dynamic 10-Tier Unilevel Tree + Real-Time Calculation Column) */}
         {activeTab === 'network' && (() => {
-          // Compute real 6-level network hierarchy dynamically from active members in Neon DB
+          // Compute real 10-level network hierarchy dynamically from active members in Neon DB
           const activeMembers = (members || []).filter(m => m.seller_status === 'active');
           const rootId = currentMember?.member_id;
           const rootRefCode = currentMember?.referral_code;
@@ -869,14 +869,18 @@ export default function MemberDashboardView() {
             { level: 3, rate: 150, label: '3rd Generation' },
             { level: 4, rate: 50, label: '4th Generation' },
             { level: 5, rate: 25, label: '5th Generation' },
-            { level: 6, rate: 25, label: '6th Generation' }
+            { level: 6, rate: 25, label: '6th Generation' },
+            { level: 7, rate: 25, label: '7th Generation' },
+            { level: 8, rate: 10, label: '8th Generation' },
+            { level: 9, rate: 10, label: '9th Generation' },
+            { level: 10, rate: 5, label: '10th Generation' }
           ];
 
           const networkLevelData = [];
           let currentUplines = [currentMember];
           const visited = new Set([rootId, rootRefCode]);
 
-          for (let lvl = 1; lvl <= 6; lvl++) {
+          for (let lvl = 1; lvl <= 10; lvl++) {
             const uplineIds = new Set(currentUplines.map(u => u.member_id || u.id).filter(Boolean));
             const uplineCodes = new Set(currentUplines.map(u => u.referral_code).filter(Boolean));
 
@@ -932,7 +936,7 @@ export default function MemberDashboardView() {
                 <div>
                   <h3 className="section-title-large">My Network</h3>
                   <p className="section-subtitle">
-                    6-Level Unilevel tree with real-time retail sales calculation matrix ({totalNetworkMembers} active partners)
+                    10-Level Unilevel tree with real-time retail sales calculation matrix ({totalNetworkMembers} active partners)
                   </p>
                 </div>
                 <div className="network-head-badges">
@@ -1028,7 +1032,7 @@ export default function MemberDashboardView() {
 
                     <div className="tree-connector-line" />
 
-                    {/* Levels 2 to 6: Numbers Only (No Profile Icons) */}
+                    {/* Levels 2 to 10: Numbers Only (No Profile Icons) */}
                     <div className="numeric-tiers-column">
                       {networkLevelData.slice(1).map(tier => (
                         <React.Fragment key={tier.level}>
@@ -1039,7 +1043,7 @@ export default function MemberDashboardView() {
                               <span className="numeric-tier-lbl">Members</span>
                             </div>
                           </div>
-                          {tier.level < 6 && <div className="tree-connector-line mini-line" />}
+                          {tier.level < networkLevelData.length && <div className="tree-connector-line mini-line" />}
                         </React.Fragment>
                       ))}
                     </div>
@@ -1102,7 +1106,7 @@ export default function MemberDashboardView() {
                   <div className="calc-total-card">
                     <div className="total-meta-info">
                       <span className="total-label-main">Total Network Commission</span>
-                      <span className="total-sub-note">Cumulative retail earnings across all 6 levels</span>
+                      <span className="total-sub-note">Cumulative retail earnings across all 10 levels</span>
                     </div>
                     <div className="total-amount-display">
                       ₹{totalNetworkEarnings.toLocaleString('en-IN')}
@@ -1816,7 +1820,7 @@ export default function MemberDashboardView() {
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Tier Hierarchy:</span>
-                      <span className="spec-v">{isUserActive ? '6-Tier Matrix Operational' : 'Inactive'}</span>
+                      <span className="spec-v">{isUserActive ? '10-Tier Matrix Operational' : 'Inactive'}</span>
                     </div>
                   </div>
                 </div>

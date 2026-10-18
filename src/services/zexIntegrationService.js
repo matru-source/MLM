@@ -269,7 +269,11 @@ export async function processVerifiedWebhook(event) {
                 { level: 3, rate: 150, desc: 'ZEX Matrix Growth Bonus (Level 3) - 3rd Tier from ' },
                 { level: 4, rate: 50, desc: 'ZEX Leadership Override (Level 4) - 4th Tier from ' },
                 { level: 5, rate: 25, desc: 'ZEX Infinity Pool Bonus (Level 5) - 5th Tier from ' },
-                { level: 6, rate: 25, desc: 'ZEX Executive Commission (Level 6) - 6th Tier from ' }
+                { level: 6, rate: 25, desc: 'ZEX Executive Commission (Level 6) - 6th Tier from ' },
+                { level: 7, rate: 25, desc: 'ZEX Executive Commission (Level 7) - 7th Tier from ' },
+                { level: 8, rate: 10, desc: 'ZEX Network Expansion Bonus (Level 8) - 8th Tier from ' },
+                { level: 9, rate: 10, desc: 'ZEX Global Growth Pool (Level 9) - 9th Tier from ' },
+                { level: 10, rate: 5, desc: 'ZEX Crown Ambassador Bonus (Level 10) - 10th Tier from ' }
               ];
 
               let currentSponsorCode = buyer.sponsor_member_id || buyer.sponsor_code;

@@ -471,7 +471,7 @@ export default function AdminPortalView() {
                           </div>
                           <div className="spec-item-compact">
                             <span className="spec-k">Matrix Hierarchy:</span>
-                            <span className="spec-v">6-Tier Unilevel Matrix</span>
+                            <span className="spec-v">10-Tier Unilevel Matrix</span>
                           </div>
                         </div>
                       </div>
@@ -1288,7 +1288,7 @@ export default function AdminPortalView() {
                     </div>
                     <div className="flex-between text-2xs text-muted">
                       <span>Base ₹2,500 + 18% GST ₹450</span>
-                      <span className="text-success font-bold">6-Tier Commissions Verified</span>
+                      <span className="text-success font-bold">10-Tier Commissions Verified</span>
                     </div>
                   </div>
 

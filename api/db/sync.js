@@ -470,14 +470,14 @@ export default async function handler(req, res) {
           WHERE buyer_member_id = ${act.member_id} OR order_id = ${act.payment_ref};
         `;
 
-        // 4. Credit multi-tier upline partners across all 6 levels (₹1000, ₹300, ₹150, ₹50, ₹25, ₹25)
+        // 4. Credit multi-tier upline partners across all 10 levels (Total: ₹1,600 / 64% of ₹2,500)
         const allDbMembers = await sql`SELECT id, referral_code, cs_customer_id, sponsor_member_id, sponsor_code FROM members;`;
-        const rates = [1000, 300, 150, 50, 25, 25];
+        const rates = [1000, 300, 150, 50, 25, 25, 25, 10, 10, 5];
 
         let currentUplineId = act.member_id;
         const visited = new Set([act.member_id]);
 
-        for (let level = 1; level <= 6; level++) {
+        for (let level = 1; level <= 10; level++) {
           const currentMem = allDbMembers.find(m => m.id === currentUplineId);
           if (!currentMem && level > 1) break;
 

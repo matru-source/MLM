@@ -8,12 +8,16 @@ import {
 } from './corporateDocuments';
 
 export const initialCommissionRules = [
-  { level: 1, name: 'Direct referring partner', amount: 1000, percentage: 40 },
+  { level: 1, name: 'Direct referring seller', amount: 1000, percentage: 40 },
   { level: 2, name: 'Referrer’s sponsor', amount: 300, percentage: 12 },
   { level: 3, name: 'Third upline', amount: 150, percentage: 6 },
   { level: 4, name: 'Fourth upline', amount: 50, percentage: 2 },
   { level: 5, name: 'Fifth upline', amount: 25, percentage: 1 },
-  { level: 6, name: 'Sixth upline', amount: 25, percentage: 1 }
+  { level: 6, name: 'Sixth upline', amount: 25, percentage: 1 },
+  { level: 7, name: 'Seventh upline', amount: 25, percentage: 1 },
+  { level: 8, name: 'Eighth upline', amount: 10, percentage: 0.4 },
+  { level: 9, name: 'Ninth upline', amount: 10, percentage: 0.4 },
+  { level: 10, name: 'Tenth upline', amount: 5, percentage: 0.2 }
 ];
 
 export const initialMembers = [

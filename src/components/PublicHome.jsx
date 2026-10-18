@@ -43,7 +43,7 @@ export default function PublicHome() {
           </h1>
 
           <p className="hero-coach-subtitle">
-            Institutional AI Cyber Coach Software, Active Licenses and Direct Sales Income Opportunity through a transparent 6-level referral program.
+            Institutional AI Cyber Coach Software, Active Licenses and Direct Sales Income Opportunity through a transparent 10-level referral program.
           </p>
 
           {/* Feature Pills */}
@@ -231,7 +231,7 @@ export default function PublicHome() {
                   </li>
                   <li>
                     <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
-                    <span><strong>6-Level Network Commissions:</strong> ₹1,000 Direct (Level 1) + override bonuses</span>
+                    <span><strong>10-Level Network Commissions:</strong> ₹1,000 Direct (Level 1) + override bonuses</span>
                   </li>
                   <li>
                     <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
