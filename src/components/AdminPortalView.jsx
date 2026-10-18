@@ -63,8 +63,9 @@ export default function AdminPortalView() {
     const memId = member?.member_id || member?.id;
     const docStoreItem = getDocumentFile(memId, docKey);
 
+    // Only accept real uploaded file data (data:image/..., data:application/pdf..., or blob)
     let fileData = docs[`${docKey}File`] || 
-      (typeof docs[docKey] === 'string' && docs[docKey].startsWith('data:') ? docs[docKey] : null) || 
+      (typeof docs[docKey] === 'string' && (docs[docKey].startsWith('data:image/') || docs[docKey].startsWith('data:application/pdf') || docs[docKey].startsWith('blob:')) ? docs[docKey] : null) || 
       docStoreItem?.dataUrl || 
       null;
 
@@ -77,22 +78,15 @@ export default function AdminPortalView() {
       fileName = rawVal.replace('Uploaded (', '').replace(/\)$/, '');
     }
 
-    let isGeneratedFallback = false;
-    // If user uploaded a document or filename exists, but base64 was not in memory, generate authentic digital copy preview
-    if (!fileData && (fileName || (rawVal && rawVal !== 'Pending Upload' && rawVal !== 'Not Uploaded' && rawVal !== 'Pending'))) {
-      fileData = generateDocPlaceholder(docKey, member, fileName);
-      isGeneratedFallback = true;
-    }
-
-    const hasFile = Boolean(fileData || fileName || (rawVal && rawVal !== 'Pending Upload' && rawVal !== 'Not Uploaded' && rawVal !== 'Pending'));
+    const hasFile = Boolean(fileData);
 
     return {
       hasFile,
       fileData,
-      fileName: fileName || (hasFile ? `${docKey.toUpperCase()}_Document` : null),
+      fileName: fileName || (hasFile ? `${docKey}_file` : null),
       fileType: fileType || (fileName?.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? 'image/jpeg' : fileName?.match(/\.pdf$/i) ? 'application/pdf' : 'document'),
-      fileSize: fileSize || (isGeneratedFallback ? 'Verified Digital Copy' : null),
-      isGeneratedFallback
+      fileSize: fileSize || null,
+      isGeneratedFallback: false
     };
   };
 
@@ -113,7 +107,7 @@ export default function AdminPortalView() {
       docFile: fileInfo.fileData,
       docType: fileInfo.fileType,
       docSize: fileInfo.fileSize,
-      isGeneratedFallback: fileInfo.isGeneratedFallback,
+      hasFile: fileInfo.hasFile,
       status: member.kyc?.verification_status || 'under_review'
     });
   };
@@ -1660,7 +1654,7 @@ export default function AdminPortalView() {
                       }}>
                         <FileText size={14} />
                         <span style={{ fontWeight: 600 }}>
-                          {panDoc.hasFile ? (panDoc.fileName || 'PAN_Card.jpg') : 'No document attached'}
+                          {panDoc.hasFile ? panDoc.fileName : 'No file uploaded'}
                         </span>
                         {panDoc.fileSize && (
                           <span style={{ color: '#64748B', fontSize: '11px' }}>({panDoc.fileSize})</span>
@@ -1673,7 +1667,7 @@ export default function AdminPortalView() {
                         type="button"
                         onClick={() => openDocPreview(m, 'pan')}
                         style={{
-                          background: '#2563EB',
+                          background: panDoc.hasFile ? '#2563EB' : '#64748B',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
@@ -1684,12 +1678,12 @@ export default function AdminPortalView() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                          boxShadow: panDoc.hasFile ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
                         }}
-                        title="View PAN Card"
+                        title="View PAN Document"
                       >
                         <Eye size={13} />
-                        <span>View Uploaded File</span>
+                        <span>{panDoc.hasFile ? 'View Uploaded File' : 'Check Document'}</span>
                       </button>
                     </div>
                   </div>
@@ -1739,7 +1733,7 @@ export default function AdminPortalView() {
                       }}>
                         <FileText size={14} />
                         <span style={{ fontWeight: 600 }}>
-                          {bankDoc.hasFile ? (bankDoc.fileName || 'Bank_Proof.jpg') : 'No passbook attached'}
+                          {bankDoc.hasFile ? bankDoc.fileName : 'No file uploaded'}
                         </span>
                         {bankDoc.fileSize && (
                           <span style={{ color: '#64748B', fontSize: '11px' }}>({bankDoc.fileSize})</span>
@@ -1752,7 +1746,7 @@ export default function AdminPortalView() {
                         type="button"
                         onClick={() => openDocPreview(m, 'bankAccount')}
                         style={{
-                          background: '#2563EB',
+                          background: bankDoc.hasFile ? '#2563EB' : '#64748B',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
@@ -1763,12 +1757,12 @@ export default function AdminPortalView() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                          boxShadow: bankDoc.hasFile ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
                         }}
                         title="View Bank Settlement Document"
                       >
                         <Eye size={13} />
-                        <span>View Uploaded File</span>
+                        <span>{bankDoc.hasFile ? 'View Uploaded File' : 'Check Document'}</span>
                       </button>
                     </div>
                   </div>
@@ -1818,7 +1812,7 @@ export default function AdminPortalView() {
                       }}>
                         <FileText size={14} />
                         <span style={{ fontWeight: 600 }}>
-                          {aadhaarDoc.hasFile ? (aadhaarDoc.fileName || 'Aadhaar_Card.jpg') : 'No Aadhaar attached'}
+                          {aadhaarDoc.hasFile ? aadhaarDoc.fileName : 'No file uploaded'}
                         </span>
                         {aadhaarDoc.fileSize && (
                           <span style={{ color: '#64748B', fontSize: '11px' }}>({aadhaarDoc.fileSize})</span>
@@ -1831,7 +1825,7 @@ export default function AdminPortalView() {
                         type="button"
                         onClick={() => openDocPreview(m, 'aadhaar')}
                         style={{
-                          background: '#2563EB',
+                          background: aadhaarDoc.hasFile ? '#2563EB' : '#64748B',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
@@ -1842,12 +1836,12 @@ export default function AdminPortalView() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                          boxShadow: aadhaarDoc.hasFile ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
                         }}
                         title="View Aadhaar Card"
                       >
                         <Eye size={13} />
-                        <span>View Uploaded File</span>
+                        <span>{aadhaarDoc.hasFile ? 'View Uploaded File' : 'Check Document'}</span>
                       </button>
                     </div>
                   </div>
@@ -1897,7 +1891,7 @@ export default function AdminPortalView() {
                       }}>
                         <FileText size={14} />
                         <span style={{ fontWeight: 600 }}>
-                          {addressDoc.hasFile ? (addressDoc.fileName || 'Address_Proof.pdf') : 'No address proof attached'}
+                          {addressDoc.hasFile ? addressDoc.fileName : 'No file uploaded'}
                         </span>
                         {addressDoc.fileSize && (
                           <span style={{ color: '#64748B', fontSize: '11px' }}>({addressDoc.fileSize})</span>
@@ -1910,7 +1904,7 @@ export default function AdminPortalView() {
                         type="button"
                         onClick={() => openDocPreview(m, 'addressProof')}
                         style={{
-                          background: '#2563EB',
+                          background: addressDoc.hasFile ? '#2563EB' : '#64748B',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
@@ -1921,12 +1915,12 @@ export default function AdminPortalView() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                          boxShadow: addressDoc.hasFile ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
                         }}
                         title="View Address Proof Document"
                       >
                         <Eye size={13} />
-                        <span>View Uploaded File</span>
+                        <span>{addressDoc.hasFile ? 'View Uploaded File' : 'Check Document'}</span>
                       </button>
                     </div>
                   </div>
@@ -2074,8 +2068,8 @@ export default function AdminPortalView() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`badge ${previewingDoc.status === 'verified' ? 'badge-green' : 'badge-amber'}`}>
-                  {previewingDoc.status === 'verified' ? 'Verified ✓' : 'Under Review'}
+                <span className={`badge ${previewingDoc.docFile ? (previewingDoc.status === 'verified' ? 'badge-green' : 'badge-amber') : 'badge-neutral'}`}>
+                  {previewingDoc.docFile ? (previewingDoc.status === 'verified' ? 'Verified ✓' : 'Under Review') : 'No File Attached'}
                 </span>
                 <button 
                   type="button" 
@@ -2101,112 +2095,119 @@ export default function AdminPortalView() {
 
             {/* Modal Body: EXACT Uploaded File */}
             <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* File Metadata Bar */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '8px' }}>
-                <div className="flex items-center gap-2">
-                  <FileText size={18} className="text-primary-blue" />
-                  <div>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '13px', color: '#2563EB' }}>
-                      {previewingDoc.docName || `${previewingDoc.docKey}_file`}
-                    </span>
-                    {previewingDoc.docSize && (
-                      <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>({previewingDoc.docSize})</span>
-                    )}
+              {previewingDoc.docFile ? (
+                <>
+                  {/* File Metadata Bar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '8px' }}>
+                    <div className="flex items-center gap-2">
+                      <FileText size={18} className="text-primary-blue" />
+                      <div>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '13px', color: '#2563EB' }}>
+                          {previewingDoc.docName || `${previewingDoc.docKey}_file`}
+                        </span>
+                        {previewingDoc.docSize && (
+                          <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>({previewingDoc.docSize})</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={previewingDoc.docFile}
+                        download={previewingDoc.docName || `${previewingDoc.docKey}_file`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          background: '#EFF6FF',
+                          border: '1px solid #BFDBFE',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          color: '#2563EB',
+                          textDecoration: 'none'
+                        }}
+                        title="Download original document file"
+                      >
+                        <Download size={12} />
+                        <span>Download</span>
+                      </a>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  {previewingDoc.docFile && (
-                    <a
-                      href={previewingDoc.docFile}
-                      download={previewingDoc.docName || `${previewingDoc.docKey}_file`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        background: '#EFF6FF',
-                        border: '1px solid #BFDBFE',
-                        borderRadius: '6px',
-                        padding: '6px 12px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        color: '#2563EB',
-                        textDecoration: 'none'
-                      }}
-                      title="Download original document file"
-                    >
-                      <Download size={12} />
-                      <span>Download</span>
-                    </a>
+                  {/* Render exact uploaded image */}
+                  {(previewingDoc.docFile.startsWith('data:image/') || previewingDoc.docType.startsWith('image/')) ? (
+                    <div style={{ textAlign: 'center', background: '#0F172A', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '360px' }}>
+                      <img 
+                        src={previewingDoc.docFile} 
+                        alt={previewingDoc.title}
+                        style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain', borderRadius: '8px' }} 
+                      />
+                    </div>
+                  ) : (previewingDoc.docFile.startsWith('data:application/pdf') || previewingDoc.docType.includes('pdf')) ? (
+                    /* Render exact uploaded PDF */
+                    <div style={{ width: '100%', height: '500px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #CBD5E1' }}>
+                      <iframe 
+                        src={previewingDoc.docFile} 
+                        title={previewingDoc.title}
+                        style={{ width: '100%', height: '100%', border: 'none' }}
+                      />
+                    </div>
+                  ) : (
+                    /* Other exact file format */
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '36px', textAlign: 'center' }}>
+                      <FileText size={52} className="mx-auto text-primary-blue mb-2" />
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>{previewingDoc.docName || 'Uploaded File'}</h4>
+                      <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#64748B' }}>{previewingDoc.docSize || ''} • {previewingDoc.docType}</p>
+                      <a
+                        href={previewingDoc.docFile}
+                        download={previewingDoc.docName || `${previewingDoc.docKey}_file`}
+                        className="btn btn-primary btn-sm inline-flex items-center gap-1"
+                      >
+                        <Download size={14} />
+                        <span>Download & Open Document</span>
+                      </a>
+                    </div>
                   )}
-                </div>
-              </div>
-
-              {previewingDoc.isGeneratedFallback && (
-                <div style={{
-                  background: '#F0FDF4',
-                  border: '1px solid #BBF7D0',
-                  borderRadius: '8px',
-                  padding: '8px 14px',
-                  fontSize: '12px',
-                  color: '#166534',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <CheckCircle2 size={16} />
-                  <span>
-                    Official verified digital partner record for <strong>{previewingDoc.docName || previewingDoc.title}</strong>.
-                  </span>
-                </div>
-              )}
-
-              {/* Render exact uploaded image */}
-              {previewingDoc.docFile && (previewingDoc.docFile.startsWith('data:image/') || previewingDoc.docType.startsWith('image/') || previewingDoc.docFile.startsWith('data:image/svg+xml')) ? (
-                <div style={{ textAlign: 'center', background: '#0F172A', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '360px' }}>
-                  <img 
-                    src={previewingDoc.docFile} 
-                    alt={previewingDoc.title}
-                    style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain', borderRadius: '8px' }} 
-                  />
-                </div>
-              ) : previewingDoc.docFile && (previewingDoc.docFile.startsWith('data:application/pdf') || previewingDoc.docType.includes('pdf')) ? (
-                /* Render exact uploaded PDF */
-                <div style={{ width: '100%', height: '500px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #CBD5E1' }}>
-                  <iframe 
-                    src={previewingDoc.docFile} 
-                    title={previewingDoc.title}
-                    style={{ width: '100%', height: '100%', border: 'none' }}
-                  />
-                </div>
-              ) : previewingDoc.docFile ? (
-                /* Other exact file format */
-                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '36px', textAlign: 'center' }}>
-                  <FileText size={52} className="mx-auto text-primary-blue mb-2" />
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>{previewingDoc.docName || 'Uploaded File'}</h4>
-                  <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#64748B' }}>{previewingDoc.docSize || ''} • {previewingDoc.docType}</p>
-                  <a
-                    href={previewingDoc.docFile}
-                    download={previewingDoc.docName || `${previewingDoc.docKey}_file`}
-                    className="btn btn-primary btn-sm inline-flex items-center gap-1"
-                  >
-                    <Download size={14} />
-                    <span>Download & Open Document</span>
-                  </a>
-                </div>
+                </>
               ) : (
-                /* No file uploaded yet */
-                <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '36px 24px', textAlign: 'center' }}>
-                  <AlertCircle size={44} className="mx-auto text-amber-500 mb-2" />
-                  <h4 style={{ margin: '0 0 6px 0', fontWeight: 800, fontSize: '16px', color: '#1E293B' }}>No Document File Attached</h4>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
-                    {previewingDoc.status === 'verified'
-                      ? `This document was verified by the administrator, but no digital file was attached by ${previewingDoc.member.name}.`
-                      : `The partner has not uploaded an image or PDF file for ${previewingDoc.title} yet.`}
-                  </p>
+                /* No file uploaded yet: Clean, clear notice */
+                <div style={{ 
+                  background: '#F8FAFC', 
+                  border: '1.5px dashed #CBD5E1', 
+                  borderRadius: '16px', 
+                  padding: '52px 24px', 
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{ 
+                    width: '56px', 
+                    height: '56px', 
+                    borderRadius: '50%', 
+                    background: '#F1F5F9', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    color: '#94A3B8'
+                  }}>
+                    <FileText size={28} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontWeight: 800, fontSize: '16px', color: '#1E293B' }}>
+                      No document file uploaded by this partner yet.
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#64748B', maxWidth: '440px', lineHeight: 1.5 }}>
+                      The partner has not attached an image (JPG/PNG) or PDF document for {previewingDoc.title}.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
