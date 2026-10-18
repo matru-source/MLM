@@ -1544,9 +1544,16 @@ export default function MemberDashboardView() {
 
                     {/* Available Balance Callout & Quick Chips */}
                     <div className="withdraw-balance-row">
-                      <span className="text-sm text-muted">
-                        Available to Withdraw: <strong className="text-primary font-bold">₹{availableBalance.toLocaleString('en-IN')}</strong>
-                      </span>
+                      <div>
+                        <span className="text-sm text-muted">
+                          Available to Withdraw: <strong className="text-primary font-bold">₹{availableBalance.toLocaleString('en-IN')}</strong>
+                        </span>
+                        {coolingOffTotal > 0 && (
+                          <div className="text-2xs text-amber font-semibold mt-0.5">
+                            (₹{coolingOffTotal.toLocaleString('en-IN')} in 30-day statutory cooling-off hold)
+                          </div>
+                        )}
+                      </div>
                       <div className="quick-amount-chips">
                         {Array.from(new Set([500, 1000, 2000, availableBalance])).filter(amt => amt <= availableBalance && amt >= 500).map(amt => (
                           <button

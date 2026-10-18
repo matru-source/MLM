@@ -277,24 +277,29 @@ export function MlmProvider({ children }) {
   // Auto-settle cooling-off transactions whose 30-day waiting period has elapsed
   useEffect(() => {
     const now = Date.now();
-    let hasMatured = false;
-    const maturedCreditsByMember = {};
+    const maturedList = (transactions || []).filter(
+      t => t.status === 'Pending' && t.type === 'credit' && t.available_at && new Date(t.available_at).getTime() <= now
+    );
 
-    setTransactions(prev => {
-      const updated = prev.map(t => {
+    if (maturedList.length === 0) return;
+
+    const maturedCreditsByMember = {};
+    for (const t of maturedList) {
+      const memId = t.member_id;
+      maturedCreditsByMember[memId] = (maturedCreditsByMember[memId] || 0) + Number(t.amount || 0);
+    }
+
+    setTransactions(prev =>
+      prev.map(t => {
         if (t.status === 'Pending' && t.type === 'credit' && t.available_at && new Date(t.available_at).getTime() <= now) {
-          hasMatured = true;
-          const memId = t.member_id;
-          maturedCreditsByMember[memId] = (maturedCreditsByMember[memId] || 0) + Number(t.amount || 0);
           return { ...t, status: 'Available', settled_at: new Date().toISOString() };
         }
         return t;
-      });
-      return hasMatured ? updated : prev;
-    });
+      })
+    );
 
-    if (hasMatured) {
-      setMembers(prev => prev.map(m => {
+    setMembers(prev =>
+      prev.map(m => {
         const id = m.member_id || m.id;
         const maturedAmt = maturedCreditsByMember[id];
         if (maturedAmt) {
@@ -304,17 +309,17 @@ export function MlmProvider({ children }) {
           };
         }
         return m;
-      }));
+      })
+    );
 
-      if (currentMember) {
-        const myId = currentMember.member_id || currentMember.id;
-        const myMatured = maturedCreditsByMember[myId];
-        if (myMatured) {
-          setAvailableBalance(prev => prev + myMatured);
-        }
+    if (currentMember) {
+      const myId = currentMember.member_id || currentMember.id;
+      const myMatured = maturedCreditsByMember[myId];
+      if (myMatured) {
+        setAvailableBalance(prev => prev + myMatured);
       }
     }
-  }, [transactions.length]);
+  }, [transactions]);
 
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
