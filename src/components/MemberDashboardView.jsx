@@ -36,7 +36,9 @@ import {
   RefreshCw,
   Upload,
   Building,
-  Lock
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
 import { getDocumentFile } from '../utils/documentStorage';
@@ -243,6 +245,25 @@ export default function MemberDashboardView() {
       if (currentMember.kyc.pan) setQuickPan(currentMember.kyc.pan);
     }
   }, [currentMember?.kyc]);
+
+  // Masking state for Bank Account in Tax Details Tab
+  const [showTaxBankAcc, setShowTaxBankAcc] = useState(false);
+  const [taxBankAccValue, setTaxBankAccValue] = useState(currentMember?.kyc?.bank_account_number || '');
+
+  useEffect(() => {
+    if (currentMember?.kyc?.bank_account_number) {
+      setTaxBankAccValue(currentMember.kyc.bank_account_number);
+    }
+  }, [currentMember?.kyc?.bank_account_number]);
+
+  const maskBankAccountNumber = (acc) => {
+    if (!acc) return '';
+    const clean = String(acc).trim();
+    if (clean.length <= 4) return clean;
+    const last4 = clean.slice(-4);
+    const maskLength = Math.max(clean.length - 4, 8);
+    return '•'.repeat(maskLength) + last4;
+  };
 
   useEffect(() => {
     if (currentPage === 'profile' || currentPage === 'kyc') {
@@ -2314,7 +2335,7 @@ export default function MemberDashboardView() {
                         const formData = new FormData(e.target);
                         const panVal = (formData.get('pan') || '').toUpperCase().trim();
                         const bankNameVal = (formData.get('bank_name') || '').trim();
-                        const accountVal = (formData.get('bank_account_number') || '').trim();
+                        const accountVal = (taxBankAccValue || formData.get('bank_account_number') || '').trim();
                         const ifscVal = (formData.get('bank_ifsc') || '').toUpperCase().trim();
                         const legalNameVal = (formData.get('legal_name') || '').trim();
 
@@ -2373,14 +2394,64 @@ export default function MemberDashboardView() {
                       </div>
 
                       <div className="form-group-clean">
-                        <label className="form-label-clean">Bank Account Number</label>
-                        <input 
-                          type="text" 
-                          name="bank_account_number"
-                          defaultValue={currentMember?.kyc?.bank_account_number || ''} 
-                          placeholder="Enter bank account number"
-                          className="form-input-clean code-font" 
-                        />
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="form-label-clean mb-0">Bank Account Number</label>
+                          {taxBankAccValue && (
+                            <button
+                              type="button"
+                              onClick={() => setShowTaxBankAcc(!showTaxBankAcc)}
+                              className="text-primary-blue text-xs font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                              title={showTaxBankAcc ? "Mask Account Number" : "Reveal Full Account Number"}
+                            >
+                              {showTaxBankAcc ? <EyeOff size={13} /> : <Eye size={13} />}
+                              <span>{showTaxBankAcc ? 'Mask' : 'Reveal'}</span>
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <input 
+                            type="text" 
+                            name="bank_account_number_display"
+                            value={showTaxBankAcc ? taxBankAccValue : maskBankAccountNumber(taxBankAccValue)}
+                            onChange={(e) => {
+                              const digitsOnly = e.target.value.replace(/[^0-9]/g, '');
+                              setTaxBankAccValue(digitsOnly);
+                            }}
+                            onFocus={() => setShowTaxBankAcc(true)}
+                            placeholder="Enter 9-18 digit account number"
+                            className="form-input-clean code-font" 
+                            style={{ paddingRight: '40px' }}
+                            autoComplete="off"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowTaxBankAcc(!showTaxBankAcc)}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              background: 'none',
+                              border: 'none',
+                              color: '#64748B',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '6px'
+                            }}
+                            title={showTaxBankAcc ? "Mask Account Number" : "Reveal Account Number"}
+                          >
+                            {showTaxBankAcc ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                          <input 
+                            type="hidden" 
+                            name="bank_account_number" 
+                            value={taxBankAccValue} 
+                          />
+                        </div>
+                        <div className="text-2xs text-muted mt-1 flex items-center gap-1">
+                          <ShieldCheck size={12} className="text-success" />
+                          <span>Confidential bank data masked per statutory norms. Click toggle to view.</span>
+                        </div>
                       </div>
 
                       <div className="form-group-clean">

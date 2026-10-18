@@ -58,6 +58,7 @@ export default function AdminPortalView() {
   const [selectedPayoutToView, setSelectedPayoutToView] = useState(null);
   const [selectedKycMember, setSelectedKycMember] = useState(null);
   const [previewingDoc, setPreviewingDoc] = useState(null);
+  const [revealedBankMembers, setRevealedBankMembers] = useState({});
 
   const getDocFileInfo = (member, docKey) => {
     const docs = member?.kyc?.documents || {};
@@ -743,17 +744,23 @@ export default function AdminPortalView() {
                             <div>
                               <span className="font-semibold">{m.kyc.pan}</span>
                               <div className="mt-1 flex items-center gap-1.5">
-                                <span className="text-xs text-muted truncate max-w-[130px]">{panDoc.hasFile ? panDoc.fileName : 'No File'}</span>
-                                {panDoc.hasFile && (
-                                  <button
-                                    type="button"
-                                    onClick={() => openDocPreview(m, 'pan')}
-                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
-                                    title="View PAN Card document"
-                                  >
-                                    <Eye size={11} />
-                                    <span>View</span>
-                                  </button>
+                                {panDoc.hasFile ? (
+                                  <>
+                                    <span className="text-xs text-muted truncate max-w-[120px]">{panDoc.fileName}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => openDocPreview(m, 'pan')}
+                                      className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                      title="View PAN Card document"
+                                    >
+                                      <Eye size={11} />
+                                      <span>View</span>
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="badge badge-neutral text-2xs" style={{ fontSize: '10px', padding: '1px 6px', color: '#94A3B8' }}>
+                                    Awaiting Upload
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -773,26 +780,11 @@ export default function AdminPortalView() {
                                 </button>
                               </div>
                             </div>
-                          ) : isVerified ? (
-                            <div>
-                              <span className="badge badge-green text-xs">Verified ✓</span>
-                              {panDoc.hasFile && (
-                                <div className="mt-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => openDocPreview(m, 'pan')}
-                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
-                                    title="View PAN document status"
-                                  >
-                                    <Eye size={11} />
-                                    <span>View</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
                           ) : (
                             <div>
-                              <span className="text-muted italic text-xs">Not Submitted</span>
+                              <span className="badge badge-neutral text-2xs" style={{ fontSize: '10px', padding: '1px 6px', color: '#94A3B8' }}>
+                                Awaiting Upload
+                              </span>
                             </div>
                           )}
                         </td>
@@ -802,17 +794,23 @@ export default function AdminPortalView() {
                               <span className="font-semibold">{m.kyc.bank_name} (••••{m.kyc.bank_account_number.slice(-4)})</span>
                               {m.kyc.bank_ifsc && <div className="text-xs text-muted">IFSC: {m.kyc.bank_ifsc}</div>}
                               <div className="mt-1 flex items-center gap-1.5">
-                                <span className="text-xs text-muted truncate max-w-[130px]">{bankDoc.hasFile ? bankDoc.fileName : 'No File'}</span>
-                                {bankDoc.hasFile && (
-                                  <button
-                                    type="button"
-                                    onClick={() => openDocPreview(m, 'bankAccount')}
-                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
-                                    title="View Bank Passbook document"
-                                  >
-                                    <Eye size={11} />
-                                    <span>View</span>
-                                  </button>
+                                {bankDoc.hasFile ? (
+                                  <>
+                                    <span className="text-xs text-muted truncate max-w-[120px]">{bankDoc.fileName}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => openDocPreview(m, 'bankAccount')}
+                                      className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                      title="View Bank Passbook document"
+                                    >
+                                      <Eye size={11} />
+                                      <span>View</span>
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="badge badge-neutral text-2xs" style={{ fontSize: '10px', padding: '1px 6px', color: '#94A3B8' }}>
+                                    Awaiting Upload
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -832,26 +830,11 @@ export default function AdminPortalView() {
                                 </button>
                               </div>
                             </div>
-                          ) : isVerified ? (
-                            <div>
-                              <span className="badge badge-green text-xs">Verified ✓</span>
-                              {bankDoc.hasFile && (
-                                <div className="mt-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => openDocPreview(m, 'bankAccount')}
-                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
-                                    title="View bank passbook status"
-                                  >
-                                    <Eye size={11} />
-                                    <span>View</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
                           ) : (
                             <div>
-                              <span className="text-muted italic text-xs">Pending Bank Setup</span>
+                              <span className="badge badge-neutral text-2xs" style={{ fontSize: '10px', padding: '1px 6px', color: '#94A3B8' }}>
+                                Awaiting Upload
+                              </span>
                             </div>
                           )}
                         </td>
@@ -863,7 +846,7 @@ export default function AdminPortalView() {
                                 {aadhaarDoc.hasFile ? (aadhaarDoc.fileName || 'Uploaded') : isVerified ? 'Verified ✓' : 'Not Uploaded'}
                               </span>
                             </div>
-                            {aadhaarDoc.hasFile && (
+                            {aadhaarDoc.hasFile ? (
                               <button
                                 type="button"
                                 onClick={() => openDocPreview(m, 'aadhaar')}
@@ -873,6 +856,10 @@ export default function AdminPortalView() {
                                 <Eye size={10} />
                                 <span>View</span>
                               </button>
+                            ) : (
+                              <span className="badge badge-neutral font-2xs" style={{ fontSize: '10px', padding: '1px 6px', color: '#94A3B8' }}>
+                                Awaiting Upload
+                              </span>
                             )}
                           </div>
                           <div className="text-xs flex items-center justify-between gap-1 mt-1.5">
@@ -882,7 +869,7 @@ export default function AdminPortalView() {
                                 {addressDoc.hasFile ? (addressDoc.fileName || 'Uploaded') : isVerified ? 'Verified ✓' : 'Not Uploaded'}
                               </span>
                             </div>
-                            {addressDoc.hasFile && (
+                            {addressDoc.hasFile ? (
                               <button
                                 type="button"
                                 onClick={() => openDocPreview(m, 'addressProof')}
@@ -892,6 +879,10 @@ export default function AdminPortalView() {
                                 <Eye size={10} />
                                 <span>View</span>
                               </button>
+                            ) : (
+                              <span className="badge badge-neutral font-2xs" style={{ fontSize: '10px', padding: '1px 6px', color: '#94A3B8' }}>
+                                Awaiting Upload
+                              </span>
                             )}
                           </div>
                         </td>
@@ -1797,8 +1788,31 @@ export default function AdminPortalView() {
                         <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>
                           {m.kyc?.bank_name || 'Bank Setup Pending'}
                         </div>
-                        <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#334155' }}>
-                          A/C: <span style={{ fontWeight: 700 }}>{m.kyc?.bank_account_number || 'Pending'}</span> • IFSC: <span style={{ fontWeight: 700 }}>{m.kyc?.bank_ifsc || 'Pending'}</span>
+                        <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
+                          <div>
+                            A/C: <span style={{ fontWeight: 700 }}>
+                              {m.kyc?.bank_account_number ? (
+                                revealedBankMembers[m.member_id || m.id] ? (
+                                  m.kyc.bank_account_number
+                                ) : (
+                                  `•••••••••${m.kyc.bank_account_number.slice(-4)}`
+                                )
+                              ) : (
+                                'Pending'
+                              )}
+                            </span> • IFSC: <span style={{ fontWeight: 700 }}>{m.kyc?.bank_ifsc || 'Pending'}</span>
+                          </div>
+                          {m.kyc?.bank_account_number && (
+                            <button
+                              type="button"
+                              onClick={() => setRevealedBankMembers(prev => ({ ...prev, [m.member_id || m.id]: !prev[m.member_id || m.id] }))}
+                              className="btn btn-secondary btn-xs py-0.5 px-1.5 flex items-center gap-1 text-primary-blue"
+                              title={revealedBankMembers[m.member_id || m.id] ? "Mask account number" : "Reveal full account number"}
+                            >
+                              {revealedBankMembers[m.member_id || m.id] ? <EyeOff size={11} /> : <Eye size={11} />}
+                              <span style={{ fontSize: '10px' }}>{revealedBankMembers[m.member_id || m.id] ? 'Mask' : 'Reveal'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
