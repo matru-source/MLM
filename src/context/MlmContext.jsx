@@ -28,10 +28,13 @@ import {
   dbFetchTransactions,
   dbUpdateKyc,
   dbUpdateProfile,
-  dbFetchZexLinkStatus
+  dbFetchZexLinkStatus,
+  dbUploadKycDocument,
+  dbFetchKycDocuments,
+  dbApproveKyc
 } from '../services/neonDbService';
 import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
-import { saveDocumentFile, getDocumentFile } from '../utils/documentStorage';
+import { saveDocumentFile, getDocumentFile, syncKycDocsFromServer } from '../utils/documentStorage';
 
 const MlmContext = createContext(null);
 
@@ -278,7 +281,12 @@ export function MlmProvider({ children }) {
         const res = await dbFetchAllSync();
         if (!active || !res || !res.ok || !res.data) return;
 
-        const { members: liveMembers, activations: liveActivations, payouts: livePayouts, orders: liveOrders, transactions: liveTxs } = res.data;
+        const { members: liveMembers, activations: liveActivations, payouts: livePayouts, orders: liveOrders, transactions: liveTxs, kyc_documents: liveKycDocs } = res.data;
+
+        // Warm local document store with documents fetched from cloud Neon PostgreSQL
+        if (Array.isArray(liveKycDocs) && liveKycDocs.length > 0) {
+          syncKycDocsFromServer(liveKycDocs);
+        }
 
         if (Array.isArray(liveMembers) && liveMembers.length > 0) {
           const normalizedMembers = liveMembers.map(m => ({
@@ -297,17 +305,21 @@ export function MlmProvider({ children }) {
               const docKeys = ['pan', 'aadhaar', 'bankAccount', 'addressProof'];
               docKeys.forEach(k => {
                 const memDoc = getDocumentFile(m.member_id || m.id, k);
+                const serverDoc = Array.isArray(liveKycDocs) 
+                  ? liveKycDocs.find(d => (String(d.member_id).toLowerCase() === String(m.member_id || m.id).toLowerCase()) && d.doc_key === k)
+                  : null;
+
                 if (!mergedDocs[`${k}File`]) {
-                  mergedDocs[`${k}File`] = prevDocs[`${k}File`] || memDoc?.dataUrl || null;
+                  mergedDocs[`${k}File`] = serverDoc?.data_url || prevDocs[`${k}File`] || memDoc?.dataUrl || null;
                 }
                 if (!mergedDocs[`${k}Name`]) {
-                  mergedDocs[`${k}Name`] = prevDocs[`${k}Name`] || memDoc?.name || null;
+                  mergedDocs[`${k}Name`] = serverDoc?.file_name || prevDocs[`${k}Name`] || memDoc?.name || null;
                 }
                 if (!mergedDocs[`${k}Type`]) {
-                  mergedDocs[`${k}Type`] = prevDocs[`${k}Type`] || memDoc?.type || null;
+                  mergedDocs[`${k}Type`] = serverDoc?.file_type || prevDocs[`${k}Type`] || memDoc?.type || null;
                 }
                 if (!mergedDocs[`${k}Size`]) {
-                  mergedDocs[`${k}Size`] = prevDocs[`${k}Size`] || memDoc?.size || null;
+                  mergedDocs[`${k}Size`] = serverDoc?.file_size || prevDocs[`${k}Size`] || memDoc?.size || null;
                 }
               });
 
@@ -1245,6 +1257,15 @@ export function MlmProvider({ children }) {
       console.warn('[KYC Cache] saveDocumentFile warning:', e);
     }
 
+    // Live Stream directly to Neon PostgreSQL via /api/kyc/upload
+    dbUploadKycDocument(memberId, docType, fileInfo)
+      .then(res => {
+        if (res && res.ok) {
+          console.log(`[Neon DB Bridge] Document ${docType} synced to PostgreSQL cloud successfully.`);
+        }
+      })
+      .catch(err => console.warn('[Neon DB Bridge] dbUploadKycDocument error:', err));
+
     // When ANY document is uploaded or re-uploaded, status MUST be under_review (requires admin re-approval)
     const updatedKyc = {
       ...existingKyc,
@@ -1287,6 +1308,7 @@ export function MlmProvider({ children }) {
           verified_at: new Date().toISOString()
         };
         dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
+        dbApproveKyc(memberId).catch(err => console.warn('[Neon DB] dbApproveKyc error:', err));
         return { ...m, kyc: updatedKyc };
       }
       return m;

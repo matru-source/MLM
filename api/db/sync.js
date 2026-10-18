@@ -162,7 +162,12 @@ export default async function handler(req, res) {
             id, member_id, description, amount::numeric, type, status,
             payout_id, utr_number, receipt_url, created_at
           FROM transactions ORDER BY created_at DESC;
-        `
+        `,
+        sql`
+          SELECT 
+            id, member_id, doc_key, file_name, file_type, file_size, data_url, status, updated_at
+          FROM kyc_documents ORDER BY updated_at DESC;
+        `.catch(() => [])
       ]);
 
       const formattedMembers = members.map(r => ({
@@ -182,6 +187,7 @@ export default async function handler(req, res) {
         ok: true,
         data: {
           members: formattedMembers,
+          kyc_documents: Array.isArray(kycDocs) ? kycDocs : [],
           activations: activations.map(a => ({
             ...a,
             amount_paid: Number(a.amount_paid || 0),
@@ -640,6 +646,47 @@ export default async function handler(req, res) {
              OR id = LOWER(${memberId}) 
              OR referral_code = ${memberId}
              OR cs_customer_id = ${memberId};
+        `;
+        return res.status(200).json({ ok: true });
+      }
+
+      // 2i-2. Upload Live KYC Document (Streamed directly to Neon PostgreSQL)
+      if (action === 'upload_kyc_doc') {
+        const { memberId, docKey, fileInfo } = body;
+        if (!memberId || !docKey || !fileInfo || !fileInfo.dataUrl) {
+          return res.status(400).json({ ok: false, error: 'Missing parameters' });
+        }
+        const cleanMemId = String(memberId).trim().toLowerCase();
+        const cleanDocKey = String(docKey).trim();
+        const docId = `kyc_${cleanMemId}_${cleanDocKey}`;
+
+        const inserted = await sql`
+          INSERT INTO kyc_documents (
+            id, member_id, doc_key, file_name, file_type, file_size, data_url, status, updated_at
+          ) VALUES (
+            ${docId}, ${cleanMemId}, ${cleanDocKey}, ${fileInfo.name || `${cleanDocKey}_document`},
+            ${fileInfo.type || 'image/jpeg'}, ${fileInfo.size || '150 KB'}, ${fileInfo.dataUrl}, 'under_review', NOW()
+          )
+          ON CONFLICT (member_id, doc_key) DO UPDATE SET
+            file_name = EXCLUDED.file_name,
+            file_type = EXCLUDED.file_type,
+            file_size = EXCLUDED.file_size,
+            data_url = EXCLUDED.data_url,
+            status = 'under_review',
+            updated_at = NOW()
+          RETURNING id, member_id, doc_key, file_name, file_type, file_size, status, updated_at;
+        `;
+        return res.status(200).json({ ok: true, document: inserted[0] });
+      }
+
+      // 2i-3. Approve Partner KYC in Neon Database
+      if (action === 'approve_kyc') {
+        const { memberId } = body;
+        const cleanMemId = String(memberId).trim().toLowerCase();
+        await sql`
+          UPDATE kyc_documents
+          SET status = 'verified', updated_at = NOW()
+          WHERE LOWER(member_id) = ${cleanMemId};
         `;
         return res.status(200).json({ ok: true });
       }

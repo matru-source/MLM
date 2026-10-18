@@ -333,3 +333,60 @@ export async function dbUpdateProfile(memberId, profile) {
   }
 }
 
+/**
+ * 17. Upload Live KYC Document (Streamed directly to Neon PostgreSQL)
+ */
+export async function dbUploadKycDocument(memberId, docKey, fileInfo) {
+  try {
+    const res = await fetch('/api/kyc/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId, docKey, fileInfo })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP error ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    console.error('[Neon DB Bridge] dbUploadKycDocument error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * 18. Fetch Live KYC Documents from Neon PostgreSQL
+ */
+export async function dbFetchKycDocuments(memberId = null) {
+  try {
+    const url = memberId 
+      ? `/api/kyc/upload?memberId=${encodeURIComponent(memberId)}` 
+      : '/api/kyc/upload?all=true';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[Neon DB Bridge] dbFetchKycDocuments error:', err.message);
+    return { ok: false, error: err.message, documents: [] };
+  }
+}
+
+/**
+ * 19. Admin Approves Partner KYC in Neon Database
+ */
+export async function dbApproveKyc(memberId) {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve_kyc', memberId })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[Neon DB Bridge] dbApproveKyc error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+

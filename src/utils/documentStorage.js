@@ -123,7 +123,39 @@ export function getDocumentFile(memberId, docKey) {
   return null;
 }
 
+// Hydrate/warm the local cache with real KYC documents from Neon PostgreSQL
+export function syncKycDocsFromServer(serverDocs = []) {
+  if (!Array.isArray(serverDocs)) return;
+  serverDocs.forEach(doc => {
+    if (!doc || !doc.member_id || !doc.doc_key) return;
+    const key = getStorageKey(doc.member_id, doc.doc_key);
+    const payload = {
+      id: doc.id || key,
+      memberId: doc.member_id,
+      docKey: doc.doc_key,
+      name: doc.file_name || `${doc.doc_key}_document`,
+      size: doc.file_size || '150 KB',
+      type: doc.file_type || (doc.file_name?.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      dataUrl: doc.data_url || null,
+      status: doc.status || 'under_review',
+      updatedAt: doc.updated_at ? new Date(doc.updated_at).getTime() : Date.now()
+    };
+    memoryCache.set(key, payload);
+
+    // Also persist in IndexedDB for offline resilience
+    getDb().then(db => {
+      if (!db) return;
+      try {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put(payload);
+      } catch (err) {}
+    });
+  });
+}
+
 // Document placeholder generator: Disabled per user requirement (display only real uploaded files)
 export function generateDocPlaceholder() {
   return null;
 }
+

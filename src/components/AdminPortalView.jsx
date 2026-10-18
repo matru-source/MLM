@@ -90,14 +90,36 @@ export default function AdminPortalView() {
     };
   };
 
-  const openDocPreview = (member, docKey) => {
+  const openDocPreview = async (member, docKey) => {
     const titles = {
       pan: 'PAN Card',
       bankAccount: 'Bank Passbook / Cheque',
       aadhaar: 'Aadhaar Card',
       addressProof: 'Address Proof'
     };
-    const fileInfo = getDocFileInfo(member, docKey);
+    let fileInfo = getDocFileInfo(member, docKey);
+
+    // If file not in local memory, query the persistent Neon PostgreSQL cloud endpoint
+    if (!fileInfo.hasFile) {
+      try {
+        const memId = member?.member_id || member?.id;
+        const res = await fetch(`/api/kyc/upload?memberId=${encodeURIComponent(memId)}&docKey=${encodeURIComponent(docKey)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.document?.data_url) {
+            saveDocumentFile(memId, docKey, {
+              name: json.document.file_name,
+              type: json.document.file_type,
+              size: json.document.file_size,
+              dataUrl: json.document.data_url
+            });
+            fileInfo = getDocFileInfo(member, docKey);
+          }
+        }
+      } catch (err) {
+        console.warn('[Doc Preview] Live Neon DB fetch error:', err);
+      }
+    }
 
     setPreviewingDoc({
       member,
