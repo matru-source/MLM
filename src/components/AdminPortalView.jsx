@@ -337,11 +337,11 @@ export default function AdminPortalView() {
 
         {/* TAB 0: NEW PARTNER ACTIVATIONS & DUAL ACCOUNTS PROVISIONING */}
         {adminTab === 'activations' && (
-          <div className="admin-panel-card card-white p-6">
-            <div className="card-head-between mb-4">
+          <div className="admin-panel-card card-white">
+            <div className="admin-panel-header">
               <div>
-                <h3 className="section-title-large mb-1">New Partner Activations & Dual Accounts Provisioning</h3>
-                <p className="text-muted text-sm">
+                <h3 className="admin-panel-title">New Partner Activations & Dual Accounts Provisioning</h3>
+                <p className="admin-panel-subtitle">
                   Review new ₹2,500 joining payments. Each registration provisions 2 accounts via API: Account 1 (MLM Direct Selling Partner) and Account 2 (Enterprise Software License Key). Verify and click Approve to unlock partner portal access.
                 </p>
               </div>
@@ -500,11 +500,11 @@ export default function AdminPortalView() {
 
         {/* TAB 1: BANK PAYOUT DISBURSEMENTS */}
         {adminTab === 'payouts' && (
-          <div className="admin-panel-card card-white p-6">
-            <div className="card-head-between mb-4">
+          <div className="admin-panel-card card-white">
+            <div className="admin-panel-header">
               <div>
-                <h3 className="section-title-large mb-1">Bank Payout Disbursements</h3>
-                <p className="text-muted text-sm">
+                <h3 className="admin-panel-title">Bank Payout Disbursements</h3>
+                <p className="admin-panel-subtitle">
                   Review withdrawal requests from partners. Transfer funds manually via NetBanking / UPI, attach the transaction screenshot, and confirm payout.
                 </p>
               </div>
@@ -592,8 +592,15 @@ export default function AdminPortalView() {
 
         {/* TAB 2: ORDERS */}
         {adminTab === 'orders' && (
-          <div className="admin-panel-card card-white p-6">
-            <h3 className="section-title-large mb-4">Retail Orders & CyberShield Billing</h3>
+          <div className="admin-panel-card card-white">
+            <div className="admin-panel-header">
+              <div>
+                <h3 className="admin-panel-title">Retail Orders & CyberShield Billing</h3>
+                <p className="admin-panel-subtitle">
+                  Real-time direct sales transactions, enterprise licenses, and recurring customer orders across all active partners.
+                </p>
+              </div>
+            </div>
             <div className="table-responsive">
               <table className="coach-table">
                 <thead>
@@ -642,9 +649,15 @@ export default function AdminPortalView() {
 
         {/* TAB 3: KYC REVIEW */}
         {adminTab === 'kyc' && (
-          <div className="admin-panel-card card-white p-6">
-            <h3 className="section-title-large mb-2">Partner KYC Approvals</h3>
-            <p className="text-muted text-sm mb-4">Review submitted identity documents and bank passbooks before authorizing withdrawals.</p>
+          <div className="admin-panel-card card-white">
+            <div className="admin-panel-header">
+              <div>
+                <h3 className="admin-panel-title">Partner KYC Approvals</h3>
+                <p className="admin-panel-subtitle">
+                  Review submitted identity documents, PAN cards, and bank settlement details before authorizing partner commission withdrawals.
+                </p>
+              </div>
+            </div>
             
             <div className="table-responsive">
               <table className="coach-table">
@@ -916,11 +929,11 @@ export default function AdminPortalView() {
 
         {/* TAB 4: WEBHOOKS & GATEWAY INTEGRATION CONSOLE */}
         {adminTab === 'webhooks' && (
-          <div className="admin-panel-card card-white p-6">
-            <div className="webhook-console-header flex-between items-center mb-6 flex-wrap gap-3">
+          <div className="admin-panel-card card-white">
+            <div className="admin-panel-header">
               <div>
-                <h3 className="section-title-large mb-1">CyberShield Gateway & Webhook Hub</h3>
-                <p className="text-muted text-sm">Cryptographic server-to-server HMAC-SHA256 webhooks, API endpoints & event dispatcher.</p>
+                <h3 className="admin-panel-title">CyberShield Gateway & Webhook Hub</h3>
+                <p className="admin-panel-subtitle">Cryptographic server-to-server HMAC-SHA256 webhooks, API endpoints & event dispatcher.</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="badge badge-green flex items-center gap-1 font-xs font-bold">
