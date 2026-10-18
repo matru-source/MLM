@@ -171,7 +171,7 @@ export async function sendEmailOtp({ email, fullName }) {
         success: true,
         mode: 'live_brevo',
         messageId: responseData.messageId,
-        message: `Verification code sent to ${email} via Brevo!`
+        message: `Verification code sent to ${email} successfully!`
       };
     } catch (err) {
       console.error('Error connecting to Brevo API:', err);

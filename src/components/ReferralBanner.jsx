@@ -7,12 +7,15 @@ export default function ReferralBanner() {
     referralBanner, 
     dismissReferralBanner, 
     setIsAuthModalOpen, 
+    isAuthModalOpen,
+    isCheckoutOpen,
     setAuthMode,
     setActiveReferral,
     isLoggedIn
   } = useMlm();
 
-  if (!referralBanner || !referralBanner.visible || isLoggedIn) {
+  // Vanish banner if already dismissed, if user is logged in, or if ANY modal (Auth or Checkout) is active
+  if (!referralBanner || !referralBanner.visible || isLoggedIn || isAuthModalOpen || isCheckoutOpen) {
     return null;
   }
 
@@ -27,6 +30,7 @@ export default function ReferralBanner() {
   const progressPercent = Math.max(0, Math.min(100, (secondsRemaining / 120) * 100));
 
   const handleJoinUnderSponsor = () => {
+    dismissReferralBanner();
     setAuthMode('register');
     if (isValid) {
       setActiveReferral(sponsorCode);

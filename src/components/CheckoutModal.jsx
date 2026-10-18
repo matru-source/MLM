@@ -53,6 +53,17 @@ export default function CheckoutModal() {
   // Net banking state
   const [selectedBank, setSelectedBank] = useState('State Bank of India');
 
+  // Auto-close modal & load dashboard in real-time when admin approves the payment
+  useEffect(() => {
+    if (currentMember && currentMember.seller_status === 'active') {
+      setIsCheckoutOpen(false);
+      if (step === 'confirmed') {
+        setCurrentPage('dashboard');
+        addToast('success', 'Activation Approved!', 'Admin has verified your payment. Welcome to your active CyberShield Dashboard!');
+      }
+    }
+  }, [currentMember?.seller_status, isCheckoutOpen]);
+
   if (!isCheckoutOpen) return null;
 
   // Handle Close
@@ -126,47 +137,106 @@ export default function CheckoutModal() {
     addToast('info', 'Payment Acknowledgment Downloaded', `Provisional payment submission receipt #${orderId} generated & downloaded. Official GST Tax Invoice is issued upon Admin clearance.`);
   };
 
+  const isAuthPrompt = !isLoggedIn || !currentMember;
+
   return (
     <div className="modal-overlay">
       <div 
         className="modal-box checkout-modal-width" 
         style={{ 
-          maxWidth: '960px', 
+          maxWidth: isAuthPrompt ? '500px' : '960px', 
           width: '94vw', 
           maxHeight: '94vh',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          borderRadius: '20px',
+          overflow: 'hidden',
+          boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.45)'
         }}
       >
         
         {/* Top Header */}
-        <div className="checkout-top-header" style={{ position: 'relative' }}>
+        <div style={{ 
+          padding: '18px 24px', 
+          borderBottom: '1px solid #E2E8F0', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          background: '#FFFFFF'
+        }}>
           <div className="brand-logo-text-small">
-            <span className="brand-title">CyberShield</span>
-            <span className="brand-subtitle">Security Network</span>
+            <span className="brand-title" style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>CyberShield</span>
+            <span className="brand-subtitle" style={{ fontSize: '11px', color: '#64748B', display: 'block' }}>Security Network</span>
           </div>
 
-          <div className="secure-badge-pill">
-            <ShieldCheck size={16} className="text-success" />
-            <span>Secure 256-Bit SSL Checkout</span>
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="secure-badge-pill" style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              fontSize: '11px', 
+              fontWeight: 700, 
+              color: '#059669', 
+              background: '#ECFDF5', 
+              border: '1px solid #A7F3D0',
+              padding: '4px 10px', 
+              borderRadius: '9999px' 
+            }}>
+              <ShieldCheck size={14} style={{ color: '#10B981' }} />
+              <span>256-Bit SSL Checkout</span>
+            </div>
 
-          <button onClick={handleClose} className="auth-modal-close-btn" aria-label="Close modal">
-            <X size={18} />
-          </button>
+            <button 
+              type="button"
+              onClick={handleClose} 
+              style={{
+                background: '#F1F5F9',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748B',
+                flexShrink: 0
+              }}
+              title="Close modal"
+              aria-label="Close modal"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* If user is not logged in, prompt to register first */}
-        {!isLoggedIn || !currentMember ? (
-          <div className="p-6 text-center">
-            <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(37, 99, 235, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-              <UserCheck size={32} style={{ color: '#2563EB' }} />
+        {isAuthPrompt ? (
+          <div style={{ padding: '36px 28px 32px', textAlign: 'center', background: '#FFFFFF' }}>
+            <div style={{ 
+              width: '68px', 
+              height: '68px', 
+              borderRadius: '20px', 
+              background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              margin: '0 auto 18px',
+              border: '1.5px solid #BFDBFE',
+              boxShadow: '0 8px 16px rgba(37, 99, 235, 0.12)'
+            }}>
+              <UserCheck size={34} style={{ color: '#2563EB' }} />
             </div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>Partner Registration Required</h3>
-            <p style={{ color: '#64748B', fontSize: '0.9rem', maxWidth: '440px', margin: '0 auto 24px' }}>
-              Please create or log into your CyberShield partner account first so that your official software license and 6-tier commission wallet are provisioned in your name.
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px', letterSpacing: '-0.3px' }}>
+              Partner Registration Required
+            </h3>
+
+            <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: '1.55', maxWidth: '400px', margin: '0 auto 24px' }}>
+              Please create or log into your authorized CyberShield partner account so your software license and multi-tier commission wallet are provisioned in your name.
             </p>
-            <div className="flex-center gap-3">
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -175,10 +245,12 @@ export default function CheckoutModal() {
                   setIsAuthModalOpen(true);
                 }}
                 className="btn btn-primary btn-lg"
+                style={{ width: '100%', justifyContent: 'center', padding: '13px 20px', fontSize: '0.95rem', fontWeight: 700 }}
               >
                 <span>Create Partner Account</span>
                 <ArrowRight size={18} />
               </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -187,8 +259,9 @@ export default function CheckoutModal() {
                   setIsAuthModalOpen(true);
                 }}
                 className="btn btn-secondary btn-lg"
+                style={{ width: '100%', justifyContent: 'center', padding: '12px 20px', fontSize: '0.92rem', fontWeight: 600, background: '#FFFFFF' }}
               >
-                Log In
+                Already have an account? Log In
               </button>
             </div>
           </div>

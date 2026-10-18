@@ -280,7 +280,7 @@ export default function AuthModal() {
     e.preventDefault();
     setBrevoApiKey(brevoKeyInput);
     setShowBrevoConfig(false);
-    addToast('success', 'Brevo API Configured', 'Brevo API key saved. Real transactional emails will be dispatched.');
+    addToast('success', 'Email Gateway Configured', 'Email gateway key saved. Real transactional verification emails will be dispatched.');
   };
 
   // Forgot Password: Step 1 - Send OTP to registered email
@@ -582,7 +582,7 @@ export default function AuthModal() {
                   style={{ marginTop: '4px' }}
                 >
                   <Mail size={16} />
-                  <span>{isSendingOtp ? 'Sending Brevo OTP...' : 'Send Verification OTP & Continue'}</span>
+                  <span>{isSendingOtp ? 'Sending Verification OTP...' : 'Send Verification OTP & Continue'}</span>
                   <ArrowRight size={16} />
                 </button>
 

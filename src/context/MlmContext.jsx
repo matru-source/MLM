@@ -355,8 +355,8 @@ export function MlmProvider({ children }) {
     // Initial load
     loadNeonData();
 
-    // Live background polling every 15s so changes on Phone A appear on Laptop B without reload
-    const interval = setInterval(loadNeonData, 15000);
+    // Live background polling every 4s so changes on Admin or other devices appear in real-time
+    const interval = setInterval(loadNeonData, 4000);
 
     // Refresh immediately when window/tab is focused
     const handleFocus = () => {
@@ -474,18 +474,14 @@ export function MlmProvider({ children }) {
       };
     }
 
-    // Check Self-Referral by Phone
-    if (userPhone && found.phone) {
-      const p1 = userPhone.replace(/\D/g, '');
-      const p2 = found.phone.replace(/\D/g, '');
-      if (p1 && p2 && p1.length >= 10 && p1.slice(-10) === p2.slice(-10)) {
-        return {
-          valid: false,
-          reason: 'self_referral',
-          member: found,
-          message: 'You cannot use your own phone number to sponsor yourself.'
-        };
-      }
+    // Check Self-Referral if user is currently logged in with this referral code
+    if (currentMember && (currentMember.referral_code === clean || currentMember.member_id === clean)) {
+      return {
+        valid: false,
+        reason: 'self_referral',
+        member: found,
+        message: 'You cannot use your own referral code.'
+      };
     }
 
     return {
