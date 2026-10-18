@@ -250,7 +250,7 @@ export default function PublicHome() {
               <div className="single-guarantee-badges">
                 <div className="guarantee-badge">
                   <CheckCircle2 size={15} className="text-success" />
-                  <span>7-Day Cooling-off Period (100% Refund Guarantee)</span>
+                  <span>30-Day Cooling-off Period (100% Refund Guarantee)</span>
                 </div>
                 <div className="guarantee-badge">
                   <CheckCircle2 size={15} className="text-primary-blue" />
@@ -382,9 +382,9 @@ export default function PublicHome() {
           </div>
 
           <div className="faq-card card-white">
-            <h4 className="faq-question">What is the 7-day cooling-off guarantee?</h4>
+            <h4 className="faq-question">What is the 30-day cooling-off guarantee?</h4>
             <p className="faq-answer">
-              Every subscriber has an unconditional 7-day refund right. If you are not satisfied, you can request a 100% refund without questions asked.
+              Every subscriber has a statutory 30-day refund window under Direct Selling Rules, 2021. If you are not satisfied, you can request a 100% refund without questions asked.
             </p>
           </div>
 

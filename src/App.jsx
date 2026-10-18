@@ -124,7 +124,7 @@ function MainApp() {
                 <h4 className="footer-title">Statutory Compliance</h4>
                 <span>Consumer Protection Act, 2019</span>
                 <span>Direct Selling Rules, 2021</span>
-                <span>7-Day Cooling-off Guarantee</span>
+                <span>30-Day Statutory Cooling-off Guarantee</span>
                 <span>Section 194H Tax Compliant</span>
               </div>
 

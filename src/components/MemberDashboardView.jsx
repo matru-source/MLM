@@ -1731,7 +1731,7 @@ export default function MemberDashboardView() {
                     Manage
                   </button>
                   <button 
-                    onClick={() => addToast('warning', 'Cancellation policy', 'Cooling-off refund can be filed via support within 7 days.')} 
+                    onClick={() => addToast('warning', 'Cancellation policy', 'Cooling-off refund can be filed via support within 30 days.')} 
                     className="btn btn-secondary btn-sm text-rose"
                   >
                     Cancel
@@ -2752,7 +2752,7 @@ export default function MemberDashboardView() {
                     </div>
                     <div className="clause-item">
                       <CheckCircle2 size={16} className="text-success" />
-                      <span><strong>7-Day Cooling-off Period:</strong> Full refund rights respected; cancelled purchases reverse unearned commissions.</span>
+                      <span><strong>30-Day Cooling-off Period:</strong> Full refund rights respected; cancelled purchases reverse unearned commissions.</span>
                     </div>
                     <div className="clause-item">
                       <CheckCircle2 size={16} className="text-success" />
