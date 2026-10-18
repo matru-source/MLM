@@ -89,6 +89,10 @@ export default function MemberDashboardView() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedReceiptModal, setSelectedReceiptModal] = useState(null);
 
+  const coolingOffTotal = (transactions || [])
+    .filter(t => (t.member_id === currentMember?.member_id || t.member_id === currentMember?.id || !t.member_id) && t.status === 'Pending' && t.type === 'credit')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
   // Dynamic Chart Granularity: auto-detect based on member joined_at date per direct selling rules
   // User specifications:
   // - If joined between weeks (<= 7 days): show daily report (last 7 days ending today)
@@ -1201,6 +1205,12 @@ export default function MemberDashboardView() {
               <div className="balance-info-left">
                 <span className="balance-label-small">Available Balance</span>
                 <div className="balance-amount-big">₹{availableBalance.toLocaleString('en-IN')}</div>
+                {coolingOffTotal > 0 && (
+                  <div className="pending-balance-callout mt-1" style={{ background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }}>
+                    <Clock size={13} className="text-amber" />
+                    <span><strong>₹{coolingOffTotal.toLocaleString('en-IN')}</strong> in statutory 30-day refund/cooling-off hold (unlocks automatically after 30 days)</span>
+                  </div>
+                )}
                 {pendingPayoutsTotal > 0 && (
                   <div className="pending-balance-callout">
                     <Clock size={13} className="text-amber" />

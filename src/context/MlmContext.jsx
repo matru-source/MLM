@@ -33,7 +33,9 @@ import {
   dbFetchKycDocuments,
   dbApproveKyc,
   dbRejectKyc,
-  dbFetchAuditLogs
+  dbFetchAuditLogs,
+  dbReleaseCommissionEarly,
+  dbClawbackCommission
 } from '../services/neonDbService';
 import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
 import { saveDocumentFile, getDocumentFile, syncKycDocsFromServer } from '../utils/documentStorage';
@@ -271,6 +273,48 @@ export function MlmProvider({ children }) {
       localStorage.setItem('cybershield_earnings', JSON.stringify(totalEarnings));
     } catch (e) {}
   }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings]);
+
+  // Auto-settle cooling-off transactions whose 30-day waiting period has elapsed
+  useEffect(() => {
+    const now = Date.now();
+    let hasMatured = false;
+    const maturedCreditsByMember = {};
+
+    setTransactions(prev => {
+      const updated = prev.map(t => {
+        if (t.status === 'Pending' && t.type === 'credit' && t.available_at && new Date(t.available_at).getTime() <= now) {
+          hasMatured = true;
+          const memId = t.member_id;
+          maturedCreditsByMember[memId] = (maturedCreditsByMember[memId] || 0) + Number(t.amount || 0);
+          return { ...t, status: 'Available', settled_at: new Date().toISOString() };
+        }
+        return t;
+      });
+      return hasMatured ? updated : prev;
+    });
+
+    if (hasMatured) {
+      setMembers(prev => prev.map(m => {
+        const id = m.member_id || m.id;
+        const maturedAmt = maturedCreditsByMember[id];
+        if (maturedAmt) {
+          return {
+            ...m,
+            wallet_balance: Number(m.wallet_balance || 0) + maturedAmt
+          };
+        }
+        return m;
+      }));
+
+      if (currentMember) {
+        const myId = currentMember.member_id || currentMember.id;
+        const myMatured = maturedCreditsByMember[myId];
+        if (myMatured) {
+          setAvailableBalance(prev => prev + myMatured);
+        }
+      }
+    }
+  }, [transactions.length]);
 
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -843,17 +887,25 @@ export function MlmProvider({ children }) {
 
   // Helper to query wallet metrics dynamically
   const getMemberWallet = (memberId = null) => {
-    const mem = memberId ? (members.find(m => m.member_id === memberId) || currentMember) : currentMember;
+    const mem = memberId ? (members.find(m => m.member_id === memberId || m.id === memberId) || currentMember) : currentMember;
+    const memId = mem?.member_id || mem?.id;
     const available = Number(mem?.wallet_balance || 0);
     const pending = payoutRequests
-      .filter(p => p.member_id === mem?.member_id && p.status === 'pending')
+      .filter(p => (p.member_id === memId) && p.status === 'pending')
       .reduce((acc, p) => acc + Number(p.amount || 0), 0);
     const paid = payoutRequests
-      .filter(p => p.member_id === mem?.member_id && p.status === 'paid')
+      .filter(p => (p.member_id === memId) && p.status === 'paid')
       .reduce((acc, p) => acc + Number(p.amount || 0), 0);
+
+    // Calculate cooling-off funds currently in statutory 15–30 day hold
+    const coolingOff = transactions
+      .filter(t => (t.member_id === memId || (!t.member_id && memId === currentMember?.member_id)) && t.status === 'Pending' && t.type === 'credit')
+      .reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
     return {
       available,
-      pending,
+      pending, // requested withdrawal awaiting admin
+      coolingOff, // under 30-day statutory cooling-off refund hold
       paid,
       totalEarned: Number(mem?.total_earnings || 0)
     };
@@ -1099,6 +1151,84 @@ export function MlmProvider({ children }) {
     dbRejectPayout(payoutId, reason).catch(err => console.warn('[Neon DB] dbRejectPayout error:', err));
 
     addToast('info', 'Payout Request Rejected & Funds Restored', `Request #${payoutId} rejected. ₹${req.amount.toLocaleString('en-IN')} returned to partner balance.`);
+    return true;
+  };
+
+  // 4. Admin Manually Releases Pending Cooling-Off Commission Early
+  const releaseCommissionEarly = async (transactionId) => {
+    const tx = transactions.find(t => t.id === transactionId);
+    if (!tx || tx.status !== 'Pending') {
+      addToast('error', 'Release Error', 'Transaction not found or already released.');
+      return false;
+    }
+
+    setTransactions(prev => prev.map(t => {
+      if (t.id === transactionId) {
+        return { ...t, status: 'Available', settled_at: new Date().toISOString() };
+      }
+      return t;
+    }));
+
+    setMembers(prev => prev.map(m => {
+      const id = m.member_id || m.id;
+      if (id === tx.member_id) {
+        return {
+          ...m,
+          wallet_balance: Number(m.wallet_balance || 0) + Number(tx.amount || 0)
+        };
+      }
+      return m;
+    }));
+
+    if (currentMember && (currentMember.member_id === tx.member_id || currentMember.id === tx.member_id)) {
+      setAvailableBalance(prev => prev + Number(tx.amount || 0));
+    }
+
+    dbReleaseCommissionEarly(transactionId).catch(err => console.warn('[Neon DB] dbReleaseCommissionEarly error:', err));
+    addToast('success', 'Commission Released Early!', `₹${tx.amount} moved from 30-day cooling-off hold into available balance.`);
+    return true;
+  };
+
+  // 5. Admin Claws Back Commission upon Buyer Refund
+  const clawbackCommission = async (transactionId, reason = 'Buyer Cancelled License') => {
+    const tx = transactions.find(t => t.id === transactionId);
+    if (!tx) {
+      addToast('error', 'Clawback Error', 'Transaction not found.');
+      return false;
+    }
+
+    setTransactions(prev => prev.map(t => {
+      if (t.id === transactionId) {
+        return { 
+          ...t, 
+          status: 'Clawed Back', 
+          description: `${t.description} [Refund Clawback: ${reason}]` 
+        };
+      }
+      return t;
+    }));
+
+    setMembers(prev => prev.map(m => {
+      const id = m.member_id || m.id;
+      if (id === tx.member_id) {
+        return {
+          ...m,
+          wallet_balance: tx.status === 'Available' ? Math.max(0, Number(m.wallet_balance || 0) - Number(tx.amount || 0)) : Number(m.wallet_balance || 0),
+          total_earnings: Math.max(0, Number(m.total_earnings || 0) - Number(tx.amount || 0))
+        };
+      }
+      return m;
+    }));
+
+    if (currentMember && (currentMember.member_id === tx.member_id || currentMember.id === tx.member_id)) {
+      if (tx.status === 'Available') {
+        setAvailableBalance(prev => Math.max(0, prev - Number(tx.amount || 0)));
+      }
+      setTotalEarnings(prev => Math.max(0, prev - Number(tx.amount || 0)));
+    }
+
+    dbClawbackCommission(transactionId, reason).catch(err => console.warn('[Neon DB] dbClawbackCommission error:', err));
+    addToast('info', 'Commission Clawed Back', `₹${tx.amount} reversed due to buyer refund within cooling-off period.`);
     return true;
   };
 
@@ -1608,6 +1738,7 @@ export function MlmProvider({ children }) {
       const rate = rates[level - 1];
       creditsByMemberId[sponsorId] = (creditsByMemberId[sponsorId] || 0) + rate;
 
+      const availableAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       newTransactions.push({
         id: generateId('tx'),
         member_id: sponsorId,
@@ -1615,7 +1746,8 @@ export function MlmProvider({ children }) {
         description: `Retail Partner Commission (Level ${level}) - ₹2,500 Joining Activation from ${act.member_name}`,
         amount: rate,
         type: 'credit',
-        status: 'Available'
+        status: 'Pending',
+        available_at: availableAt
       });
 
       // Advance to next upline level
@@ -1629,20 +1761,20 @@ export function MlmProvider({ children }) {
         if (addAmount) {
           return {
             ...m,
-            wallet_balance: Number(m.wallet_balance || 0) + addAmount,
+            // 30-Day Cooling-off hold: wallet_balance NOT credited yet
             total_earnings: Number(m.total_earnings || 0) + addAmount
           };
         }
         return m;
       }));
 
-      // Update active session wallet balance if current logged-in member is in the upline chain
+      // Update active session total_earnings if current logged-in member is in the upline chain
       if (currentMember) {
         const myId = currentMember.member_id || currentMember.id;
         const myCredit = creditsByMemberId[myId];
         if (myCredit) {
-          setAvailableBalance(prev => prev + myCredit);
           setTotalEarnings(prev => prev + myCredit);
+          // availableBalance stays untouched during 30-day cooling-off hold
         }
       }
 
@@ -1881,6 +2013,8 @@ export function MlmProvider({ children }) {
       rejectPayout,
       approveMemberActivation,
       rejectMemberActivation,
+      releaseCommissionEarly,
+      clawbackCommission,
       toasts,
       addToast,
       removeToast,

@@ -299,22 +299,23 @@ export async function processVerifiedWebhook(event) {
                 await sql`
                   UPDATE members
                   SET 
-                    wallet_balance = COALESCE(wallet_balance, 0) + ${tier.rate},
                     total_earnings = COALESCE(total_earnings, 0) + ${tier.rate}
                   WHERE id = ${upline.id};
                 `;
 
                 const txId = `tx_zex_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`;
+                const availableAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
                 await sql`
                   INSERT INTO transactions (
-                    id, member_id, description, amount, type, status, created_at
+                    id, member_id, description, amount, type, status, available_at, created_at
                   ) VALUES (
                     ${txId},
                     ${upline.id},
                     ${tier.desc + buyer.name},
                     ${tier.rate},
                     'credit',
-                    'Available',
+                    'Pending',
+                    ${availableAt},
                     NOW()
                   );
                 `;

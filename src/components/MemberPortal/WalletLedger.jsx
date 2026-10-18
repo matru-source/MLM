@@ -70,19 +70,19 @@ export default function WalletLedger({ memberId }) {
           </div>
         </div>
 
-        {/* Pending (Cooling-off Hold) */}
+        {/* Pending (30-Day Cooling-off Hold) */}
         <div className="balance-summary-card glass-panel">
           <div className="card-top-row">
-            <span className="card-title">Pending (7-Day Cooling-Off)</span>
+            <span className="card-title">Pending (30-Day Cooling-Off)</span>
             <div className="card-icon-wrap bg-amber-dim">
               <Clock size={18} className="text-amber" />
             </div>
           </div>
           <div className="card-amount-large text-amber">
-            {formatINR(wallet.pending)}
+            {formatINR(wallet.coolingOff !== undefined ? wallet.coolingOff : wallet.pending)}
           </div>
           <p className="card-caption">
-            Statutory cooling-off period protection. Becomes available once 7-day buyer refund window elapses.
+            Statutory 30-day refund/cooling-off period protection. Automatically unlocks and moves to available balance once the 30-day window elapses.
           </p>
         </div>
 

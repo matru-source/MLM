@@ -54,10 +54,12 @@ export default function AdminPortalView() {
     uploadKycDocument,
     isDbConnected,
     auditLogs = [],
+    releaseCommissionEarly,
+    clawbackCommission,
     addToast 
   } = useMlm();
 
-  const [adminTab, setAdminTab] = useState('activations'); // 'activations' | 'payouts' | 'orders' | 'kyc' | 'audit' | 'webhooks'
+  const [adminTab, setAdminTab] = useState('activations'); // 'activations' | 'payouts' | 'escrow' | 'orders' | 'kyc' | 'audit' | 'webhooks'
   const [selectedPayoutForManualPay, setSelectedPayoutForManualPay] = useState(null);
   const [selectedPayoutToView, setSelectedPayoutToView] = useState(null);
   const [selectedKycMember, setSelectedKycMember] = useState(null);
@@ -257,6 +259,8 @@ export default function AdminPortalView() {
   const pendingRequests = payoutRequests.filter(p => p.status === 'pending');
   const pendingTotalAmount = pendingRequests.reduce((sum, p) => sum + p.amount, 0);
   const pendingActivationList = (pendingActivations || []).filter(a => a.status === 'pending');
+  const coolingOffTransactions = (transactions || []).filter(t => t.status === 'Pending' && t.type === 'credit');
+  const coolingOffTotalAmount = coolingOffTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
   return (
     <div className="admin-dedicated-app">
@@ -369,6 +373,17 @@ export default function AdminPortalView() {
             className={`admin-clean-tab ${adminTab === 'audit' ? 'active' : ''}`}
           >
             Compliance & Audit Trail ({auditLogs.length})
+          </button>
+          <button
+            onClick={() => setAdminTab('escrow')}
+            className={`admin-clean-tab ${adminTab === 'escrow' ? 'active' : ''}`}
+          >
+            Cooling-Off Escrow ({coolingOffTransactions.length})
+            {coolingOffTransactions.length > 0 && (
+              <span className="admin-tab-alert-badge" style={{ backgroundColor: '#f59e0b', color: '#fff' }}>
+                ₹{coolingOffTotalAmount.toLocaleString('en-IN')} Hold
+              </span>
+            )}
           </button>
           <button
             onClick={() => setAdminTab('webhooks')}
@@ -1139,6 +1154,111 @@ export default function AdminPortalView() {
                 </div>
               );
             })()}
+          </div>
+        )}
+
+        {/* TAB: COOLING-OFF ESCROW COMMISSIONS MANAGER */}
+        {adminTab === 'escrow' && (
+          <div className="admin-panel-card card-white">
+            <div className="admin-panel-header">
+              <div>
+                <h3 className="admin-panel-title">30-Day Statutory Cooling-Off Escrow</h3>
+                <p className="admin-panel-subtitle">
+                  Under Direct Selling Guidelines, commissions remain in pending escrow for 15–30 days before automatically unlocking to partner withdrawal wallets.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="badge badge-amber font-xs font-bold">
+                  {coolingOffTransactions.length} Pending Escrow ({coolingOffTotalAmount > 0 ? `₹${coolingOffTotalAmount.toLocaleString('en-IN')}` : '₹0'})
+                </span>
+              </div>
+            </div>
+
+            {coolingOffTransactions.length > 0 ? (
+              <div className="table-responsive">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Recipient Partner</th>
+                      <th>Commission Details</th>
+                      <th>Amount (₹)</th>
+                      <th>Status</th>
+                      <th>Auto-Matures On</th>
+                      <th className="text-right">Administrative Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coolingOffTransactions.map((tx) => {
+                      const recipient = members.find(m => m.member_id === tx.member_id || m.id === tx.member_id);
+                      const unlocksAt = tx.available_at ? new Date(tx.available_at) : null;
+                      const daysRemaining = unlocksAt ? Math.max(0, Math.ceil((unlocksAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 30;
+
+                      return (
+                        <tr key={tx.id}>
+                          <td>
+                            <div className="font-bold text-primary">{recipient?.name || tx.member_id}</div>
+                            <div className="code-font text-2xs text-muted">ID: {tx.member_id} • Code: {recipient?.referral_code || 'N/A'}</div>
+                          </td>
+                          <td>
+                            <div className="font-sm">{tx.description}</div>
+                            <div className="code-font text-2xs text-secondary font-mono mt-0.5">Ref: {tx.id}</div>
+                          </td>
+                          <td className="font-bold text-primary-blue code-font font-sm">
+                            ₹{Number(tx.amount || 0).toLocaleString('en-IN')}
+                          </td>
+                          <td>
+                            <span className="badge badge-amber flex items-center gap-1 font-xs font-bold">
+                              <Clock size={11} />
+                              <span>Cooling-Off Hold ({daysRemaining}d left)</span>
+                            </span>
+                          </td>
+                          <td className="code-font text-xs text-secondary">
+                            {unlocksAt ? unlocksAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '30 Days'}
+                          </td>
+                          <td className="text-right">
+                            <div className="flex-center gap-1 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Release ₹${tx.amount} immediately to ${recipient?.name || tx.member_id}'s available withdrawal wallet?`)) {
+                                    releaseCommissionEarly(tx.id);
+                                  }
+                                }}
+                                className="btn btn-secondary btn-sm"
+                                style={{ fontSize: '11px', padding: '4px 8px', color: '#059669', borderColor: '#a7f3d0' }}
+                                title="Release commission early to withdrawable balance"
+                              >
+                                Release Early
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const reason = prompt('Enter refund reason for clawback:', 'Buyer cancelled subscription within 30-day window');
+                                  if (reason) {
+                                    clawbackCommission(tx.id, reason);
+                                  }
+                                }}
+                                className="btn btn-secondary btn-sm"
+                                style={{ fontSize: '11px', padding: '4px 8px', color: '#e11d48', borderColor: '#fecdd3' }}
+                                title="Claw back commission upon customer refund"
+                              >
+                                Claw Back
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="admin-empty-clean p-6 text-center text-muted">
+                <CheckCircle2 size={36} className="text-success mx-auto mb-2 opacity-60" />
+                <h4 className="font-sm font-bold text-primary mb-1">No Commissions in Cooling-Off Hold</h4>
+                <p className="text-xs text-muted m-0">All commissions have either matured to available balance or no pending sales exist.</p>
+              </div>
+            )}
           </div>
         )}
 

@@ -64,7 +64,7 @@ export default function PayoutModal({ isOpen, onClose, member }) {
               <div className="balance-val text-emerald">{formatINR(wallet.available)}</div>
             </div>
             <div className="pending-badge-wrap">
-              <span className="badge badge-amber">{formatINR(wallet.pending)} in Cooling-Off Hold</span>
+              <span className="badge badge-amber">{formatINR(wallet.coolingOff !== undefined ? wallet.coolingOff : wallet.pending)} in 30-Day Cooling-Off Hold</span>
             </div>
           </div>
 

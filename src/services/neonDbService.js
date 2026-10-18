@@ -457,4 +457,40 @@ export async function dbFetchAuditLogs() {
   }
 }
 
+/**
+ * 22. Admin Releases Pending Cooling-Off Commission Early
+ */
+export async function dbReleaseCommissionEarly(transactionId) {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'release_commission_early', transactionId })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[Neon DB Bridge] dbReleaseCommissionEarly error:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * 23. Admin Claws Back Commission upon Buyer Refund
+ */
+export async function dbClawbackCommission(transactionId, reason = 'Buyer Refunded') {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'clawback_commission', transactionId, reason })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[Neon DB Bridge] dbClawbackCommission error:', err.message);
+    throw err;
+  }
+}
+
 

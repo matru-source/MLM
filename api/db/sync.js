@@ -45,6 +45,48 @@ async function ensureAuditTable(sql) {
   }
 }
 
+let isTransactionColumnsReady = false;
+async function ensureTransactionColumns(sql) {
+  if (isTransactionColumnsReady || !sql) return;
+  try {
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ;`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;`;
+    isTransactionColumnsReady = true;
+  } catch (e) {
+    // Non-fatal
+  }
+}
+
+async function autoSettleMaturedCommissions(sql) {
+  if (!sql) return;
+  try {
+    const matured = await sql`
+      UPDATE transactions
+      SET status = 'Available', settled_at = NOW()
+      WHERE status = 'Pending' 
+        AND type = 'credit' 
+        AND available_at IS NOT NULL 
+        AND available_at <= NOW()
+      RETURNING member_id, amount::numeric as amount;
+    `;
+    if (matured && matured.length > 0) {
+      const totals = {};
+      for (const row of matured) {
+        totals[row.member_id] = (totals[row.member_id] || 0) + Number(row.amount);
+      }
+      for (const [memId, amt] of Object.entries(totals)) {
+        await sql`
+          UPDATE members
+          SET wallet_balance = COALESCE(wallet_balance, 0) + ${amt}
+          WHERE id = ${memId};
+        `;
+      }
+    }
+  } catch (e) {
+    // Non-fatal
+  }
+}
+
 export default async function handler(req, res) {
   const sql = getSql();
 
@@ -60,6 +102,8 @@ export default async function handler(req, res) {
   // =========================================================================
   if (req.method === 'GET') {
     try {
+      await ensureTransactionColumns(sql);
+      await autoSettleMaturedCommissions(sql);
       const type = req.query?.type;
 
       // Audit Logs resource query
@@ -133,7 +177,7 @@ export default async function handler(req, res) {
         const rows = await sql`
           SELECT 
             id, member_id, description, amount::numeric, type, status,
-            payout_id, utr_number, receipt_url, created_at
+            payout_id, utr_number, receipt_url, available_at, settled_at, created_at
           FROM transactions ORDER BY created_at DESC;
         `;
         return res.status(200).json({ ok: true, data: rows });
@@ -198,7 +242,7 @@ export default async function handler(req, res) {
         sql`
           SELECT 
             id, member_id, description, amount::numeric, type, status,
-            payout_id, utr_number, receipt_url, created_at
+            payout_id, utr_number, receipt_url, available_at, settled_at, created_at
           FROM transactions ORDER BY created_at DESC;
         `,
         sql`
@@ -501,25 +545,30 @@ export default async function handler(req, res) {
 
           const rate = rates[level - 1];
 
+          // 15–30 Day Statutory Cooling-Off Period (Default: 30 Days):
+          // Funds remain in 'Pending' escrow hold until 30-day refund window elapses.
+          // total_earnings increments immediately so partners see live commission performance.
+          // wallet_balance remains untouched until 30-day cooling-off window completes.
           await sql`
             UPDATE members
             SET 
-              wallet_balance = COALESCE(wallet_balance, 0) + ${rate},
               total_earnings = COALESCE(total_earnings, 0) + ${rate}
             WHERE id = ${sponsor.id};
           `;
 
           const txId = `tx_act_${Date.now()}_${Math.floor(Math.random() * 10000)}_${level}`;
+          const availableAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
           await sql`
             INSERT INTO transactions (
-              id, member_id, description, amount, type, status, created_at
+              id, member_id, description, amount, type, status, available_at, created_at
             ) VALUES (
               ${txId},
               ${sponsor.id},
               ${`Retail Partner Commission (Level ${level}) - ₹2,500 Joining Activation from ${act.member_name}`},
               ${rate},
               'credit',
-              'Available',
+              'Pending',
+              ${availableAt},
               NOW()
             );
           `;
@@ -864,6 +913,61 @@ export default async function handler(req, res) {
           WHERE id = ${memberId};
         `;
         return res.status(200).json({ ok: true });
+      }
+
+      // 2l. Admin Releases Pending Cooling-Off Commission Early
+      if (action === 'release_commission_early') {
+        const { transactionId } = body;
+        const txRows = await sql`
+          SELECT id, member_id, amount::numeric as amount, status FROM transactions WHERE id = ${transactionId} LIMIT 1;
+        `;
+        if (txRows.length > 0 && txRows[0].status === 'Pending') {
+          const tx = txRows[0];
+          await sql`
+            UPDATE transactions
+            SET status = 'Available', settled_at = NOW()
+            WHERE id = ${transactionId};
+          `;
+          await sql`
+            UPDATE members
+            SET wallet_balance = COALESCE(wallet_balance, 0) + ${tx.amount}
+            WHERE id = ${tx.member_id};
+          `;
+          return res.status(200).json({ ok: true });
+        }
+        return res.status(400).json({ ok: false, error: 'Transaction not found or already released' });
+      }
+
+      // 2m. Admin Claws Back / Cancels Commission on Buyer Refund
+      if (action === 'clawback_commission') {
+        const { transactionId, reason } = body;
+        const txRows = await sql`
+          SELECT id, member_id, amount::numeric as amount, status FROM transactions WHERE id = ${transactionId} LIMIT 1;
+        `;
+        if (txRows.length > 0) {
+          const tx = txRows[0];
+          await sql`
+            UPDATE transactions
+            SET status = 'Clawed Back', description = description || ${` [Refund Clawback: ${reason || 'Buyer Cancelled'}]`}
+            WHERE id = ${transactionId};
+          `;
+          if (tx.status === 'Available') {
+            await sql`
+              UPDATE members
+              SET wallet_balance = GREATEST(0, COALESCE(wallet_balance, 0) - ${tx.amount}),
+                  total_earnings = GREATEST(0, COALESCE(total_earnings, 0) - ${tx.amount})
+              WHERE id = ${tx.member_id};
+            `;
+          } else {
+            await sql`
+              UPDATE members
+              SET total_earnings = GREATEST(0, COALESCE(total_earnings, 0) - ${tx.amount})
+              WHERE id = ${tx.member_id};
+            `;
+          }
+          return res.status(200).json({ ok: true });
+        }
+        return res.status(400).json({ ok: false, error: 'Transaction not found' });
       }
 
       return res.status(400).json({ ok: false, error: `Unrecognized action: ${action}` });
