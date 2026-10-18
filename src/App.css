@@ -2200,30 +2200,42 @@
 
 .admin-metrics-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
   margin-bottom: 24px;
 }
 
 .admin-stat-card {
-  padding: 20px;
+  padding: 16px 18px;
+  min-width: 0;
 }
 
 .stat-label-muted {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .stat-number-bold {
-  font-size: 1.8rem;
+  font-size: 1.65rem;
   font-weight: 800;
   margin: 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-badge-tag {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
 }
 
 .admin-tabs-bar-clean {

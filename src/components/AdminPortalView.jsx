@@ -308,7 +308,7 @@ export default function AdminPortalView() {
 
       {/* Admin Body Content */}
       <main className="admin-dedicated-body">
-        {/* 4 Admin Stat Cards */}
+        {/* 5 Admin Stat Cards in a Single Row */}
         <div className="admin-metrics-row">
           <div className="admin-stat-card card-white">
             <span className="stat-label-muted">Total Sales Volume</span>
