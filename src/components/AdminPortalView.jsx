@@ -30,7 +30,7 @@ import {
   FileText
 } from 'lucide-react';
 import { getDocumentFile, generateDocPlaceholder, saveDocumentFile } from '../utils/documentStorage';
-import { getEffectiveKycStatus } from '../utils/kycValidation';
+import { getEffectiveKycStatus, validateAadhaar, maskAadhaar } from '../utils/kycValidation';
 
 export default function AdminPortalView() {
   const { 
@@ -59,6 +59,7 @@ export default function AdminPortalView() {
   const [selectedKycMember, setSelectedKycMember] = useState(null);
   const [previewingDoc, setPreviewingDoc] = useState(null);
   const [revealedBankMembers, setRevealedBankMembers] = useState({});
+  const [revealedAadhaarMembers, setRevealedAadhaarMembers] = useState({});
 
   const getDocFileInfo = (member, docKey) => {
     const docs = member?.kyc?.documents || {};
@@ -706,25 +707,14 @@ export default function AdminPortalView() {
                     const aadhaarDoc = getDocFileInfo(m, 'aadhaar');
                     const addressDoc = getDocFileInfo(m, 'addressProof');
 
-                    // Check if partner has uploaded any real documents
-                    const hasAnyUploadedDoc = Boolean(
-                      panDoc.hasFile || 
-                      bankDoc.hasFile || 
-                      aadhaarDoc.hasFile || 
-                      addressDoc.hasFile ||
-                      docs.panFile ||
-                      docs.bankAccountFile ||
-                      docs.aadhaarFile ||
-                      docs.addressProofFile ||
-                      docs.panName ||
-                      docs.bankAccountName ||
-                      docs.aadhaarName ||
-                      docs.addressProofName ||
-                      (typeof docs.pan === 'string' && docs.pan.startsWith('Uploaded')) ||
-                      (typeof docs.aadhaar === 'string' && docs.aadhaar.startsWith('Uploaded')) ||
-                      (typeof docs.bankAccount === 'string' && docs.bankAccount.startsWith('Uploaded')) ||
-                      (typeof docs.addressProof === 'string' && docs.addressProof.startsWith('Uploaded'))
-                    );
+                    // Check genuine uploaded documents (requires actual file data)
+                    const genuinePan = panDoc.hasFile;
+                    const genuineBank = bankDoc.hasFile;
+                    const genuineAadhaar = aadhaarDoc.hasFile;
+                    const genuineAddress = addressDoc.hasFile;
+                    const uploadedDocsCount = (genuinePan ? 1 : 0) + (genuineBank ? 1 : 0) + (genuineAadhaar ? 1 : 0) + (genuineAddress ? 1 : 0);
+                    const hasAnyUploadedDoc = uploadedDocsCount > 0;
+                    const isFullyDocumented = uploadedDocsCount === 4 && hasPanText && hasBankText;
 
                     const hasAnySubmissions = hasPanText || hasBankText || hasAnyUploadedDoc;
                     const effectiveStatus = getEffectiveKycStatus(m);
@@ -901,25 +891,37 @@ export default function AdminPortalView() {
                             >
                               Details
                             </button>
-                            {hasAnyUploadedDoc && !isVerified && (
-                              <button 
-                                type="button"
-                                onClick={() => approveKyc(m.member_id || m.id)}
-                                className="btn btn-primary btn-sm py-1 px-2 text-xs"
-                                title="Approve KYC documents"
-                              >
-                                Approve
-                              </button>
-                            )}
-                            {hasAnyUploadedDoc && !isVerified && (
-                              <button 
-                                type="button"
-                                onClick={() => rejectKyc(m.member_id || m.id, 'Document illegible or mismatched')}
-                                className="btn btn-secondary btn-sm py-1 px-2 text-xs text-rose"
-                                title="Reject KYC"
-                              >
-                                Reject
-                              </button>
+                            {!isVerified && (
+                              uploadedDocsCount === 0 ? (
+                                <button 
+                                  type="button" 
+                                  disabled 
+                                  className="btn btn-secondary btn-sm py-1 px-2 text-xs" 
+                                  style={{ opacity: 0.5, cursor: 'not-allowed', color: '#94A3B8' }}
+                                  title="Direct Selling Rules 2021 prohibit approval without verified documents"
+                                >
+                                  0 Uploads
+                                </button>
+                              ) : (
+                                <>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => approveKyc(m.member_id || m.id)}
+                                    className="btn btn-primary btn-sm py-1 px-2 text-xs"
+                                    title={isFullyDocumented ? "Approve & Fully Authorize KYC" : `Approve ${uploadedDocsCount}/4 submitted proofs`}
+                                  >
+                                    {isFullyDocumented ? 'Approve' : `Approve (${uploadedDocsCount}/4)`}
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => rejectKyc(m.member_id || m.id, 'Document illegible or mismatched')}
+                                    className="btn btn-secondary btn-sm py-1 px-2 text-xs text-rose"
+                                    title="Reject KYC"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
+                              )
                             )}
                           </div>
                         </td>
@@ -1518,24 +1520,15 @@ export default function AdminPortalView() {
         const bankDoc = getDocFileInfo(m, 'bankAccount');
         const aadhaarDoc = getDocFileInfo(m, 'aadhaar');
         const addressDoc = getDocFileInfo(m, 'addressProof');
-        const hasAnyUploadedDoc = Boolean(
-          panDoc.hasFile || 
-          bankDoc.hasFile || 
-          aadhaarDoc.hasFile || 
-          addressDoc.hasFile ||
-          docs.panFile ||
-          docs.bankAccountFile ||
-          docs.aadhaarFile ||
-          docs.addressProofFile ||
-          docs.panName ||
-          docs.bankAccountName ||
-          docs.aadhaarName ||
-          docs.addressProofName ||
-          (typeof docs.pan === 'string' && docs.pan.startsWith('Uploaded')) ||
-          (typeof docs.aadhaar === 'string' && docs.aadhaar.startsWith('Uploaded')) ||
-          (typeof docs.bankAccount === 'string' && docs.bankAccount.startsWith('Uploaded')) ||
-          (typeof docs.addressProof === 'string' && docs.addressProof.startsWith('Uploaded'))
-        );
+        const genuinePan = panDoc.hasFile;
+        const genuineBank = bankDoc.hasFile;
+        const genuineAadhaar = aadhaarDoc.hasFile;
+        const genuineAddress = addressDoc.hasFile;
+        const uploadedDocsCount = (genuinePan ? 1 : 0) + (genuineBank ? 1 : 0) + (genuineAadhaar ? 1 : 0) + (genuineAddress ? 1 : 0);
+        const hasAnyUploadedDoc = uploadedDocsCount > 0;
+        const hasPanText = Boolean(m.kyc?.pan && m.kyc.pan.trim().length >= 10);
+        const hasBankText = Boolean(m.kyc?.bank_name && m.kyc?.bank_account_number);
+        const isFullyDocumented = uploadedDocsCount === 4 && hasPanText && hasBankText;
 
         return (
           <div className="custom-modal-backdrop" style={{ zIndex: 9998, padding: '16px' }} onClick={() => setSelectedKycMember(null)}>
@@ -1894,12 +1887,45 @@ export default function AdminPortalView() {
                         borderRadius: '8px',
                         padding: '10px 14px'
                       }}>
-                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>
-                          National Identity Verification
+                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>12-DIGIT AADHAAR NUMBER</div>
+                        <div style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', flexWrap: 'wrap', gap: '4px' }}>
+                          <span>
+                            {m.kyc?.aadhaar ? (
+                              revealedAadhaarMembers[m.member_id || m.id] ? (
+                                m.kyc.aadhaar
+                              ) : (
+                                maskAadhaar(m.kyc.aadhaar)
+                              )
+                            ) : (
+                              'Pending UIDAI Furnishing'
+                            )}
+                          </span>
+                          {m.kyc?.aadhaar && (
+                            <button
+                              type="button"
+                              onClick={() => setRevealedAadhaarMembers(prev => ({ ...prev, [m.member_id || m.id]: !prev[m.member_id || m.id] }))}
+                              className="btn btn-secondary btn-xs py-0.5 px-1.5 flex items-center gap-1 text-primary-blue"
+                              title={revealedAadhaarMembers[m.member_id || m.id] ? "Mask Aadhaar" : "Reveal full Aadhaar"}
+                            >
+                              {revealedAadhaarMembers[m.member_id || m.id] ? <EyeOff size={11} /> : <Eye size={11} />}
+                              <span>{revealedAadhaarMembers[m.member_id || m.id] ? 'Mask' : 'Reveal'}</span>
+                            </button>
+                          )}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748B' }}>
-                          Government of India Authorized Citizen Record
-                        </div>
+                        {m.kyc?.aadhaar && (() => {
+                          const vRes = validateAadhaar(m.kyc.aadhaar);
+                          return vRes.isValid ? (
+                            <div style={{ fontSize: '10px', color: '#059669', fontWeight: 700, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <CheckCircle2 size={11} />
+                              <span>UIDAI Verhoeff Checksum Passed ✓</span>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '10px', color: '#DC2626', fontWeight: 700, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <AlertCircle size={11} />
+                              <span>{vRes.message}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div style={{
@@ -2095,7 +2121,35 @@ export default function AdminPortalView() {
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {!isVerified && (
-                    hasAnyUploadedDoc ? (
+                    uploadedDocsCount === 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertCircle size={14} />
+                          <span>Statutory Block: 0 documents uploaded</span>
+                        </span>
+                        <button 
+                          type="button" 
+                          disabled 
+                          style={{
+                            background: '#F1F5F9',
+                            border: '1px solid #CBD5E1',
+                            color: '#94A3B8',
+                            padding: '8px 18px',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'not-allowed',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          title="Direct Selling Rules 2021 prohibit approval without verified documents"
+                        >
+                          <Lock size={15} />
+                          <span>Approval Blocked (0 Uploads)</span>
+                        </button>
+                      </div>
+                    ) : (
                       <>
                         <button 
                           type="button" 
@@ -2123,7 +2177,9 @@ export default function AdminPortalView() {
                             setSelectedKycMember(null);
                           }} 
                           style={{
-                            background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                            background: isFullyDocumented 
+                              ? 'linear-gradient(135deg, #059669 0%, #10B981 100%)' 
+                              : 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
                             border: 'none',
                             color: '#FFFFFF',
                             padding: '8px 22px',
@@ -2134,17 +2190,14 @@ export default function AdminPortalView() {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
+                            boxShadow: isFullyDocumented ? '0 4px 10px rgba(16, 185, 129, 0.3)' : '0 4px 10px rgba(245, 158, 11, 0.3)'
                           }}
+                          title={isFullyDocumented ? "Approve and authorize partner KYC" : `Approve currently submitted ${uploadedDocsCount}/4 documents`}
                         >
                           <CheckCircle2 size={16} />
-                          <span>Approve Partner KYC</span>
+                          <span>{isFullyDocumented ? 'Approve Partner KYC (4/4)' : `Approve Uploads (${uploadedDocsCount}/4)`}</span>
                         </button>
                       </>
-                    ) : (
-                      <span className="badge badge-neutral text-xs py-1.5 px-3">
-                        Awaiting Document Upload
-                      </span>
                     )
                   )}
                 </div>

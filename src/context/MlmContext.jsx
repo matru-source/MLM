@@ -1187,6 +1187,7 @@ export function MlmProvider({ children }) {
       ...existingKyc,
       legal_name: kycDetails.legal_name || existingKyc.legal_name || existingMember?.name,
       pan: kycDetails.pan !== undefined ? (kycDetails.pan || '').toUpperCase().trim() : (existingKyc.pan || ''),
+      aadhaar: kycDetails.aadhaar !== undefined ? (kycDetails.aadhaar || '').trim() : (existingKyc.aadhaar || ''),
       bank_name: kycDetails.bank_name !== undefined ? (kycDetails.bank_name || '') : (existingKyc.bank_name || ''),
       bank_account_number: kycDetails.bank_account_number !== undefined ? (kycDetails.bank_account_number || '').trim() : (existingKyc.bank_account_number || ''),
       bank_ifsc: kycDetails.bank_ifsc !== undefined ? (kycDetails.bank_ifsc || '').toUpperCase().trim() : (existingKyc.bank_ifsc || ''),
@@ -1287,38 +1288,63 @@ export function MlmProvider({ children }) {
     return true;
   };
 
-  // Admin Approves Partner KYC (Enforces 4-Proof Statutory Rule)
+  // Admin Approves Partner KYC (Enforces Direct Selling Rules 2021 Compliance)
   const approveKyc = (memberId) => {
+    const targetMember = members.find(m => m.member_id === memberId || m.id === memberId);
+    if (!targetMember) return false;
+
+    const kyc = targetMember.kyc || {};
+    const docs = kyc.documents || {};
+    const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
+
+    const hasGenuineFile = (key) => {
+      if (docs[`${key}File`]) return true;
+      const val = docs[key];
+      return typeof val === 'string' && (val.startsWith('data:') || val.startsWith('blob:') || val.startsWith('http'));
+    };
+
+    const uploadedDocKeys = primaryDocKeys.filter(hasGenuineFile);
+
+    // Statutory Check: Cannot approve partner KYC if zero documents have been uploaded
+    if (uploadedDocKeys.length === 0) {
+      addToast(
+        'error', 
+        'Compliance Validation Blocked', 
+        'Direct Selling Rules 2021 mandate identity & address proofs. Cannot approve partner KYC when zero documents have been uploaded.'
+      );
+      return false;
+    }
+
     let isFullyCompliant = false;
 
     setMembers(prev => prev.map(m => {
       if (m.member_id === memberId || m.id === memberId) {
-        const kyc = m.kyc || {};
-        const docs = kyc.documents || {};
-        const verifiedDocs = { ...docs };
-        const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
+        const mKyc = m.kyc || {};
+        const mDocs = mKyc.documents || {};
+        const verifiedDocs = { ...mDocs };
 
+        // Only mark genuine uploaded files as verified!
         primaryDocKeys.forEach(k => {
-          if (docs[k] || docs[`${k}File`] || docs[`${k}Name`]) {
+          if (hasGenuineFile(k)) {
             verifiedDocs[k] = 'Verified ✓';
             verifiedDocs[`${k}Status`] = 'verified';
           }
         });
 
-        // Statutory Check: PAN + Bank + Aadhaar + Address Proof must all be submitted
-        const hasPan = Boolean((kyc.pan && kyc.pan.trim().length >= 10) || docs.panFile || docs.panName || (typeof docs.pan === 'string' && docs.pan.startsWith('Uploaded')));
-        const hasBank = Boolean((kyc.bank_name && kyc.bank_account_number) || docs.bankAccountFile || docs.bankAccountName || (typeof docs.bankAccount === 'string' && docs.bankAccount.startsWith('Uploaded')));
-        const hasAadhaar = Boolean(docs.aadhaarFile || docs.aadhaarName || (typeof docs.aadhaar === 'string' && docs.aadhaar.startsWith('Uploaded')));
-        const hasAddress = Boolean(docs.addressProofFile || docs.addressProofName || (typeof docs.addressProof === 'string' && docs.addressProof.startsWith('Uploaded')));
+        // Statutory Check: PAN + Bank + Aadhaar + Address Proof files must all exist
+        const hasPan = hasGenuineFile('pan') && Boolean(mKyc.pan && mKyc.pan.trim().length >= 10);
+        const hasBank = hasGenuineFile('bankAccount') && Boolean(mKyc.bank_name && mKyc.bank_account_number);
+        const hasAadhaar = hasGenuineFile('aadhaar');
+        const hasAddress = hasGenuineFile('addressProof');
 
         isFullyCompliant = hasPan && hasBank && hasAadhaar && hasAddress;
         const finalStatus = isFullyCompliant ? 'verified' : 'under_review';
 
         const updatedKyc = {
-          ...kyc,
+          ...mKyc,
           verification_status: finalStatus,
           documents: verifiedDocs,
-          verified_at: isFullyCompliant ? new Date().toISOString() : kyc.verified_at
+          verified_at: isFullyCompliant ? new Date().toISOString() : mKyc.verified_at
         };
 
         dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
@@ -1333,8 +1359,13 @@ export function MlmProvider({ children }) {
     if (isFullyCompliant) {
       addToast('success', 'KYC Fully Verified', 'All 4 statutory proofs verified. Partner KYC is now fully verified.');
     } else {
-      addToast('info', 'Documents Approved (Partial)', 'Submitted proofs marked verified. Statutory compliance requires all 4 proofs (Aadhaar, PAN, Address, Bank) before overall KYC status becomes Verified.');
+      addToast(
+        'info', 
+        `Submitted Proofs Approved (${uploadedDocKeys.length}/4)`, 
+        `Approved ${uploadedDocKeys.length} uploaded proofs. Direct Selling Rules 2021 require all 4 proofs (Aadhaar, PAN, Address, Bank) before overall KYC status becomes Verified.`
+      );
     }
+    return true;
   };
 
   // Admin Rejects Partner KYC

@@ -42,7 +42,14 @@ import {
 } from 'lucide-react';
 import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
 import { getDocumentFile } from '../utils/documentStorage';
-import { getEffectiveKycStatus, getKycStatusBadge } from '../utils/kycValidation';
+import { 
+  getEffectiveKycStatus, 
+  getKycStatusBadge, 
+  validateAadhaar, 
+  maskAadhaar, 
+  formatAadhaarInput, 
+  lookupIfsc 
+} from '../utils/kycValidation';
 
 export default function MemberDashboardView() {
   const { 
@@ -250,11 +257,51 @@ export default function MemberDashboardView() {
   const [showTaxBankAcc, setShowTaxBankAcc] = useState(false);
   const [taxBankAccValue, setTaxBankAccValue] = useState(currentMember?.kyc?.bank_account_number || '');
 
+  // 12-Digit Aadhaar state in Tax Details Tab
+  const [showTaxAadhaar, setShowTaxAadhaar] = useState(false);
+  const [taxAadhaarValue, setTaxAadhaarValue] = useState(currentMember?.kyc?.aadhaar || '');
+
+  // Real-Time IFSC Lookup State (via free Razorpay IFSC API)
+  const [taxIfscValue, setTaxIfscValue] = useState(currentMember?.kyc?.bank_ifsc || '');
+  const [ifscLookupData, setIfscLookupData] = useState(null);
+  const [ifscLookupLoading, setIfscLookupLoading] = useState(false);
+  const [ifscLookupError, setIfscLookupError] = useState('');
+
   useEffect(() => {
     if (currentMember?.kyc?.bank_account_number) {
       setTaxBankAccValue(currentMember.kyc.bank_account_number);
     }
-  }, [currentMember?.kyc?.bank_account_number]);
+    if (currentMember?.kyc?.aadhaar) {
+      setTaxAadhaarValue(currentMember.kyc.aadhaar);
+    }
+    if (currentMember?.kyc?.bank_ifsc) {
+      setTaxIfscValue(currentMember.kyc.bank_ifsc);
+    }
+  }, [currentMember?.kyc?.bank_account_number, currentMember?.kyc?.aadhaar, currentMember?.kyc?.bank_ifsc]);
+
+  // Real-time IFSC lookup function
+  const handleIfscLookup = async (code) => {
+    const clean = (code || '').trim().toUpperCase();
+    setTaxIfscValue(clean);
+    setIfscLookupError('');
+    if (/^[A-Z]{4}0[A-Z0-9]{6}$/.test(clean)) {
+      setIfscLookupLoading(true);
+      const res = await lookupIfsc(clean);
+      setIfscLookupLoading(false);
+      if (res.success) {
+        setIfscLookupData(res);
+        setIfscLookupError('');
+      } else {
+        setIfscLookupData(null);
+        setIfscLookupError(res.error || 'IFSC code not found in RBI registry.');
+      }
+    } else {
+      setIfscLookupData(null);
+      if (clean.length === 11) {
+        setIfscLookupError('Invalid IFSC format. Must be 4 letters, 0, then 6 alphanumeric characters.');
+      }
+    }
+  };
 
   const maskBankAccountNumber = (acc) => {
     if (!acc) return '';
@@ -2115,8 +2162,23 @@ export default function MemberDashboardView() {
                               </span>
                             )}
                           </div>
-                          <div className="doc-sub">
-                            {currentMember?.kyc?.documents?.aadhaar || 'Identity & Address verification document'}
+                          <div className="doc-sub" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            {currentMember?.kyc?.aadhaar ? (
+                              <span className="text-primary-blue font-semibold code-font">
+                                UIDAI: {maskAadhaar(currentMember.kyc.aadhaar)} • Verhoeff Checksum ✓
+                              </span>
+                            ) : (
+                              <span>
+                                {currentMember?.kyc?.documents?.aadhaar || 'Identity & Address verification document'} •{' '}
+                                <button
+                                  type="button"
+                                  onClick={() => setKycTab('tax')}
+                                  className="text-primary-blue hover:underline font-semibold"
+                                >
+                                  Link 12-Digit UIDAI Number &rarr;
+                                </button>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2302,7 +2364,7 @@ export default function MemberDashboardView() {
                       <span className="text-muted text-xs">Permanent Account Number (PAN)</span>
                       <div className="font-bold text-lg code-font mt-1">{currentMember?.kyc?.pan || 'Not Submitted'}</div>
                       <span className={`badge ${hasValidPan ? 'badge-green' : 'badge-amber'} font-xs mt-2`}>
-                        {hasValidPan ? 'Verified with ITD (5% TDS)' : 'Pending Submission (20% TDS)'}
+                        {hasValidPan ? 'Valid PAN Format (Sec 194H)' : 'Pending Submission (20% TDS)'}
                       </span>
                     </div>
 
@@ -2326,22 +2388,31 @@ export default function MemberDashboardView() {
                   {/* Bank Settlement & Tax Details Form */}
                   <div className="card-white p-5 mt-4">
                     <h5 className="font-bold text-base mb-1">Bank Settlement & Statutory Tax Account</h5>
-                    <p className="text-muted text-xs mb-4">Enter your Permanent Account Number (PAN) and verified bank account details to receive direct commission payouts via IMPS/NEFT.</p>
+                    <p className="text-muted text-xs mb-4">Enter your Permanent Account Number (PAN), 12-Digit Aadhaar, and verified bank account details to receive direct commission payouts via IMPS/NEFT per Direct Selling Rules 2021.</p>
 
                     <form 
-                      key={`tax-form-${currentMember?.member_id}-${currentMember?.kyc?.bank_account_number || 'none'}-${currentMember?.kyc?.pan || 'none'}`}
+                      key={`tax-form-${currentMember?.member_id}-${currentMember?.kyc?.bank_account_number || 'none'}-${currentMember?.kyc?.pan || 'none'}-${currentMember?.kyc?.aadhaar || 'none'}`}
                       onSubmit={(e) => {
                         e.preventDefault();
                         const formData = new FormData(e.target);
                         const panVal = (formData.get('pan') || '').toUpperCase().trim();
-                        const bankNameVal = (formData.get('bank_name') || '').trim();
+                        const aadhaarVal = (taxAadhaarValue || formData.get('aadhaar') || '').trim();
+                        const bankNameVal = (ifscLookupData?.bank || formData.get('bank_name') || '').trim();
                         const accountVal = (taxBankAccValue || formData.get('bank_account_number') || '').trim();
-                        const ifscVal = (formData.get('bank_ifsc') || '').toUpperCase().trim();
+                        const ifscVal = (taxIfscValue || formData.get('bank_ifsc') || '').toUpperCase().trim();
                         const legalNameVal = (formData.get('legal_name') || '').trim();
 
                         if (panVal && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panVal)) {
                           addToast('error', 'Invalid PAN Format', 'PAN must be 10 alphanumeric characters (e.g., ABCDE1234F).');
                           return;
+                        }
+
+                        if (aadhaarVal) {
+                          const aRes = validateAadhaar(aadhaarVal);
+                          if (!aRes.isValid) {
+                            addToast('error', 'Invalid Aadhaar Checksum', aRes.message);
+                            return;
+                          }
                         }
 
                         if (ifscVal && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscVal)) {
@@ -2351,6 +2422,7 @@ export default function MemberDashboardView() {
 
                         submitKyc(currentMember.member_id || currentMember.id, {
                           pan: panVal,
+                          aadhaar: aadhaarVal,
                           bank_name: bankNameVal,
                           bank_account_number: accountVal,
                           bank_ifsc: ifscVal,
@@ -2372,6 +2444,83 @@ export default function MemberDashboardView() {
                       </div>
 
                       <div className="form-group-clean">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="form-label-clean mb-0">12-Digit Aadhaar Number</label>
+                          {taxAadhaarValue && (
+                            <button
+                              type="button"
+                              onClick={() => setShowTaxAadhaar(!showTaxAadhaar)}
+                              className="text-primary-blue text-xs font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                              title={showTaxAadhaar ? "Mask Aadhaar" : "Reveal Aadhaar"}
+                            >
+                              {showTaxAadhaar ? <EyeOff size={13} /> : <Eye size={13} />}
+                              <span>{showTaxAadhaar ? 'Mask' : 'Reveal'}</span>
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <input 
+                            type="text" 
+                            name="aadhaar_display"
+                            value={showTaxAadhaar ? formatAadhaarInput(taxAadhaarValue) : maskAadhaar(taxAadhaarValue)}
+                            onChange={(e) => {
+                              const clean = e.target.value.replace(/\D/g, '').slice(0, 12);
+                              setTaxAadhaarValue(clean);
+                            }}
+                            onFocus={() => setShowTaxAadhaar(true)}
+                            placeholder="e.g. 2345 6789 0124"
+                            maxLength={14}
+                            className="form-input-clean code-font" 
+                            style={{ paddingRight: '40px' }}
+                            autoComplete="off"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowTaxAadhaar(!showTaxAadhaar)}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              background: 'none',
+                              border: 'none',
+                              color: '#64748B',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '6px'
+                            }}
+                            title={showTaxAadhaar ? "Mask Aadhaar" : "Reveal Aadhaar"}
+                          >
+                            {showTaxAadhaar ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                          <input 
+                            type="hidden" 
+                            name="aadhaar" 
+                            value={taxAadhaarValue} 
+                          />
+                        </div>
+                        {taxAadhaarValue.length === 12 ? (() => {
+                          const vRes = validateAadhaar(taxAadhaarValue);
+                          return vRes.isValid ? (
+                            <div className="text-2xs text-success mt-1 flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              <span>Valid UIDAI Aadhaar (Verhoeff Checksum ✓)</span>
+                            </div>
+                          ) : (
+                            <div className="text-2xs text-rose mt-1 flex items-center gap-1">
+                              <AlertCircle size={12} />
+                              <span>{vRes.message}</span>
+                            </div>
+                          );
+                        })() : (
+                          <div className="text-2xs text-muted mt-1 flex items-center gap-1">
+                            <ShieldCheck size={12} className="text-success" />
+                            <span>Masked per UIDAI compliance (only last 4 digits visible).</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="form-group-clean">
                         <label className="form-label-clean">Legal Name (As on PAN & Bank)</label>
                         <input 
                           type="text" 
@@ -2387,7 +2536,7 @@ export default function MemberDashboardView() {
                         <input 
                           type="text" 
                           name="bank_name"
-                          defaultValue={currentMember?.kyc?.bank_name || ''} 
+                          defaultValue={ifscLookupData?.bank || currentMember?.kyc?.bank_name || ''} 
                           placeholder="e.g. HDFC Bank, SBI, ICICI"
                           className="form-input-clean" 
                         />
@@ -2455,15 +2604,61 @@ export default function MemberDashboardView() {
                       </div>
 
                       <div className="form-group-clean">
-                        <label className="form-label-clean">Bank IFSC Code</label>
-                        <input 
-                          type="text" 
-                          name="bank_ifsc"
-                          defaultValue={currentMember?.kyc?.bank_ifsc || ''} 
-                          placeholder="e.g. HDFC0001234"
-                          maxLength={11}
-                          className="form-input-clean code-font uppercase" 
-                        />
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="form-label-clean mb-0">Bank IFSC Code</label>
+                          {ifscLookupLoading && (
+                            <span className="text-2xs text-primary-blue flex items-center gap-1 font-semibold">
+                              <RefreshCw size={11} className="animate-spin" />
+                              <span>Checking RBI registry...</span>
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input 
+                            type="text" 
+                            name="bank_ifsc"
+                            value={taxIfscValue}
+                            onChange={(e) => {
+                              handleIfscLookup(e.target.value);
+                            }}
+                            placeholder="e.g. HDFC0001234"
+                            maxLength={11}
+                            className="form-input-clean code-font uppercase" 
+                            style={{ flex: 1 }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleIfscLookup(taxIfscValue)}
+                            disabled={ifscLookupLoading || !taxIfscValue}
+                            className="btn btn-secondary btn-sm"
+                            style={{ whiteSpace: 'nowrap', padding: '0 12px' }}
+                          >
+                            Verify IFSC
+                          </button>
+                        </div>
+                        {ifscLookupData && (
+                          <div className="mt-1.5 p-2.5 rounded-lg text-xs" style={{ background: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+                            <div className="font-bold flex items-center gap-1" style={{ color: '#1D4ED8' }}>
+                              <CheckCircle2 size={13} className="text-success" />
+                              <span>{ifscLookupData.bank}</span>
+                              <span className="badge badge-green text-3xs py-0 px-1 ml-1" style={{ fontSize: '9px', padding: '1px 5px' }}>RBI Verified</span>
+                            </div>
+                            <div className="mt-0.5" style={{ color: '#475569' }}>
+                              Branch: <span className="font-semibold text-slate-800">{ifscLookupData.branch}</span> • {ifscLookupData.city}, {ifscLookupData.state}
+                            </div>
+                          </div>
+                        )}
+                        {ifscLookupError && (
+                          <div className="text-2xs text-rose mt-1 flex items-center gap-1" style={{ color: '#E11D48' }}>
+                            <AlertCircle size={12} />
+                            <span>{ifscLookupError}</span>
+                          </div>
+                        )}
+                        {!ifscLookupData && !ifscLookupError && (
+                          <div className="text-2xs text-muted mt-1">
+                            Real-time branch detection via RBI registry (Razorpay IFSC API).
+                          </div>
+                        )}
                       </div>
 
                       <div className="full-grid-width mt-2">

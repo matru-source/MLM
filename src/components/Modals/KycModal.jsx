@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { useMlm } from '../../context/MlmContext';
-import { X, ShieldCheck, FileText, CheckCircle2, Building, AlertCircle, Upload, Check } from 'lucide-react';
+import { X, ShieldCheck, FileText, CheckCircle2, Building, AlertCircle, Upload, Check, RefreshCw } from 'lucide-react';
+import { validateAadhaar, lookupIfsc, formatAadhaarInput } from '../../utils/kycValidation';
 
 export default function KycModal({ isOpen, onClose, member }) {
   const { submitKyc } = useMlm();
 
   const [legalName, setLegalName] = useState(member?.kyc?.legal_name || member?.name || '');
   const [pan, setPan] = useState(member?.kyc?.pan || '');
+  const [aadhaarNumber, setAadhaarNumber] = useState(member?.kyc?.aadhaar || '');
   const [bankName, setBankName] = useState(member?.kyc?.bank_name || 'HDFC Bank');
   const [accountNumber, setAccountNumber] = useState(member?.kyc?.bank_account_number || '');
   const [ifsc, setIfsc] = useState(member?.kyc?.bank_ifsc || '');
+  const [ifscData, setIfscData] = useState(null);
+  const [ifscLoading, setIfscLoading] = useState(false);
+  const [ifscError, setIfscError] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(member?.kyc?.agreement_accepted || false);
   const [agreeRefund, setAgreeRefund] = useState(true);
   const [agreeConduct, setAgreeConduct] = useState(true);
@@ -56,6 +61,14 @@ export default function KycModal({ isOpen, onClose, member }) {
       return;
     }
 
+    if (aadhaarNumber) {
+      const aRes = validateAadhaar(aadhaarNumber);
+      if (!aRes.isValid) {
+        setError(`Aadhaar validation failed: ${aRes.message}`);
+        return;
+      }
+    }
+
     if (!accountNumber || accountNumber.length < 8) {
       setError('Please enter a valid bank account number.');
       return;
@@ -83,18 +96,19 @@ export default function KycModal({ isOpen, onClose, member }) {
 
     const submittedDocs = {
       pan: panFile ? panFile.dataUrl : (existingDocs.pan || 'Pending Upload'),
-      panName: panFile ? panFile.name : (existingDocs.panName || 'PAN_Card.jpg'),
+      panName: panFile ? panFile.name : (existingDocs.panName || null),
       bankAccount: bankFile ? bankFile.dataUrl : (existingDocs.bankAccount || 'Pending Upload'),
-      bankAccountName: bankFile ? bankFile.name : (existingDocs.bankAccountName || 'Bank_Proof.jpg'),
+      bankAccountName: bankFile ? bankFile.name : (existingDocs.bankAccountName || null),
       aadhaar: aadhaarFile ? aadhaarFile.dataUrl : (existingDocs.aadhaar || 'Pending Upload'),
-      aadhaarName: aadhaarFile ? aadhaarFile.name : (existingDocs.aadhaarName || 'Aadhaar_Card.jpg'),
+      aadhaarName: aadhaarFile ? aadhaarFile.name : (existingDocs.aadhaarName || null),
       addressProof: existingDocs.addressProof || 'Pending Upload'
     };
 
     submitKyc(member.member_id, {
       legal_name: legalName,
       pan: pan.toUpperCase(),
-      bank_name: bankName,
+      aadhaar: aadhaarNumber,
+      bank_name: ifscData?.bank || bankName,
       bank_account_number: accountNumber,
       bank_ifsc: ifsc.toUpperCase(),
       documents: submittedDocs
@@ -163,6 +177,36 @@ export default function KycModal({ isOpen, onClose, member }) {
                   placeholder="ABCDE1234F"
                 />
               </div>
+            </div>
+
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label className="input-label" style={{ marginBottom: 0 }}>12-Digit Aadhaar Number (UIDAI)</label>
+                <span style={{ fontSize: '11px', color: '#64748B' }}>Direct Selling Rules 2021 Identity Proof</span>
+              </div>
+              <input
+                type="text"
+                maxLength={14}
+                value={formatAadhaarInput(aadhaarNumber)}
+                onChange={(e) => {
+                  const clean = e.target.value.replace(/\D/g, '').slice(0, 12);
+                  setAadhaarNumber(clean);
+                }}
+                className="form-input code-font"
+                placeholder="2345 6789 0124"
+              />
+              {aadhaarNumber.length === 12 && (() => {
+                const v = validateAadhaar(aadhaarNumber);
+                return v.isValid ? (
+                  <span style={{ fontSize: '11px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                    <CheckCircle2 size={12} /> Valid UIDAI Aadhaar (Verhoeff Checksum Passed ✓)
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '11px', color: '#EF4444', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                    <AlertCircle size={12} /> {v.message}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
@@ -261,33 +305,74 @@ export default function KycModal({ isOpen, onClose, member }) {
             <div className="form-grid-2">
               <div>
                 <label className="input-label">Bank Name</label>
-                <select
-                  value={bankName}
+                <input
+                  type="text"
+                  required
+                  value={ifscData?.bank || bankName}
                   onChange={(e) => setBankName(e.target.value)}
-                  className="form-select"
-                >
-                  <option value="HDFC Bank">HDFC Bank</option>
-                  <option value="ICICI Bank">ICICI Bank</option>
-                  <option value="State Bank of India">State Bank of India</option>
-                  <option value="Axis Bank">Axis Bank</option>
-                  <option value="Kotak Mahindra Bank">Kotak Mahindra Bank</option>
-                  <option value="Punjab National Bank">Punjab National Bank</option>
-                  <option value="Other Commercial Bank">Other Commercial Bank</option>
-                </select>
+                  className="form-input"
+                  placeholder="e.g. HDFC Bank, SBI"
+                />
               </div>
               <div>
-                <label className="input-label">IFSC Code</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="input-label" style={{ marginBottom: 0 }}>IFSC Code</label>
+                  {ifscLoading && (
+                    <span style={{ fontSize: '10px', color: '#2563EB', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <RefreshCw size={10} className="animate-spin" /> Verifying...
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   required
                   maxLength={11}
                   value={ifsc}
-                  onChange={(e) => setIfsc(e.target.value.toUpperCase())}
+                  onChange={async (e) => {
+                    const clean = e.target.value.toUpperCase().trim();
+                    setIfsc(clean);
+                    setIfscError('');
+                    if (/^[A-Z]{4}0[A-Z0-9]{6}$/.test(clean)) {
+                      setIfscLoading(true);
+                      const res = await lookupIfsc(clean);
+                      setIfscLoading(false);
+                      if (res.success) {
+                        setIfscData(res);
+                        setIfscError('');
+                        if (res.bank) setBankName(res.bank);
+                      } else {
+                        setIfscData(null);
+                        setIfscError(res.error || 'IFSC code not found in RBI registry.');
+                      }
+                    } else {
+                      setIfscData(null);
+                    }
+                  }}
                   className="form-input code-font"
                   placeholder="HDFC0001234"
                 />
               </div>
             </div>
+
+            {ifscData && (
+              <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '8px 12px', marginTop: '10px', fontSize: '12px' }}>
+                <div style={{ fontWeight: 700, color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CheckCircle2 size={13} className="text-emerald" />
+                  <span>{ifscData.bank}</span>
+                  <span style={{ background: '#D1FAE5', color: '#065F46', fontSize: '9px', fontWeight: 800, padding: '1px 6px', borderRadius: '4px' }}>
+                    RBI Verified
+                  </span>
+                </div>
+                <div style={{ color: '#475569', marginTop: '2px', fontSize: '11px' }}>
+                  Branch: <strong style={{ color: '#0F172A' }}>{ifscData.branch}</strong> • {ifscData.city}, {ifscData.state}
+                </div>
+              </div>
+            )}
+            {ifscError && (
+              <div style={{ color: '#EF4444', fontSize: '11px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <AlertCircle size={12} /> {ifscError}
+              </div>
+            )}
 
             <div className="form-group-single">
               <label className="input-label">Account Number</label>
