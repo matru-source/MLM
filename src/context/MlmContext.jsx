@@ -1193,20 +1193,13 @@ export function MlmProvider({ children }) {
       return m;
     }));
 
-    setCurrentMember(prev => {
-      if (prev && (prev.member_id === memberId || prev.id === memberId)) {
-        return { ...prev, kyc: updatedKyc };
-      }
-      return prev;
-    });
-
     // Persist to live Neon PostgreSQL
     dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
 
     if (hasDocuments) {
       addToast('info', 'KYC Documents Submitted for Review', 'Your KYC documents have been submitted to compliance. Verification takes 24-48 hours.');
     } else {
-      addToast('warning', 'Bank Details Saved (Documents Pending)', 'Bank details saved, but please upload your PAN and Aadhaar identity documents for compliance verification.');
+      addToast('success', 'Bank & Tax Details Saved', 'Settlement bank account and PAN details successfully linked and saved.');
     }
     return true;
   };
@@ -1268,13 +1261,6 @@ export function MlmProvider({ children }) {
       return m;
     }));
 
-    setCurrentMember(prev => {
-      if (prev && (prev.member_id === memberId || prev.id === memberId)) {
-        return { ...prev, kyc: updatedKyc };
-      }
-      return prev;
-    });
-
     dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
     addToast('success', 'Document Uploaded', `${docType.toUpperCase()} uploaded. Status updated to Under Review.`);
     return true;
@@ -1306,31 +1292,6 @@ export function MlmProvider({ children }) {
       return m;
     }));
 
-    setCurrentMember(prev => {
-      if (prev && (prev.member_id === memberId || prev.id === memberId)) {
-        const kyc = prev.kyc || {};
-        const docs = kyc.documents || {};
-        const verifiedDocs = { ...docs };
-        const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
-        primaryDocKeys.forEach(k => {
-          if (docs[k] || docs[`${k}File`] || docs[`${k}Name`]) {
-            verifiedDocs[k] = 'Verified ✓';
-            verifiedDocs[`${k}Status`] = 'verified';
-          }
-        });
-        return {
-          ...prev,
-          kyc: {
-            ...kyc,
-            verification_status: 'verified',
-            documents: verifiedDocs,
-            verified_at: new Date().toISOString()
-          }
-        };
-      }
-      return prev;
-    });
-
     addToast('success', 'KYC Approved', 'Partner KYC and documents successfully verified.');
   };
 
@@ -1348,20 +1309,6 @@ export function MlmProvider({ children }) {
       }
       return m;
     }));
-
-    setCurrentMember(prev => {
-      if (prev && (prev.member_id === memberId || prev.id === memberId)) {
-        return {
-          ...prev,
-          kyc: {
-            ...(prev.kyc || {}),
-            verification_status: 'rejected',
-            rejection_reason: reason
-          }
-        };
-      }
-      return prev;
-    });
 
     addToast('error', 'KYC Rejected', `Partner KYC rejected: ${reason}`);
   };
@@ -1406,53 +1353,83 @@ export function MlmProvider({ children }) {
       return o;
     }));
 
-    // Credit direct retail partner commission (₹1,000) to actual referring sponsor
-    const activatedMember = members.find(m => m.member_id === act.member_id);
-    const targetSponsorRef = (activatedMember?.sponsor_member_id || 
-                              activatedMember?.sponsor_code || 
-                              act.sponsor_code || '').trim().toUpperCase();
+    // Credit multi-tier retail partner commissions across all 6 upline levels (₹1000, ₹300, ₹150, ₹50, ₹25, ₹25)
+    const activatedMember = members.find(m => m.member_id === act.member_id || m.id === act.member_id);
+    const rates = [1000, 300, 150, 50, 25, 25];
+    const newTransactions = [];
+    const creditsByMemberId = {};
 
-    const actualSponsor = targetSponsorRef
-      ? members.find(m => 
-          (m.member_id && m.member_id.toUpperCase() === targetSponsorRef) ||
-          (m.referral_code && m.referral_code.toUpperCase() === targetSponsorRef) ||
-          (m.cs_customer_id && m.cs_customer_id.toUpperCase() === targetSponsorRef)
-        )
-      : null;
+    let currentUplineTarget = activatedMember;
+    const visited = new Set([act.member_id]);
 
-    const sponsorIdentifier = actualSponsor?.member_id || targetSponsorRef || 'mem_matru';
+    for (let level = 1; level <= 6; level++) {
+      if (!currentUplineTarget) break;
 
-    setMembers(prev => prev.map(m => {
-      const isSponsor = actualSponsor 
-        ? m.member_id === actualSponsor.member_id 
-        : ((m.member_id && m.member_id.toUpperCase() === targetSponsorRef) || 
-           (m.referral_code && m.referral_code.toUpperCase() === targetSponsorRef));
-      if (isSponsor) {
-        return {
-          ...m,
-          wallet_balance: Number(m.wallet_balance || 0) + 1000,
-          total_earnings: Number(m.total_earnings || 0) + 1000
-        };
-      }
-      return m;
-    }));
+      const sponsorRef = (
+        currentUplineTarget.sponsor_member_id || 
+        currentUplineTarget.sponsor_code || 
+        (level === 1 ? act.sponsor_code : '') || 
+        ''
+      ).trim().toUpperCase();
 
-    // CRUCIAL: Only update the active session's wallet balance IF the currently logged-in user IS genuinely the sponsor!
-    // Admin approving someone else's referral must NEVER have their own wallet balance increase!
-    if (currentMember && actualSponsor && currentMember.member_id === actualSponsor.member_id) {
-      setAvailableBalance(prev => prev + 1000);
-      setTotalEarnings(prev => prev + 1000);
+      if (!sponsorRef) break;
+
+      const sponsor = members.find(m => 
+        (m.member_id && m.member_id.toUpperCase() === sponsorRef) ||
+        (m.id && m.id.toUpperCase() === sponsorRef) ||
+        (m.referral_code && m.referral_code.toUpperCase() === sponsorRef) ||
+        (m.cs_customer_id && m.cs_customer_id.toUpperCase() === sponsorRef)
+      );
+
+      if (!sponsor) break;
+
+      const sponsorId = sponsor.member_id || sponsor.id;
+      if (visited.has(sponsorId)) break;
+      visited.add(sponsorId);
+
+      const rate = rates[level - 1];
+      creditsByMemberId[sponsorId] = (creditsByMemberId[sponsorId] || 0) + rate;
+
+      newTransactions.push({
+        id: generateId('tx'),
+        member_id: sponsorId,
+        date: 'Just Now',
+        description: `Retail Partner Commission (Level ${level}) - ₹2,500 Joining Activation from ${act.member_name}`,
+        amount: rate,
+        type: 'credit',
+        status: 'Available'
+      });
+
+      // Advance to next upline level
+      currentUplineTarget = sponsor;
     }
 
-    setTransactions(prev => [{
-      id: generateId('tx'),
-      member_id: sponsorIdentifier,
-      date: 'Just Now',
-      description: `Retail Partner Commission (Level 1) - ₹2,500 Joining Activation from ${act.member_name}`,
-      amount: 1000,
-      type: 'credit',
-      status: 'Available'
-    }, ...prev]);
+    if (Object.keys(creditsByMemberId).length > 0) {
+      setMembers(prev => prev.map(m => {
+        const id = m.member_id || m.id;
+        const addAmount = creditsByMemberId[id];
+        if (addAmount) {
+          return {
+            ...m,
+            wallet_balance: Number(m.wallet_balance || 0) + addAmount,
+            total_earnings: Number(m.total_earnings || 0) + addAmount
+          };
+        }
+        return m;
+      }));
+
+      // Update active session wallet balance if current logged-in member is in the upline chain
+      if (currentMember) {
+        const myId = currentMember.member_id || currentMember.id;
+        const myCredit = creditsByMemberId[myId];
+        if (myCredit) {
+          setAvailableBalance(prev => prev + myCredit);
+          setTotalEarnings(prev => prev + myCredit);
+        }
+      }
+
+      setTransactions(prev => [...newTransactions, ...prev]);
+    }
 
     // Persist activation approval, software license unlock and commission to live Neon PostgreSQL
     dbApproveActivation(activationId).then(res => {

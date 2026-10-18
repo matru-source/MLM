@@ -191,22 +191,18 @@ export default function AdminPortalView() {
     if (!selectedPayoutForManualPay) return;
 
     const cleanUtr = manualUtr.trim().toUpperCase();
-    if (!cleanUtr || cleanUtr.length < 8) {
-      addToast('error', 'UTR Missing or Invalid', 'Please enter a valid 8 to 22-digit Bank Reference / UTR Number from your corporate bank transfer.');
+    if (!cleanUtr || cleanUtr.length < 6) {
+      addToast('error', 'UTR Missing or Invalid', 'Please enter a valid Bank Reference / UTR Number from your corporate bank transfer.');
       return;
     }
 
-    if (!screenshotPreview) {
-      addToast('error', 'Bank Counterfoil Required', 'Compliance Requirement: Please attach the genuine bank transfer receipt/screenshot before confirming disbursement.');
-      return;
-    }
-
+    // Payment proof screenshot is strictly optional: admin can proceed with UTR reference alone
     approvePayout({
       payoutId: selectedPayoutForManualPay.id,
       utrNumber: cleanUtr,
-      receiptUrl: screenshotPreview,
+      receiptUrl: screenshotPreview || '',
       paymentMode: paymentMode,
-      adminNotes: adminNotes || 'Disbursed via verified corporate net banking.'
+      adminNotes: adminNotes || 'Disbursed via verified corporate banking gateway.'
     });
 
     setSelectedPayoutForManualPay(null);
@@ -1195,31 +1191,31 @@ export default function AdminPortalView() {
                 </div>
 
                 <div className="beneficiary-details-grid">
-                  <div className="pay-field-box">
-                    <span className="pay-field-lbl">Beneficiary Legal Name</span>
-                    <span className="pay-field-val font-bold">
+                  <div className="pay-detail-item">
+                    <span className="pay-lbl">Beneficiary Legal Name</span>
+                    <span className="pay-val">
                       {selectedPayoutForManualPay.bank_details?.account_holder || selectedPayoutForManualPay.member_name}
                     </span>
                   </div>
 
-                  <div className="pay-field-box">
-                    <span className="pay-field-lbl">Bank Name</span>
-                    <span className="pay-field-val">
-                      {selectedPayoutForManualPay.bank_details?.bank_name || 'Commercial Bank'}
+                  <div className="pay-detail-item">
+                    <span className="pay-lbl">Bank Name</span>
+                    <span className="pay-val">
+                      {selectedPayoutForManualPay.bank_details?.bank_name || selectedPayoutForManualPay.bank_name || 'Commercial Bank'}
                     </span>
                   </div>
 
-                  <div className="pay-field-box">
-                    <span className="pay-field-lbl">Full Bank Account Number</span>
-                    <div className="copy-action-row">
-                      <span className="pay-field-val code-font font-bold text-primary">
-                        {selectedPayoutForManualPay.bank_details?.account_number || 'Not Provided'}
+                  <div className="pay-detail-item">
+                    <span className="pay-lbl">Full Bank Account Number</span>
+                    <div className="pay-val-copy-row">
+                      <span className="pay-val code-font text-primary-blue">
+                        {selectedPayoutForManualPay.bank_details?.account_number || selectedPayoutForManualPay.bank_account || 'Not Provided'}
                       </span>
-                      {selectedPayoutForManualPay.bank_details?.account_number && (
+                      {(selectedPayoutForManualPay.bank_details?.account_number || selectedPayoutForManualPay.bank_account) && (
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(selectedPayoutForManualPay.bank_details.account_number);
+                            navigator.clipboard.writeText(selectedPayoutForManualPay.bank_details?.account_number || selectedPayoutForManualPay.bank_account);
                             setIsCopiedAc(true);
                             setTimeout(() => setIsCopiedAc(false), 2000);
                             addToast('success', 'A/C Copied', 'Account number copied to clipboard.');
@@ -1234,17 +1230,17 @@ export default function AdminPortalView() {
                     </div>
                   </div>
 
-                  <div className="pay-field-box">
-                    <span className="pay-field-lbl">IFSC Code</span>
-                    <div className="copy-action-row">
-                      <span className="pay-field-val code-font font-bold">
-                        {selectedPayoutForManualPay.bank_details?.ifsc || 'Not Provided'}
+                  <div className="pay-detail-item">
+                    <span className="pay-lbl">IFSC Code</span>
+                    <div className="pay-val-copy-row">
+                      <span className="pay-val code-font">
+                        {selectedPayoutForManualPay.bank_details?.ifsc || selectedPayoutForManualPay.bank_ifsc || 'Not Provided'}
                       </span>
-                      {selectedPayoutForManualPay.bank_details?.ifsc && (
+                      {(selectedPayoutForManualPay.bank_details?.ifsc || selectedPayoutForManualPay.bank_ifsc) && (
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(selectedPayoutForManualPay.bank_details.ifsc);
+                            navigator.clipboard.writeText(selectedPayoutForManualPay.bank_details?.ifsc || selectedPayoutForManualPay.bank_ifsc);
                             setIsCopiedIfsc(true);
                             setTimeout(() => setIsCopiedIfsc(false), 2000);
                             addToast('success', 'IFSC Copied', 'IFSC code copied to clipboard.');
@@ -1263,11 +1259,19 @@ export default function AdminPortalView() {
                 {/* Amount to transfer banner */}
                 <div className="admin-net-pay-banner">
                   <div className="pay-banner-breakdown">
-                    <span>Gross Requested: <strong>₹{selectedPayoutForManualPay.amount.toLocaleString('en-IN')}</strong></span>
-                    <span>{selectedPayoutForManualPay.tds_rate ? `${selectedPayoutForManualPay.tds_rate}% TDS Deducted` : 'TDS Deducted'} ({selectedPayoutForManualPay.tds_section || 'Statutory'}): <strong className="text-rose">-₹{selectedPayoutForManualPay.tds_amount.toLocaleString('en-IN')}</strong></span>
+                    <div className="breakdown-line">
+                      <span className="text-xs text-muted">Gross Requested:</span>
+                      <strong className="text-sm">₹{selectedPayoutForManualPay.amount.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="breakdown-line">
+                      <span className="text-xs text-muted">
+                        {selectedPayoutForManualPay.tds_rate ? `${selectedPayoutForManualPay.tds_rate}% TDS Deducted` : 'TDS Deducted'} ({selectedPayoutForManualPay.tds_section || 'Statutory'}):
+                      </span>
+                      <strong className="text-sm text-rose">-₹{selectedPayoutForManualPay.tds_amount.toLocaleString('en-IN')}</strong>
+                    </div>
                   </div>
                   <div className="pay-banner-final">
-                    <span className="final-pay-lbl">NET AMOUNT TO TRANSFER:</span>
+                    <span className="final-pay-lbl">NET AMOUNT TO TRANSFER</span>
                     <span className="final-pay-num">₹{selectedPayoutForManualPay.net_payable.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
@@ -1275,9 +1279,9 @@ export default function AdminPortalView() {
 
               {/* Instructions Callout */}
               <div className="admin-instruction-alert">
-                <AlertCircle size={16} className="text-primary-blue flex-shrink-0" />
-                <p className="text-xs text-secondary mb-0">
-                  <strong>Admin Instructions:</strong> Open your Corporate NetBanking / UPI, initiate a transfer of <strong>₹{selectedPayoutForManualPay.net_payable.toLocaleString('en-IN')}</strong> to the beneficiary above, enter the generated Bank UTR Reference, and attach the payment confirmation screenshot. The user's balance will be deducted immediately upon your confirmation.
+                <AlertCircle size={18} className="text-primary-blue flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-secondary mb-0 leading-relaxed">
+                  <strong>Admin Instructions:</strong> Open your Corporate NetBanking / UPI, initiate a transfer of <strong>₹{selectedPayoutForManualPay.net_payable.toLocaleString('en-IN')}</strong> to the beneficiary above, enter the generated Bank UTR Reference, and optionally attach the payment confirmation screenshot. The user's balance will be deducted immediately upon your confirmation.
                 </p>
               </div>
 
@@ -1310,28 +1314,28 @@ export default function AdminPortalView() {
                 </div>
               </div>
 
-              {/* Screenshot Attachment Section */}
+              {/* Screenshot Attachment Section (Optional) */}
               <div className="form-group-clean">
                 <div className="screenshot-label-row">
-                  <label className="form-label-clean mb-0">Genuine Bank Payment Proof / Counterfoil *</label>
-                  <span className="badge badge-amber font-xs font-semibold">Banking Compliance Mandate</span>
+                  <label className="form-label-clean mb-0">Bank Payment Receipt / Screenshot (Optional)</label>
+                  <span className="badge badge-blue font-xs">Optional</span>
                 </div>
                 <p className="text-muted font-xs mt-1 mb-2">
-                  Admin must disburse funds via corporate net banking / UPI and attach the authentic bank counterfoil. Simulated or fabricated receipts are strictly prohibited under financial audit rules.
+                  Entering the UTR reference number alone is sufficient to approve payout. Uploading a receipt screenshot is optional.
                 </p>
 
                 <div className="upload-dropzone-box">
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     id="admin-screenshot-upload"
                     onChange={handleFileUpload}
                     style={{ display: 'none' }}
                   />
                   <label htmlFor="admin-screenshot-upload" className="dropzone-label">
                     <Upload size={18} className="text-primary-blue mb-1" />
-                    <span className="font-semibold text-xs text-primary">Click to Upload Payment Screenshot</span>
-                    <span className="text-muted font-xs">PNG, JPG, or PDF confirmation (max 5MB)</span>
+                    <span className="font-semibold text-xs text-primary">Click to Upload Payment Screenshot (Optional)</span>
+                    <span className="text-muted font-xs">PNG, JPG, or PDF (optional)</span>
                   </label>
                 </div>
 

@@ -419,46 +419,61 @@ export default async function handler(req, res) {
           WHERE buyer_member_id = ${act.member_id} OR order_id = ${act.payment_ref};
         `;
 
-        // 4. Credit Level-1 sponsor (₹1,000)
-        // Check the member row first to get the official registered sponsor
-        const memberRows = await sql`
-          SELECT sponsor_member_id, sponsor_code FROM members WHERE id = ${act.member_id} LIMIT 1;
-        `;
-        const registeredMem = memberRows[0] || {};
-        const sponsorRef = registeredMem.sponsor_member_id || registeredMem.sponsor_code || act.sponsor_code || 'CS123456';
+        // 4. Credit multi-tier upline partners across all 6 levels (₹1000, ₹300, ₹150, ₹50, ₹25, ₹25)
+        const allDbMembers = await sql`SELECT id, referral_code, cs_customer_id, sponsor_member_id, sponsor_code FROM members;`;
+        const rates = [1000, 300, 150, 50, 25, 25];
 
-        const sponsorRows = await sql`
-          SELECT id, name FROM members 
-          WHERE UPPER(referral_code) = UPPER(${sponsorRef}) 
-             OR id = ${sponsorRef} 
-             OR cs_customer_id = ${sponsorRef}
-          LIMIT 1;
-        `;
+        let currentUplineId = act.member_id;
+        const visited = new Set([act.member_id]);
 
-        if (sponsorRows.length > 0) {
-          const sponsor = sponsorRows[0];
+        for (let level = 1; level <= 6; level++) {
+          const currentMem = allDbMembers.find(m => m.id === currentUplineId);
+          if (!currentMem && level > 1) break;
+
+          const sponsorRef = (
+            (currentMem ? (currentMem.sponsor_member_id || currentMem.sponsor_code) : null) ||
+            (level === 1 ? act.sponsor_code : null) ||
+            ''
+          ).trim().toUpperCase();
+
+          if (!sponsorRef) break;
+
+          const sponsor = allDbMembers.find(m =>
+            (m.id && m.id.toUpperCase() === sponsorRef) ||
+            (m.referral_code && m.referral_code.toUpperCase() === sponsorRef) ||
+            (m.cs_customer_id && m.cs_customer_id.toUpperCase() === sponsorRef)
+          );
+
+          if (!sponsor) break;
+          if (visited.has(sponsor.id)) break;
+          visited.add(sponsor.id);
+
+          const rate = rates[level - 1];
+
           await sql`
             UPDATE members
             SET 
-              wallet_balance = COALESCE(wallet_balance, 0) + 1000,
-              total_earnings = COALESCE(total_earnings, 0) + 1000
+              wallet_balance = COALESCE(wallet_balance, 0) + ${rate},
+              total_earnings = COALESCE(total_earnings, 0) + ${rate}
             WHERE id = ${sponsor.id};
           `;
 
-          const txId = `tx_act_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+          const txId = `tx_act_${Date.now()}_${Math.floor(Math.random() * 10000)}_${level}`;
           await sql`
             INSERT INTO transactions (
               id, member_id, description, amount, type, status, created_at
             ) VALUES (
               ${txId},
               ${sponsor.id},
-              ${`Retail Partner Commission (Level 1) - ₹2,500 Joining Activation from ${act.member_name}`},
-              1000,
+              ${`Retail Partner Commission (Level ${level}) - ₹2,500 Joining Activation from ${act.member_name}`},
+              ${rate},
               'credit',
               'Available',
               NOW()
             );
           `;
+
+          currentUplineId = sponsor.id;
         }
 
         return res.status(200).json({ ok: true });
@@ -621,7 +636,10 @@ export default async function handler(req, res) {
         await sql`
           UPDATE members
           SET kyc_data = ${JSON.stringify(kyc || {})}
-          WHERE id = ${memberId};
+          WHERE id = ${memberId} 
+             OR id = LOWER(${memberId}) 
+             OR referral_code = ${memberId}
+             OR cs_customer_id = ${memberId};
         `;
         return res.status(200).json({ ok: true });
       }

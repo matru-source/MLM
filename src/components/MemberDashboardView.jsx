@@ -2104,33 +2104,37 @@ export default function MemberDashboardView() {
                     <h5 className="font-bold text-base mb-1">Bank Settlement & Statutory Tax Account</h5>
                     <p className="text-muted text-xs mb-4">Enter your Permanent Account Number (PAN) and verified bank account details to receive direct commission payouts via IMPS/NEFT.</p>
 
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const formData = new FormData(e.target);
-                      const panVal = (formData.get('pan') || '').toUpperCase().trim();
-                      const bankNameVal = (formData.get('bank_name') || '').trim();
-                      const accountVal = (formData.get('bank_account_number') || '').trim();
-                      const ifscVal = (formData.get('bank_ifsc') || '').toUpperCase().trim();
-                      const legalNameVal = (formData.get('legal_name') || '').trim();
+                    <form 
+                      key={`tax-form-${currentMember?.member_id}-${currentMember?.kyc?.bank_account_number || 'none'}-${currentMember?.kyc?.pan || 'none'}`}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.target);
+                        const panVal = (formData.get('pan') || '').toUpperCase().trim();
+                        const bankNameVal = (formData.get('bank_name') || '').trim();
+                        const accountVal = (formData.get('bank_account_number') || '').trim();
+                        const ifscVal = (formData.get('bank_ifsc') || '').toUpperCase().trim();
+                        const legalNameVal = (formData.get('legal_name') || '').trim();
 
-                      if (panVal && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panVal)) {
-                        addToast('error', 'Invalid PAN Format', 'PAN must be 10 alphanumeric characters (e.g., ABCDE1234F).');
-                        return;
-                      }
+                        if (panVal && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panVal)) {
+                          addToast('error', 'Invalid PAN Format', 'PAN must be 10 alphanumeric characters (e.g., ABCDE1234F).');
+                          return;
+                        }
 
-                      if (ifscVal && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscVal)) {
-                        addToast('error', 'Invalid IFSC Format', 'IFSC code must be 11 characters (e.g., HDFC0001234).');
-                        return;
-                      }
+                        if (ifscVal && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscVal)) {
+                          addToast('error', 'Invalid IFSC Format', 'IFSC code must be 11 characters (e.g., HDFC0001234).');
+                          return;
+                        }
 
-                      submitKyc(currentMember.member_id || currentMember.id, {
-                        pan: panVal,
-                        bank_name: bankNameVal,
-                        bank_account_number: accountVal,
-                        bank_ifsc: ifscVal,
-                        legal_name: legalNameVal || currentMember?.name
-                      });
-                    }} className="kyc-form-grid">
+                        submitKyc(currentMember.member_id || currentMember.id, {
+                          pan: panVal,
+                          bank_name: bankNameVal,
+                          bank_account_number: accountVal,
+                          bank_ifsc: ifscVal,
+                          legal_name: legalNameVal || currentMember?.name
+                        });
+                      }} 
+                      className="kyc-form-grid"
+                    >
                       <div className="form-group-clean">
                         <label className="form-label-clean">10-Digit PAN Number</label>
                         <input 
