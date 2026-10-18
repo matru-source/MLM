@@ -1582,11 +1582,10 @@ export function MlmProvider({ children }) {
     const visited = new Set([act.member_id]);
 
     for (let level = 1; level <= 10; level++) {
-      if (!currentUplineTarget) break;
+      if (!currentUplineTarget && level > 1) break;
 
       const sponsorRef = (
-        currentUplineTarget.sponsor_member_id || 
-        currentUplineTarget.sponsor_code || 
+        (currentUplineTarget ? (currentUplineTarget.sponsor_member_id || currentUplineTarget.sponsor_code) : '') || 
         (level === 1 ? act.sponsor_code : '') || 
         ''
       ).trim().toUpperCase();
