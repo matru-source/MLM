@@ -210,7 +210,7 @@ export default function CheckoutModal() {
                   {currentMember.name}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
-                  {currentMember.email} • {currentMember.phone || 'Verified'}
+                  {currentMember.phone ? `Mobile: ${currentMember.phone}` : (currentMember.member_id || 'Verified Partner')}
                 </div>
               </div>
 

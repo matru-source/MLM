@@ -229,7 +229,7 @@ export default function Navbar() {
                       />
                       <div>
                         <div className="font-bold text-sm">{currentMember?.name}</div>
-                        <div className="text-muted font-xs">{currentMember?.rank} • {currentMember?.email}</div>
+                        <div className="text-muted font-xs">{currentMember?.rank} • {currentMember?.phone || currentMember?.email}</div>
                       </div>
                     </div>
 

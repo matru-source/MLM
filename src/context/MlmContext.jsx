@@ -1079,15 +1079,17 @@ export function MlmProvider({ children }) {
     return true;
   };
 
-  // Register New User (Step 2 of Brevo Email OTP verification)
+  // Register New User (Direct 1-step registration with Mobile Number & Password)
   const registerUser = async ({ fullName, email, mobile, password, sponsorId, sponsorMemberId, sponsorName, isSeller }) => {
     const newMemberId = generateId('mem');
+    const cleanMobile = (mobile || '').replace(/\D/g, '');
+    const cleanEmail = email && email.trim() ? email.trim() : (cleanMobile ? `${cleanMobile}@cybershield.net` : `${newMemberId}@cybershield.net`);
     const passwordHash = password ? await hashPassword(password) : '';
     const newMember = {
       member_id: newMemberId,
       name: fullName,
-      email: email,
-      phone: mobile,
+      email: cleanEmail,
+      phone: mobile || cleanMobile,
       password: passwordHash, // Cryptographically hashed with salt (SHA-256)
       avatar: '/matru-avatar.jpg',
       rank: isSeller ? 'Partner (Pending Plan Purchase)' : 'Customer',
@@ -1133,7 +1135,7 @@ export function MlmProvider({ children }) {
     // Persist to live Neon PostgreSQL with cryptographically hashed password
     dbRegisterMember(newMember).catch(err => console.warn('[Neon DB] dbRegisterMember error:', err));
 
-    addToast('success', 'Email Verified & Account Created!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
+    addToast('success', 'Account Created Successfully!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
     
     // Automatically prompt checkout for ₹2,500 Joining Plan
     setTimeout(() => {
@@ -1477,25 +1479,45 @@ export function MlmProvider({ children }) {
     return true;
   };
 
-  // Login as existing member by email or ID with Cryptographic Password Verification
-  const loginUserByEmail = async ({ email, password }) => {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    if (!cleanEmail) {
-      return { ok: false, error: 'Please enter your registered email address.' };
+  // Login as existing member by Mobile Number, Member ID, Referral Code, or Email
+  const loginUserByEmail = async ({ identifier, email, password }) => {
+    const input = (identifier || email || '').trim();
+    if (!input) {
+      return { ok: false, error: 'Please enter your 10-digit Mobile Number or Partner ID.' };
     }
     if (!password) {
       return { ok: false, error: 'Please enter your account password.' };
     }
 
-    const found = members.find(m => 
-      (m.email && m.email.toLowerCase() === cleanEmail) ||
-      (m.member_id && m.member_id.toLowerCase() === cleanEmail) ||
-      (m.cs_customer_id && m.cs_customer_id.toLowerCase() === cleanEmail)
-    );
+    const cleanInput = input.toLowerCase();
+    const cleanDigits = input.replace(/\D/g, '');
+
+    const found = members.find(m => {
+      // 1. Mobile Number (match 10 digits)
+      if (cleanDigits.length >= 10 && m.phone) {
+        const memDigits = m.phone.replace(/\D/g, '');
+        if (memDigits.length >= 10 && memDigits.slice(-10) === cleanDigits.slice(-10)) {
+          return true;
+        }
+      }
+      // 2. Exact phone match
+      if (m.phone && m.phone.trim() === input) return true;
+      // 3. Member ID match
+      if (m.member_id && m.member_id.toLowerCase() === cleanInput) return true;
+      if (m.id && m.id.toLowerCase() === cleanInput) return true;
+      // 4. Referral Code match
+      if (m.referral_code && m.referral_code.toLowerCase() === cleanInput) return true;
+      // 5. CS Customer ID match
+      if (m.cs_customer_id && m.cs_customer_id.toLowerCase() === cleanInput) return true;
+      // 6. Email fallback
+      if (m.email && m.email.toLowerCase() === cleanInput) return true;
+      return false;
+    });
+
     if (!found) {
       return { 
         ok: false, 
-        error: `No partner account found with email "${cleanEmail}". Please check your email or click "Create Account".` 
+        error: `No partner account found with mobile number or Partner ID "${input}". Please check your credentials or click "Join Now".` 
       };
     }
 
@@ -1684,6 +1706,7 @@ export function MlmProvider({ children }) {
       rejectKyc,
       getMemberWallet,
       requestPayout,
+      loginUser: loginUserByEmail,
       loginUserByEmail,
       isDbConnected,
       zexLinkStatus,
