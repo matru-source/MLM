@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
 import { getDocumentFile } from '../utils/documentStorage';
+import { getEffectiveKycStatus, getKycStatusBadge } from '../utils/kycValidation';
 
 export default function MemberDashboardView() {
   const { 
@@ -1372,13 +1373,21 @@ export default function MemberDashboardView() {
                           <div className="text-muted font-xs">
                             {currentMember?.kyc?.bank_account_number 
                               ? `IFSC: ${currentMember.kyc.bank_ifsc} • Beneficiary: ${currentMember.kyc.legal_name || currentMember.name}`
-                              : 'Documents verified! Enter your settlement bank account number & IFSC below to receive IMPS payouts.'}
+                              : 'Enter your settlement bank account number & IFSC below to receive IMPS payouts.'}
                           </div>
                         </div>
                       </div>
-                      <span className={`badge ${currentMember?.kyc?.bank_account_number ? 'badge-green' : 'badge-amber'} font-xs`}>
-                        {currentMember?.kyc?.bank_account_number ? 'KYC Verified ✓' : 'Action Required'}
-                      </span>
+                      {(() => {
+                        const effectiveStatus = getEffectiveKycStatus(currentMember);
+                        const hasBank = Boolean(currentMember?.kyc?.bank_account_number);
+                        if (effectiveStatus === 'verified' && hasBank) {
+                          return <span className="badge badge-green font-xs">Bank Verified ✓</span>;
+                        }
+                        if (hasBank) {
+                          return <span className="badge badge-amber font-xs">Bank Linked (KYC Under Review)</span>;
+                        }
+                        return <span className="badge badge-rose font-xs">Action Required</span>;
+                      })()}
                     </div>
 
                     {/* Quick Inline Bank Entry If Missing */}
@@ -1827,11 +1836,9 @@ export default function MemberDashboardView() {
                 <h3 className="kyc-user-name">{currentMember?.name || 'Registered Partner'}</h3>
                 <span className="badge badge-amber">{currentMember?.rank || 'Partner Member'}</span>
                 {(() => {
-                  const status = currentMember?.kyc?.verification_status;
-                  if (status === 'verified') return <span className="badge badge-green ml-2">KYC Verified ✓</span>;
-                  if (status === 'under_review') return <span className="badge badge-amber ml-2">KYC Under Verification</span>;
-                  if (status === 'rejected') return <span className="badge badge-rose ml-2">KYC Rejected</span>;
-                  return <span className="badge badge-neutral ml-2">KYC Documents Pending</span>;
+                  const effectiveStatus = getEffectiveKycStatus(currentMember);
+                  const badgeInfo = getKycStatusBadge(effectiveStatus);
+                  return <span className={`badge ${badgeInfo.badgeClass} ml-2`}>{badgeInfo.label}</span>;
                 })()}
               </div>
             </div>
@@ -1972,12 +1979,12 @@ export default function MemberDashboardView() {
                   return { label: 'Pending Upload', badge: 'badge-neutral', isUploaded: false, isVerified: false, fileName: null };
                 }
 
-                const overallStatus = currentMember?.kyc?.verification_status;
+                const effectiveStatus = getEffectiveKycStatus(currentMember);
                 const docStatus = docs[`${docKey}Status`];
                 const isDocVerifiedText = docVal === 'Verified ✓' || docVal === 'Verified';
 
                 // Re-verification rule: only verified if overall is verified AND this document has not been replaced/re-uploaded
-                if (overallStatus === 'verified' && docStatus !== 'under_review' && isDocVerifiedText) {
+                if (effectiveStatus === 'verified' && docStatus !== 'under_review' && isDocVerifiedText) {
                   return { label: 'Verified ✓', badge: 'badge-green', isUploaded: true, isVerified: true, fileName };
                 }
 

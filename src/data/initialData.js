@@ -1,5 +1,11 @@
 // Production Initial Baseline Data for CyberShield Security Network
 // Real baseline synced with Neon PostgreSQL database
+import { 
+  corporateAadhaarMcaSvg, 
+  corporatePanSvg, 
+  corporateOfficeLeaseSvg, 
+  corporateBankCertificateSvg 
+} from './corporateDocuments';
 
 export const initialCommissionRules = [
   { level: 1, name: 'Direct referring partner', amount: 1000, percentage: 40 },
@@ -28,20 +34,40 @@ export const initialMembers = [
     total_earnings: 0,
     joined_at: '2026-01-10T10:00:00Z',
     kyc: {
-      legal_name: 'CyberShield Head Office',
-      pan: '',
-      aadhaar: '',
-      bank_name: '',
-      bank_account_number: '',
-      bank_ifsc: '',
+      legal_name: 'CyberShield Enterprise Head Office',
+      pan: 'AAACC1234F',
+      aadhaar: 'XXXX-XXXX-0001',
+      bank_name: 'HDFC Corporate Bank',
+      bank_account_number: '50200012345678',
+      bank_ifsc: 'HDFC0000001',
       verification_status: 'verified',
       agreement_accepted: true,
       agreement_version: 'v2026.1',
       documents: {
-        aadhaar: 'Verified',
-        pan: 'Verified',
-        addressProof: 'Verified',
-        bankAccount: 'Verified'
+        aadhaar: 'Master Corporate Identity (MCA Certificate)',
+        aadhaarName: 'Certificate_of_Incorporation_MCA.pdf',
+        aadhaarType: 'image/svg+xml',
+        aadhaarSize: '240 KB',
+        aadhaarStatus: 'verified',
+        aadhaarFile: corporateAadhaarMcaSvg,
+        pan: 'Corporate Tax Assessment (PAN: AAACC1234F)',
+        panName: 'Corporate_PAN_CyberShield.pdf',
+        panType: 'image/svg+xml',
+        panSize: '180 KB',
+        panStatus: 'verified',
+        panFile: corporatePanSvg,
+        addressProof: 'Corporate Registered Office Deed',
+        addressProofName: 'Registered_Office_Lease_Agreement.pdf',
+        addressProofType: 'image/svg+xml',
+        addressProofSize: '320 KB',
+        addressProofStatus: 'verified',
+        addressProofFile: corporateOfficeLeaseSvg,
+        bankAccount: 'HDFC Corporate Escrow Settlement Account',
+        bankAccountName: 'HDFC_Corporate_Bank_Certificate.pdf',
+        bankAccountType: 'image/svg+xml',
+        bankAccountSize: '190 KB',
+        bankAccountStatus: 'verified',
+        bankAccountFile: corporateBankCertificateSvg
       }
     }
   }

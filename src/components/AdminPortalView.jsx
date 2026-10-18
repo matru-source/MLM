@@ -30,6 +30,7 @@ import {
   FileText
 } from 'lucide-react';
 import { getDocumentFile, generateDocPlaceholder, saveDocumentFile } from '../utils/documentStorage';
+import { getEffectiveKycStatus } from '../utils/kycValidation';
 
 export default function AdminPortalView() {
   const { 
@@ -725,9 +726,10 @@ export default function AdminPortalView() {
                     );
 
                     const hasAnySubmissions = hasPanText || hasBankText || hasAnyUploadedDoc;
-                    const status = m.kyc?.verification_status || (hasAnyUploadedDoc ? 'under_review' : 'pending_documents');
-                    const isVerified = status === 'verified';
-                    const isUnderReview = status === 'under_review';
+                    const effectiveStatus = getEffectiveKycStatus(m);
+                    const isVerified = effectiveStatus === 'verified';
+                    const isUnderReview = effectiveStatus === 'under_review';
+                    const isRejected = effectiveStatus === 'rejected';
 
                     return (
                       <tr key={m.member_id || m.id}>
@@ -742,15 +744,17 @@ export default function AdminPortalView() {
                               <span className="font-semibold">{m.kyc.pan}</span>
                               <div className="mt-1 flex items-center gap-1.5">
                                 <span className="text-xs text-muted truncate max-w-[130px]">{panDoc.hasFile ? panDoc.fileName : 'No File'}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => openDocPreview(m, 'pan')}
-                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
-                                  title="View PAN Card document"
-                                >
-                                  <Eye size={11} />
-                                  <span>View</span>
-                                </button>
+                                {panDoc.hasFile && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openDocPreview(m, 'pan')}
+                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                    title="View PAN Card document"
+                                  >
+                                    <Eye size={11} />
+                                    <span>View</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ) : panDoc.hasFile ? (
@@ -772,32 +776,23 @@ export default function AdminPortalView() {
                           ) : isVerified ? (
                             <div>
                               <span className="badge badge-green text-xs">Verified ✓</span>
-                              <div className="mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => openDocPreview(m, 'pan')}
-                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
-                                  title="View PAN document status"
-                                >
-                                  <Eye size={11} />
-                                  <span>View</span>
-                                </button>
-                              </div>
+                              {panDoc.hasFile && (
+                                <div className="mt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openDocPreview(m, 'pan')}
+                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                    title="View PAN document status"
+                                  >
+                                    <Eye size={11} />
+                                    <span>View</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div>
                               <span className="text-muted italic text-xs">Not Submitted</span>
-                              <div className="mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => openDocPreview(m, 'pan')}
-                                  className="btn btn-secondary btn-xs flex items-center gap-0.5 py-0.5 px-1.5 text-muted"
-                                  title="Inspect PAN status"
-                                >
-                                  <Eye size={10} />
-                                  <span>Inspect</span>
-                                </button>
-                              </div>
                             </div>
                           )}
                         </td>
@@ -808,15 +803,17 @@ export default function AdminPortalView() {
                               {m.kyc.bank_ifsc && <div className="text-xs text-muted">IFSC: {m.kyc.bank_ifsc}</div>}
                               <div className="mt-1 flex items-center gap-1.5">
                                 <span className="text-xs text-muted truncate max-w-[130px]">{bankDoc.hasFile ? bankDoc.fileName : 'No File'}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => openDocPreview(m, 'bankAccount')}
-                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
-                                  title="View Bank Passbook document"
-                                >
-                                  <Eye size={11} />
-                                  <span>View</span>
-                                </button>
+                                {bankDoc.hasFile && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openDocPreview(m, 'bankAccount')}
+                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                    title="View Bank Passbook document"
+                                  >
+                                    <Eye size={11} />
+                                    <span>View</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ) : bankDoc.hasFile ? (
@@ -838,32 +835,23 @@ export default function AdminPortalView() {
                           ) : isVerified ? (
                             <div>
                               <span className="badge badge-green text-xs">Verified ✓</span>
-                              <div className="mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => openDocPreview(m, 'bankAccount')}
-                                  className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
-                                  title="View bank passbook status"
-                                >
-                                  <Eye size={11} />
-                                  <span>View</span>
-                                </button>
-                              </div>
+                              {bankDoc.hasFile && (
+                                <div className="mt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openDocPreview(m, 'bankAccount')}
+                                    className="btn btn-outline-blue btn-xs flex items-center gap-1 py-0.5 px-1.5"
+                                    title="View bank passbook status"
+                                  >
+                                    <Eye size={11} />
+                                    <span>View</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div>
                               <span className="text-muted italic text-xs">Pending Bank Setup</span>
-                              <div className="mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => openDocPreview(m, 'bankAccount')}
-                                  className="btn btn-secondary btn-xs flex items-center gap-0.5 py-0.5 px-1.5 text-muted"
-                                  title="Inspect Bank status"
-                                >
-                                  <Eye size={10} />
-                                  <span>Inspect</span>
-                                </button>
-                              </div>
                             </div>
                           )}
                         </td>
@@ -871,41 +859,45 @@ export default function AdminPortalView() {
                           <div className="text-xs flex items-center justify-between gap-1">
                             <div>
                               <span className="text-muted">Aadhaar: </span>
-                              <span className={aadhaarDoc.hasFile ? 'text-primary-blue font-semibold' : docs.aadhaar?.includes('Verified') ? 'text-success font-semibold' : 'text-muted'}>
-                                {aadhaarDoc.hasFile ? (aadhaarDoc.fileName || 'Uploaded') : (docs.aadhaar?.includes('Verified') ? 'Verified ✓' : 'Not Uploaded')}
+                              <span className={aadhaarDoc.hasFile ? 'text-primary-blue font-semibold' : isVerified ? 'text-success font-semibold' : 'text-muted'}>
+                                {aadhaarDoc.hasFile ? (aadhaarDoc.fileName || 'Uploaded') : isVerified ? 'Verified ✓' : 'Not Uploaded'}
                               </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => openDocPreview(m, 'aadhaar')}
-                              className="btn btn-outline-blue btn-xs flex items-center gap-0.5 py-0.5 px-1.5"
-                              title="View Aadhaar Card document"
-                            >
-                              <Eye size={10} />
-                              <span>View</span>
-                            </button>
+                            {aadhaarDoc.hasFile && (
+                              <button
+                                type="button"
+                                onClick={() => openDocPreview(m, 'aadhaar')}
+                                className="btn btn-outline-blue btn-xs flex items-center gap-0.5 py-0.5 px-1.5"
+                                title="View Aadhaar Card document"
+                              >
+                                <Eye size={10} />
+                                <span>View</span>
+                              </button>
+                            )}
                           </div>
                           <div className="text-xs flex items-center justify-between gap-1 mt-1.5">
                             <div>
                               <span className="text-muted">Address: </span>
-                              <span className={addressDoc.hasFile ? 'text-primary-blue font-semibold' : docs.addressProof?.includes('Verified') ? 'text-success font-semibold' : 'text-muted'}>
-                                {addressDoc.hasFile ? (addressDoc.fileName || 'Uploaded') : (docs.addressProof?.includes('Verified') ? 'Verified ✓' : 'Not Uploaded')}
+                              <span className={addressDoc.hasFile ? 'text-primary-blue font-semibold' : isVerified ? 'text-success font-semibold' : 'text-muted'}>
+                                {addressDoc.hasFile ? (addressDoc.fileName || 'Uploaded') : isVerified ? 'Verified ✓' : 'Not Uploaded'}
                               </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => openDocPreview(m, 'addressProof')}
-                              className="btn btn-outline-blue btn-xs flex items-center gap-0.5 py-0.5 px-1.5"
-                              title="View Address Proof document"
-                            >
-                              <Eye size={10} />
-                              <span>View</span>
-                            </button>
+                            {addressDoc.hasFile && (
+                              <button
+                                type="button"
+                                onClick={() => openDocPreview(m, 'addressProof')}
+                                className="btn btn-outline-blue btn-xs flex items-center gap-0.5 py-0.5 px-1.5"
+                                title="View Address Proof document"
+                              >
+                                <Eye size={10} />
+                                <span>View</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                         <td>
-                          <span className={`badge ${isVerified ? 'badge-green' : (isUnderReview ? 'badge-amber' : 'badge-neutral')}`}>
-                            {isVerified ? 'Verified ✓' : (isUnderReview ? 'Under Review' : 'Pending Documents')}
+                          <span className={`badge ${isVerified ? 'badge-green' : (isUnderReview ? 'badge-amber' : (isRejected ? 'badge-rose' : 'badge-neutral'))}`}>
+                            {isVerified ? 'Verified ✓' : (isUnderReview ? 'Under Review' : (isRejected ? 'Rejected' : 'Pending Documents'))}
                           </span>
                         </td>
                         <td>
@@ -1527,7 +1519,10 @@ export default function AdminPortalView() {
       {selectedKycMember && (() => {
         const m = selectedKycMember;
         const docs = m.kyc?.documents || {};
-        const isVerified = m.kyc?.verification_status === 'verified';
+        const effectiveStatus = getEffectiveKycStatus(m);
+        const isVerified = effectiveStatus === 'verified';
+        const isUnderReview = effectiveStatus === 'under_review';
+        const isRejected = effectiveStatus === 'rejected';
         const panDoc = getDocFileInfo(m, 'pan');
         const bankDoc = getDocFileInfo(m, 'bankAccount');
         const aadhaarDoc = getDocFileInfo(m, 'aadhaar');
@@ -1740,28 +1735,35 @@ export default function AdminPortalView() {
                     </div>
 
                     <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => openDocPreview(m, 'pan')}
-                        style={{
-                          background: panDoc.hasFile ? '#2563EB' : '#64748B',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '7px 16px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: panDoc.hasFile ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
-                        }}
-                        title="View PAN Document"
-                      >
-                        <Eye size={13} />
-                        <span>{panDoc.hasFile ? 'View Uploaded File' : 'Check Document'}</span>
-                      </button>
+                      {panDoc.hasFile ? (
+                        <button
+                          type="button"
+                          onClick={() => openDocPreview(m, 'pan')}
+                          style={{
+                            background: '#2563EB',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '7px 16px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                          }}
+                          title="View PAN Document"
+                        >
+                          <Eye size={13} />
+                          <span>View Uploaded File</span>
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertCircle size={13} />
+                          <span>Awaiting PAN Document File</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1819,28 +1821,35 @@ export default function AdminPortalView() {
                     </div>
 
                     <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => openDocPreview(m, 'bankAccount')}
-                        style={{
-                          background: bankDoc.hasFile ? '#2563EB' : '#64748B',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '7px 16px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: bankDoc.hasFile ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
-                        }}
-                        title="View Bank Settlement Document"
-                      >
-                        <Eye size={13} />
-                        <span>{bankDoc.hasFile ? 'View Uploaded File' : 'Check Document'}</span>
-                      </button>
+                      {bankDoc.hasFile ? (
+                        <button
+                          type="button"
+                          onClick={() => openDocPreview(m, 'bankAccount')}
+                          style={{
+                            background: '#2563EB',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '7px 16px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                          }}
+                          title="View Bank Settlement Document"
+                        >
+                          <Eye size={13} />
+                          <span>View Uploaded File</span>
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertCircle size={13} />
+                          <span>Awaiting Passbook / Cheque File</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1898,28 +1907,35 @@ export default function AdminPortalView() {
                     </div>
 
                     <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => openDocPreview(m, 'aadhaar')}
-                        style={{
-                          background: aadhaarDoc.hasFile ? '#2563EB' : '#64748B',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '7px 16px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: aadhaarDoc.hasFile ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
-                        }}
-                        title="View Aadhaar Card"
-                      >
-                        <Eye size={13} />
-                        <span>{aadhaarDoc.hasFile ? 'View Uploaded File' : 'Check Document'}</span>
-                      </button>
+                      {aadhaarDoc.hasFile ? (
+                        <button
+                          type="button"
+                          onClick={() => openDocPreview(m, 'aadhaar')}
+                          style={{
+                            background: '#2563EB',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '7px 16px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                          }}
+                          title="View Aadhaar Card"
+                        >
+                          <Eye size={13} />
+                          <span>View Uploaded File</span>
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertCircle size={13} />
+                          <span>Awaiting Aadhaar Card File</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1977,28 +1993,35 @@ export default function AdminPortalView() {
                     </div>
 
                     <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => openDocPreview(m, 'addressProof')}
-                        style={{
-                          background: addressDoc.hasFile ? '#2563EB' : '#64748B',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '7px 16px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: addressDoc.hasFile ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
-                        }}
-                        title="View Address Proof Document"
-                      >
-                        <Eye size={13} />
-                        <span>{addressDoc.hasFile ? 'View Uploaded File' : 'Check Document'}</span>
-                      </button>
+                      {addressDoc.hasFile ? (
+                        <button
+                          type="button"
+                          onClick={() => openDocPreview(m, 'addressProof')}
+                          style={{
+                            background: '#2563EB',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '7px 16px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                          }}
+                          title="View Address Proof Document"
+                        >
+                          <Eye size={13} />
+                          <span>View Uploaded File</span>
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertCircle size={13} />
+                          <span>Awaiting Address Proof File</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

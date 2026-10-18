@@ -1287,34 +1287,54 @@ export function MlmProvider({ children }) {
     return true;
   };
 
-  // Admin Approves Partner KYC
+  // Admin Approves Partner KYC (Enforces 4-Proof Statutory Rule)
   const approveKyc = (memberId) => {
+    let isFullyCompliant = false;
+
     setMembers(prev => prev.map(m => {
       if (m.member_id === memberId || m.id === memberId) {
         const kyc = m.kyc || {};
         const docs = kyc.documents || {};
         const verifiedDocs = { ...docs };
         const primaryDocKeys = ['pan', 'bankAccount', 'aadhaar', 'addressProof'];
+
         primaryDocKeys.forEach(k => {
           if (docs[k] || docs[`${k}File`] || docs[`${k}Name`]) {
             verifiedDocs[k] = 'Verified ✓';
             verifiedDocs[`${k}Status`] = 'verified';
           }
         });
+
+        // Statutory Check: PAN + Bank + Aadhaar + Address Proof must all be submitted
+        const hasPan = Boolean((kyc.pan && kyc.pan.trim().length >= 10) || docs.panFile || docs.panName || (typeof docs.pan === 'string' && docs.pan.startsWith('Uploaded')));
+        const hasBank = Boolean((kyc.bank_name && kyc.bank_account_number) || docs.bankAccountFile || docs.bankAccountName || (typeof docs.bankAccount === 'string' && docs.bankAccount.startsWith('Uploaded')));
+        const hasAadhaar = Boolean(docs.aadhaarFile || docs.aadhaarName || (typeof docs.aadhaar === 'string' && docs.aadhaar.startsWith('Uploaded')));
+        const hasAddress = Boolean(docs.addressProofFile || docs.addressProofName || (typeof docs.addressProof === 'string' && docs.addressProof.startsWith('Uploaded')));
+
+        isFullyCompliant = hasPan && hasBank && hasAadhaar && hasAddress;
+        const finalStatus = isFullyCompliant ? 'verified' : 'under_review';
+
         const updatedKyc = {
           ...kyc,
-          verification_status: 'verified',
+          verification_status: finalStatus,
           documents: verifiedDocs,
-          verified_at: new Date().toISOString()
+          verified_at: isFullyCompliant ? new Date().toISOString() : kyc.verified_at
         };
+
         dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
-        dbApproveKyc(memberId).catch(err => console.warn('[Neon DB] dbApproveKyc error:', err));
+        if (isFullyCompliant) {
+          dbApproveKyc(memberId).catch(err => console.warn('[Neon DB] dbApproveKyc error:', err));
+        }
         return { ...m, kyc: updatedKyc };
       }
       return m;
     }));
 
-    addToast('success', 'KYC Approved', 'Partner KYC and documents successfully verified.');
+    if (isFullyCompliant) {
+      addToast('success', 'KYC Fully Verified', 'All 4 statutory proofs verified. Partner KYC is now fully verified.');
+    } else {
+      addToast('info', 'Documents Approved (Partial)', 'Submitted proofs marked verified. Statutory compliance requires all 4 proofs (Aadhaar, PAN, Address, Bank) before overall KYC status becomes Verified.');
+    }
   };
 
   // Admin Rejects Partner KYC
