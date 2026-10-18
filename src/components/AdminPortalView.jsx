@@ -42,6 +42,7 @@ export default function AdminPortalView() {
     orders, 
     members, 
     transactions, 
+    companyReserve = 0,
     totalEarnings, 
     payoutRequests,
     pendingActivations = [],
@@ -261,6 +262,10 @@ export default function AdminPortalView() {
   const pendingActivationList = (pendingActivations || []).filter(a => a.status === 'pending');
   const coolingOffTransactions = (transactions || []).filter(t => t.status === 'Pending' && t.type === 'credit');
   const coolingOffTotalAmount = coolingOffTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const reserveTransactions = (transactions || []).filter(t => 
+    t.type === 'company_reserve' || (t.description && t.description.includes('Company Reserve'))
+  );
+  const reserveTransactionsTotal = reserveTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
   return (
     <div className="admin-dedicated-app">
@@ -332,6 +337,16 @@ export default function AdminPortalView() {
             </div>
             <span className={`stat-badge-tag ${pendingRequests.length > 0 ? 'text-amber' : 'text-success'}`}>
               {pendingRequests.length} {pendingRequests.length === 1 ? 'Request' : 'Requests'} Pending
+            </span>
+          </div>
+
+          <div className="admin-stat-card card-white">
+            <span className="stat-label-muted">Company Reserve Fund</span>
+            <div className="stat-number-bold text-success">
+              ₹{Number(companyReserve || 0).toLocaleString('en-IN')}
+            </div>
+            <span className="stat-badge-tag text-success">
+              ₹900 Base + Unused Tiers
             </span>
           </div>
         </div>
@@ -1259,6 +1274,67 @@ export default function AdminPortalView() {
                 <p className="text-xs text-muted m-0">All commissions have either matured to available balance or no pending sales exist.</p>
               </div>
             )}
+
+            {/* Company Reserve Fund Audit Ledger */}
+            <div className="mt-6 pt-6" style={{ borderTop: '1px solid #E2E8F0' }}>
+              <div className="flex-between items-center mb-3">
+                <div>
+                  <h4 className="font-md font-bold text-primary flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-success" />
+                    Statutory Company Reserve Fund Ledger (Head Office Retention)
+                  </h4>
+                  <p className="text-xs text-muted">
+                    Direct Selling Rules 2021: ₹900 base company margin + unallocated/unused upline commission tiers (from ₹1,600 network allocation) credited to CyberShield Head Office.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-2xs text-muted block uppercase font-bold">Total Retained</span>
+                  <span className="text-lg font-extrabold text-success code-font">₹{Number(companyReserve || 0).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+
+              {reserveTransactions.length > 0 ? (
+                <div className="table-responsive">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Date & Reference</th>
+                        <th>Fund Credit Reason</th>
+                        <th>Amount (₹)</th>
+                        <th>Status</th>
+                        <th>Destination</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reserveTransactions.map(rtx => (
+                        <tr key={rtx.id}>
+                          <td>
+                            <div className="font-sm font-semibold text-primary">{rtx.date || 'Just now'}</div>
+                            <div className="code-font text-2xs text-muted font-mono">{rtx.id}</div>
+                          </td>
+                          <td>
+                            <div className="font-sm">{rtx.description}</div>
+                          </td>
+                          <td className="font-bold text-success code-font font-sm">
+                            +₹{Number(rtx.amount || 0).toLocaleString('en-IN')}
+                          </td>
+                          <td>
+                            <span className="badge badge-green font-xs font-bold">Available (Retained)</span>
+                          </td>
+                          <td className="code-font text-xs text-secondary">
+                            Head Office (mem_matru)
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="admin-empty-clean p-4 text-center text-muted" style={{ background: '#f8fafc', borderRadius: '8px' }}>
+                  <p className="text-xs text-muted m-0">No unallocated upline tiers logged yet. Base margin accrues automatically with each verified subscription.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

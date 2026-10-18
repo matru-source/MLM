@@ -520,6 +520,8 @@ export default async function handler(req, res) {
 
         let currentUplineId = act.member_id;
         const visited = new Set([act.member_id]);
+        const paidLevels = [];
+        let totalPaidToNetwork = 0;
 
         for (let level = 1; level <= 10; level++) {
           const currentMem = allDbMembers.find(m => m.id === currentUplineId);
@@ -544,6 +546,8 @@ export default async function handler(req, res) {
           visited.add(sponsor.id);
 
           const rate = rates[level - 1];
+          paidLevels.push(level);
+          totalPaidToNetwork += rate;
 
           // 15–30 Day Statutory Cooling-Off Period (Default: 30 Days):
           // Funds remain in 'Pending' escrow hold until 30-day refund window elapses.
@@ -576,7 +580,42 @@ export default async function handler(req, res) {
           currentUplineId = sponsor.id;
         }
 
-        return res.status(200).json({ ok: true });
+        // 5. Statutory Company Reserve Allocation for Unused / Unallocated Levels
+        // Total network allocation is ₹1,600. If fewer than 10 levels exist in ancestry,
+        // all remaining unused commissions are credited to the Company Reserve Fund (Head Office: mem_matru)
+        const unusedCommission = 1600 - totalPaidToNetwork;
+        if (unusedCommission > 0) {
+          const unusedLevels = [];
+          for (let lvl = 1; lvl <= 10; lvl++) {
+            if (!paidLevels.includes(lvl)) unusedLevels.push(lvl);
+          }
+
+          // Credit CyberShield Head Office Reserve Account
+          await sql`
+            UPDATE members
+            SET 
+              wallet_balance = COALESCE(wallet_balance, 0) + ${unusedCommission},
+              total_earnings = COALESCE(total_earnings, 0) + ${unusedCommission}
+            WHERE id = 'mem_matru' OR referral_code = 'CS123456';
+          `;
+
+          const txReserveId = `tx_reserve_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+          await sql`
+            INSERT INTO transactions (
+              id, member_id, description, amount, type, status, created_at
+            ) VALUES (
+              ${txReserveId},
+              'mem_matru',
+              ${`Company Reserve Fund (Unused Levels ${unusedLevels.join(', ')}) - ₹${unusedCommission} from ${act.member_name} Activation`},
+              ${unusedCommission},
+              'company_reserve',
+              'Available',
+              NOW()
+            );
+          `;
+        }
+
+        return res.status(200).json({ ok: true, unusedCommission });
       }
 
       // 2e. Admin Rejects Partner Activation

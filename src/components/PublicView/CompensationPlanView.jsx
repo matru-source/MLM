@@ -33,9 +33,9 @@ export default function CompensationPlanView() {
           <span className="stat-sub">Distributed Across 10 Upline Tiers</span>
         </div>
         <div className="comp-stat-card">
-          <span className="stat-label">Company Reserve & Margin</span>
+          <span className="stat-label">Company Fixed Base Margin</span>
           <div className="stat-val text-cyan">{formatINR(2500 - totalPayout)}</div>
-          <span className="stat-sub">Gateway, GST & Unallocated Reserve</span>
+          <span className="stat-sub">Statutory ₹900 Base (+ Unused Tiers to Reserve)</span>
         </div>
       </div>
 
@@ -103,7 +103,7 @@ export default function CompensationPlanView() {
             <span>Cooling-Off & Clawback</span>
           </div>
           <p className="rule-card-text">
-            Commissions remain pending in cooling-off hold for 7 days. Customer refunds or chargebacks 
+            Commissions remain pending in statutory cooling-off hold for 30 days. Customer refunds or chargebacks 
             automatically trigger an immutable clawback across all 10 upline entries.
           </p>
         </div>

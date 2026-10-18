@@ -278,6 +278,8 @@ export async function processVerifiedWebhook(event) {
 
               let currentSponsorCode = buyer.sponsor_member_id || buyer.sponsor_code;
               const visitedUplines = new Set();
+              let totalDistributed = 0;
+              const creditedTiers = [];
 
               for (let i = 0; i < tierRates.length; i++) {
                 if (!currentSponsorCode) break;
@@ -295,6 +297,8 @@ export async function processVerifiedWebhook(event) {
                 visitedUplines.add(upline.id);
 
                 const tier = tierRates[i];
+                creditedTiers.push(tier.level);
+                totalDistributed += tier.rate;
 
                 await sql`
                   UPDATE members
@@ -321,6 +325,33 @@ export async function processVerifiedWebhook(event) {
                 `;
 
                 currentSponsorCode = upline.sponsor_member_id || upline.sponsor_code;
+              }
+
+              // Route unallocated commission tiers to Company Reserve Fund
+              const unusedCommission = 1600 - totalDistributed;
+              if (unusedCommission > 0) {
+                const unusedTiers = tierRates.filter(t => !creditedTiers.includes(t.level)).map(t => t.level);
+                await sql`
+                  UPDATE members
+                  SET 
+                    wallet_balance = COALESCE(wallet_balance, 0) + ${unusedCommission},
+                    total_earnings = COALESCE(total_earnings, 0) + ${unusedCommission}
+                  WHERE id = 'mem_matru' OR referral_code = 'CS123456';
+                `;
+                const txReserveId = `tx_zex_reserve_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                await sql`
+                  INSERT INTO transactions (
+                    id, member_id, description, amount, type, status, created_at
+                  ) VALUES (
+                    ${txReserveId},
+                    'mem_matru',
+                    ${`Company Reserve Fund (Unused Levels ${unusedTiers.join(', ')}) - ₹${unusedCommission} from ZEX Sale (${buyer.name})`},
+                    ${unusedCommission},
+                    'company_reserve',
+                    'Available',
+                    NOW()
+                  );
+                `;
               }
             }
           }

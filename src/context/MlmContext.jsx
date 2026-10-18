@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   initialMembers,
   initialOrders,
@@ -1715,6 +1715,8 @@ export function MlmProvider({ children }) {
 
     let currentUplineTarget = activatedMember;
     const visited = new Set([act.member_id]);
+    const paidLevels = [];
+    let totalPaidToNetwork = 0;
 
     for (let level = 1; level <= 10; level++) {
       if (!currentUplineTarget && level > 1) break;
@@ -1741,6 +1743,8 @@ export function MlmProvider({ children }) {
       visited.add(sponsorId);
 
       const rate = rates[level - 1];
+      paidLevels.push(level);
+      totalPaidToNetwork += rate;
       creditsByMemberId[sponsorId] = (creditsByMemberId[sponsorId] || 0) + rate;
 
       const availableAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -1759,14 +1763,41 @@ export function MlmProvider({ children }) {
       currentUplineTarget = sponsor;
     }
 
+    // Statutory Company Reserve Allocation for Unused / Unallocated Levels
+    // Total network allocation is ₹1,600. If fewer than 10 levels exist in ancestry,
+    // all remaining unused commissions are credited to the Company Reserve Fund (Head Office: mem_matru)
+    const unusedCommission = 1600 - totalPaidToNetwork;
+    if (unusedCommission > 0) {
+      const unusedLevels = [];
+      for (let lvl = 1; lvl <= 10; lvl++) {
+        if (!paidLevels.includes(lvl)) unusedLevels.push(lvl);
+      }
+
+      const headOfficeId = 'mem_matru';
+      creditsByMemberId[headOfficeId] = (creditsByMemberId[headOfficeId] || 0) + unusedCommission;
+
+      newTransactions.push({
+        id: generateId('tx_res'),
+        member_id: headOfficeId,
+        date: 'Just Now',
+        description: `Company Reserve Fund (Unused Levels ${unusedLevels.join(', ')}) - ₹${unusedCommission} from ${act.member_name} Activation`,
+        amount: unusedCommission,
+        type: 'company_reserve',
+        status: 'Available',
+        created_at: new Date().toISOString()
+      });
+    }
+
     if (Object.keys(creditsByMemberId).length > 0) {
       setMembers(prev => prev.map(m => {
         const id = m.member_id || m.id;
         const addAmount = creditsByMemberId[id];
         if (addAmount) {
+          const reserveAmount = (id === 'mem_matru' && unusedCommission > 0) ? unusedCommission : 0;
           return {
             ...m,
-            // 30-Day Cooling-off hold: wallet_balance NOT credited yet
+            // Reserve amount is immediately Available; partner commissions held for cooling-off
+            wallet_balance: Number(m.wallet_balance || 0) + reserveAmount,
             total_earnings: Number(m.total_earnings || 0) + addAmount
           };
         }
@@ -1779,7 +1810,9 @@ export function MlmProvider({ children }) {
         const myCredit = creditsByMemberId[myId];
         if (myCredit) {
           setTotalEarnings(prev => prev + myCredit);
-          // availableBalance stays untouched during 30-day cooling-off hold
+          if (myId === 'mem_matru' && unusedCommission > 0) {
+            setAvailableBalance(prev => prev + unusedCommission);
+          }
         }
       }
 
@@ -1969,6 +2002,22 @@ export function MlmProvider({ children }) {
     amount: t.amount || 0
   }));
 
+  // Derive statutory Company Reserve Fund (₹900 base company margin per activation/sale + all unallocated/unused upline commission tiers)
+  const dynamicCompanyReserve = useMemo(() => {
+    const reserveTransactions = (transactions || []).filter(t => 
+      t.type === 'company_reserve' || (t.description && t.description.includes('Company Reserve'))
+    );
+    const unusedTiersTotal = reserveTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+    const completedOrdersCount = (orders || []).filter(o => 
+      o.subscription_status === 'active' || o.payment_status === 'verified' || o.payment_status === 'succeeded'
+    ).length;
+    const approvedActivationsCount = (pendingActivations || []).filter(a => a.status === 'approved').length;
+    const totalCompanySales = Math.max(completedOrdersCount, approvedActivationsCount);
+
+    return unusedTiersTotal + (totalCompanySales * 900);
+  }, [transactions, orders, pendingActivations]);
+
   return (
     <MlmContext.Provider value={{
       isAdminMode,
@@ -1993,7 +2042,7 @@ export function MlmProvider({ children }) {
       commissionEntries: [],
       payouts: payoutRequests,
       auditLogs,
-      companyReserve: 0,
+      companyReserve: dynamicCompanyReserve,
       payoutRequests,
       pendingActivations,
       pendingPayoutsTotal,
