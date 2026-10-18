@@ -1571,7 +1571,7 @@ export default function MemberDashboardView() {
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Client Portal Access:</span>
-                      <span className="spec-v">{currentMember.phone || currentMember.member_id || currentMember.email}</span>
+                      <span className="spec-v">{currentMember.email}</span>
                     </div>
                   </div>
                 </div>

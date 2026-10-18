@@ -243,8 +243,6 @@ export default async function handler(req, res) {
       // 2a. Register New Member
       if (action === 'register_member') {
         const mem = data;
-        const cleanMobile = (mem.phone || '').replace(/\D/g, '');
-        const memberEmail = mem.email && mem.email.trim() ? mem.email.trim() : (cleanMobile ? `${cleanMobile}@cybershield.net` : `${mem.member_id || Date.now()}@cybershield.net`);
         const rows = await sql`
           INSERT INTO members (
             id, name, email, phone, avatar, password, rank, 
@@ -254,7 +252,7 @@ export default async function handler(req, res) {
           ) VALUES (
             ${mem.member_id},
             ${mem.name},
-            ${memberEmail},
+            ${mem.email},
             ${mem.phone || ''},
             ${mem.avatar || '/matru-avatar.jpg'},
             ${mem.password || ''},
