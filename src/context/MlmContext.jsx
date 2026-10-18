@@ -1574,8 +1574,12 @@ export function MlmProvider({ children }) {
     ? pendingActivations.filter(a => a.member_id === currentMember.member_id) 
     : [];
 
-  const dynamicEarningsMonthly = months.map(month => {
-    const monthTx = memberTransactions.filter(t => t.type === 'credit' && t.date && t.date.includes(month));
+  const dynamicEarningsMonthly = months.map((month, idx) => {
+    const monthTx = memberTransactions.filter(t => {
+      if (t.type !== 'credit') return false;
+      const d = new Date(t.created_at || (t.date && t.date !== 'Just Now' ? t.date : Date.now()));
+      return !isNaN(d.getTime()) && d.getMonth() === idx;
+    });
     const total = monthTx.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     return { month, amount: total };
   });

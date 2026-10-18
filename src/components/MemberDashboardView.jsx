@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useMlm } from '../context/MlmContext';
 import { 
   LayoutDashboard, 
@@ -78,6 +78,155 @@ export default function MemberDashboardView() {
   const [isDirectReferralsModalOpen, setIsDirectReferralsModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedReceiptModal, setSelectedReceiptModal] = useState(null);
+
+  // Dynamic Chart Granularity: auto-detect based on member joined_at date per direct selling rules
+  // User specifications:
+  // - If joined between weeks (<= 7 days): show daily report (last 7 days ending today)
+  // - If joined week ago (7 - 60 days): show weekly bar chart
+  // - If joined > 2 months ago or year ago (60 - 5*365 days): show monthly chart
+  // - If joined > 5 years ago (> 5*365 days): show yearly bar chart with option to switch to month-wise
+  // No hardcoded data: only genuine original transactions data from database
+  const defaultGranularity = useMemo(() => {
+    const joinedAt = currentMember?.joined_at || currentMember?.created_at;
+    if (!joinedAt) return 'daily';
+    const joinDate = new Date(joinedAt);
+    const now = new Date();
+    const diffDays = Math.max(0, (now.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 7) return 'daily';
+    if (diffDays <= 60) return 'weekly';
+    if (diffDays <= 5 * 365) return 'monthly';
+    return 'yearly';
+  }, [currentMember?.joined_at, currentMember?.created_at]);
+
+  const [selectedGranularity, setSelectedGranularity] = useState(null);
+  const activeGranularity = selectedGranularity || defaultGranularity;
+
+  // Real, genuine chart data calculated directly from member's live credit transactions
+  const chartData = useMemo(() => {
+    if (!currentMember) return [];
+    const myId = currentMember.member_id || currentMember.id;
+    const now = new Date();
+
+    // Genuine credit commission transactions for this member only (no dummy or hardcoded amounts)
+    const myCreditTxs = (transactions || []).filter(t => {
+      const isMyTx = (t.member_id === myId || (currentMember.referral_code && t.member_id === currentMember.referral_code));
+      const isCredit = t.type === 'credit' && Number(t.amount) > 0;
+      return isMyTx && isCredit;
+    });
+
+    if (activeGranularity === 'daily') {
+      // 7 Daily bars ending today
+      const list = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        d.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(d);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const dayName = i === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' });
+        const dateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+
+        const amount = myCreditTxs.filter(t => {
+          const txDate = new Date(t.created_at || (t.date && t.date !== 'Just Now' ? t.date : now));
+          return txDate >= d && txDate <= endOfDay;
+        }).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        list.push({
+          label: dayName,
+          subLabel: dateStr,
+          amount,
+          dateLabel: `${dayName}, ${dateStr}`
+        });
+      }
+      return list;
+    }
+
+    if (activeGranularity === 'weekly') {
+      // 6 Weekly bars
+      const list = [];
+      for (let i = 5; i >= 0; i--) {
+        const start = new Date(now);
+        start.setDate(start.getDate() - (i * 7 + 6));
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+
+        const label = i === 0 ? 'This Wk' : `Wk -${i}`;
+        const rangeStr = `${start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`;
+
+        const amount = myCreditTxs.filter(t => {
+          const txDate = new Date(t.created_at || (t.date && t.date !== 'Just Now' ? t.date : now));
+          return txDate >= start && txDate <= end;
+        }).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        list.push({
+          label,
+          subLabel: rangeStr,
+          amount,
+          dateLabel: rangeStr
+        });
+      }
+      return list;
+    }
+
+    if (activeGranularity === 'monthly') {
+      // 12 Monthly bars
+      const list = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        const monthName = start.toLocaleDateString('en-US', { month: 'short' });
+        const fullMonth = start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+        const amount = myCreditTxs.filter(t => {
+          const txDate = new Date(t.created_at || (t.date && t.date !== 'Just Now' ? t.date : now));
+          return txDate >= start && txDate <= end;
+        }).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        list.push({
+          label: monthName,
+          subLabel: fullMonth,
+          amount,
+          dateLabel: fullMonth
+        });
+      }
+      return list;
+    }
+
+    if (activeGranularity === 'yearly') {
+      // Past 5-6 Years
+      const list = [];
+      const currYear = now.getFullYear();
+      for (let y = currYear - 5; y <= currYear; y++) {
+        const start = new Date(y, 0, 1, 0, 0, 0, 0);
+        const end = new Date(y, 11, 31, 23, 59, 59, 999);
+
+        const amount = myCreditTxs.filter(t => {
+          const txDate = new Date(t.created_at || (t.date && t.date !== 'Just Now' ? t.date : now));
+          return txDate >= start && txDate <= end;
+        }).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        list.push({
+          label: String(y),
+          subLabel: `FY ${y}`,
+          amount,
+          dateLabel: `Calendar Year ${y}`
+        });
+      }
+      return list;
+    }
+
+    return [];
+  }, [currentMember, transactions, activeGranularity]);
+
+  const chartPeriodTotal = chartData.reduce((acc, curr) => acc + curr.amount, 0);
+  const maxChartEarning = Math.max(...chartData.map(e => e.amount), 500);
 
   // Quick settlement bank details for withdrawal modal
   const [quickBankName, setQuickBankName] = useState(currentMember?.kyc?.bank_name || '');
@@ -357,34 +506,81 @@ export default function MemberDashboardView() {
 
                   {/* Middle Grid: Earnings Overview Chart + Recent Activity */}
                   <div className="dash-middle-grid">
-                    {/* Left: Earnings Overview Bar Chart */}
+                    {/* Left: Dynamic Earnings Overview Bar Chart */}
                     <div className="dash-chart-card card-white">
-                      <div className="card-head-between">
+                      <div className="card-head-between flex-wrap gap-2">
                         <div>
-                          <h3 className="chart-card-title">Earnings Overview</h3>
-                          <p className="chart-card-sub">Monthly commission growth (Jan - Dec)</p>
+                          <div className="flex items-center gap-2">
+                            <h3 className="chart-card-title">Earnings Overview</h3>
+                            {chartPeriodTotal > 0 && (
+                              <span className="badge badge-green font-xs font-bold">
+                                ₹{chartPeriodTotal.toLocaleString('en-IN')} Total
+                              </span>
+                            )}
+                          </div>
+                          <p className="chart-card-sub">
+                            {activeGranularity === 'daily' && 'Daily commission report (Last 7 Days)'}
+                            {activeGranularity === 'weekly' && 'Weekly commission breakdown (Last 6 Weeks)'}
+                            {activeGranularity === 'monthly' && 'Monthly commission growth (Last 12 Months)'}
+                            {activeGranularity === 'yearly' && 'Year-over-year commission trajectory (Past 6 Years)'}
+                          </p>
                         </div>
-                        <span className="badge badge-blue">Last 12 Months</span>
+
+                        {/* Interactive Granularity Switcher */}
+                        <div className="chart-granularity-toggle" role="group" aria-label="Chart timeframe">
+                          {[
+                            { id: 'daily', label: 'Daily' },
+                            { id: 'weekly', label: 'Weekly' },
+                            { id: 'monthly', label: 'Monthly' },
+                            { id: 'yearly', label: 'Yearly' }
+                          ].map(tab => (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              onClick={() => setSelectedGranularity(tab.id)}
+                              className={`chart-toggle-btn ${activeGranularity === tab.id ? 'active' : ''}`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       {/* Bar Chart Bars */}
                       <div className="chart-bars-container">
-                        {earningsMonthly.map((item, idx) => (
-                          <div key={idx} className="chart-bar-col">
-                            <div className="bar-track">
-                              <div 
-                                className="bar-fill" 
-                                style={{ height: `${item.amount > 0 ? Math.min(100, (item.amount / maxMonthlyEarning) * 100) : 4}%` }}
-                                title={`₹${item.amount.toLocaleString('en-IN')}`}
-                              />
+                        {chartData.map((item, idx) => {
+                          const pct = item.amount > 0 ? Math.min(100, Math.max(10, (item.amount / maxChartEarning) * 100)) : 0;
+                          return (
+                            <div 
+                              key={idx} 
+                              className={`chart-bar-col ${item.amount > 0 ? 'has-earning' : ''}`}
+                              title={`${item.dateLabel}: ₹${item.amount.toLocaleString('en-IN')}`}
+                            >
+                              <div className="bar-val-badge">
+                                {item.amount > 0 ? `₹${item.amount.toLocaleString('en-IN')}` : '₹0'}
+                              </div>
+                              <div className="bar-track">
+                                <div 
+                                  className="bar-fill" 
+                                  style={{ height: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="bar-month-label">{item.label}</span>
+                              <span className="bar-sub-date">{item.subLabel}</span>
                             </div>
-                            <span className="bar-month-label">{item.month}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
-                      {totalEarnings === 0 && (
+
+                      {chartPeriodTotal === 0 ? (
                         <div className="text-center text-muted text-xs mt-3">
-                          Zero commission earnings. Commission bars will populate upon partner sales.
+                          No commission earnings in this period. Bars will populate dynamically as team sales occur.
+                        </div>
+                      ) : (
+                        <div className="chart-footer-note mt-3">
+                          <span className="text-xs text-muted">
+                            ⚡ Real-time commission ledger data synchronized across multi-tier retail sales.
+                          </span>
                         </div>
                       )}
                     </div>
