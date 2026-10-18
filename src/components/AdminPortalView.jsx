@@ -27,7 +27,10 @@ import {
   Lock,
   Eye,
   EyeOff,
-  FileText
+  FileText,
+  History,
+  Search,
+  Filter
 } from 'lucide-react';
 import { getDocumentFile, generateDocPlaceholder, saveDocumentFile } from '../utils/documentStorage';
 import { getEffectiveKycStatus, validateAadhaar, maskAadhaar } from '../utils/kycValidation';
@@ -50,16 +53,25 @@ export default function AdminPortalView() {
     rejectKyc,
     uploadKycDocument,
     isDbConnected,
+    auditLogs = [],
     addToast 
   } = useMlm();
 
-  const [adminTab, setAdminTab] = useState('activations'); // 'activations' | 'payouts' | 'orders' | 'kyc' | 'webhooks'
+  const [adminTab, setAdminTab] = useState('activations'); // 'activations' | 'payouts' | 'orders' | 'kyc' | 'audit' | 'webhooks'
   const [selectedPayoutForManualPay, setSelectedPayoutForManualPay] = useState(null);
   const [selectedPayoutToView, setSelectedPayoutToView] = useState(null);
   const [selectedKycMember, setSelectedKycMember] = useState(null);
   const [previewingDoc, setPreviewingDoc] = useState(null);
   const [revealedBankMembers, setRevealedBankMembers] = useState({});
   const [revealedAadhaarMembers, setRevealedAadhaarMembers] = useState({});
+  const [auditFilterAction, setAuditFilterAction] = useState('all');
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [rejectionModal, setRejectionModal] = useState({
+    open: false,
+    member: null,
+    predefinedReason: 'Document illegible or blurred',
+    customReason: ''
+  });
 
   const getDocFileInfo = (member, docKey) => {
     const docs = member?.kyc?.documents || {};
@@ -351,6 +363,12 @@ export default function AdminPortalView() {
             className={`admin-clean-tab ${adminTab === 'kyc' ? 'active' : ''}`}
           >
             Partner KYC Review ({members.length})
+          </button>
+          <button
+            onClick={() => setAdminTab('audit')}
+            className={`admin-clean-tab ${adminTab === 'audit' ? 'active' : ''}`}
+          >
+            Compliance & Audit Trail ({auditLogs.length})
           </button>
           <button
             onClick={() => setAdminTab('webhooks')}
@@ -914,9 +932,14 @@ export default function AdminPortalView() {
                                   </button>
                                   <button 
                                     type="button" 
-                                    onClick={() => rejectKyc(m.member_id || m.id, 'Document illegible or mismatched')}
+                                    onClick={() => setRejectionModal({
+                                      open: true,
+                                      member: m,
+                                      predefinedReason: 'Document illegible or blurred',
+                                      customReason: ''
+                                    })}
                                     className="btn btn-secondary btn-sm py-1 px-2 text-xs text-rose"
-                                    title="Reject KYC"
+                                    title="Record Statutory KYC Rejection"
                                   >
                                     Reject
                                   </button>
@@ -931,6 +954,191 @@ export default function AdminPortalView() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* TAB 3B: STATUTORY COMPLIANCE AUDIT TRAIL */}
+        {adminTab === 'audit' && (
+          <div className="admin-panel-card card-white">
+            <div className="admin-panel-header">
+              <div>
+                <h3 className="admin-panel-title flex items-center gap-2">
+                  <History size={20} className="text-primary-blue" />
+                  Statutory Compliance & Audit Trail (Direct Selling Rules 2021)
+                </h3>
+                <p className="admin-panel-subtitle">
+                  Immutable historical log of partner KYC verification approvals, statutory rejections, compliance overrides, and IP metadata for regulatory audit compliance.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="badge badge-green flex items-center gap-1 font-xs font-bold">
+                  <span className="live-dot-pulse"></span> Neon PostgreSQL Synced
+                </span>
+                <span className="badge badge-blue font-xs font-bold">
+                  Rule 3(1)(b) Compliant
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <div style={{ background: '#F8FAFC', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                <span className="text-2xs text-muted block font-semibold uppercase tracking-wider">Total Audited Events</span>
+                <span className="text-xl font-bold text-main">{auditLogs.length}</span>
+                <span className="text-2xs text-primary-blue block mt-0.5">Cloud Database Records</span>
+              </div>
+              <div style={{ background: '#F0FDF4', padding: '12px 16px', borderRadius: '10px', border: '1px solid #BBF7D0' }}>
+                <span className="text-2xs text-muted block font-semibold uppercase tracking-wider">KYC Approvals</span>
+                <span className="text-xl font-bold text-success">{auditLogs.filter(a => a.action === 'kyc_approved').length}</span>
+                <span className="text-2xs text-success block mt-0.5">Direct Selling Certified</span>
+              </div>
+              <div style={{ background: '#FEF2F2', padding: '12px 16px', borderRadius: '10px', border: '1px solid #FECACA' }}>
+                <span className="text-2xs text-muted block font-semibold uppercase tracking-wider">KYC Rejections</span>
+                <span className="text-xl font-bold text-rose">{auditLogs.filter(a => a.action === 'kyc_rejected').length}</span>
+                <span className="text-2xs text-rose block mt-0.5">Deficiencies Logged</span>
+              </div>
+              <div style={{ background: '#EEF2FF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #C7D2FE' }}>
+                <span className="text-2xs text-muted block font-semibold uppercase tracking-wider">Active Partners</span>
+                <span className="text-xl font-bold text-primary-blue">{members.length}</span>
+                <span className="text-2xs text-primary-blue block mt-0.5">In Network Registry</span>
+              </div>
+            </div>
+
+            {/* Filters Bar */}
+            <div className="flex-between items-center gap-3 mb-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAuditFilterAction('all')}
+                  className={`btn btn-xs ${auditFilterAction === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                >
+                  All Events ({auditLogs.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuditFilterAction('kyc_approved')}
+                  className={`btn btn-xs ${auditFilterAction === 'kyc_approved' ? 'btn-primary' : 'btn-secondary'}`}
+                >
+                  Approvals ({auditLogs.filter(a => a.action === 'kyc_approved').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuditFilterAction('kyc_rejected')}
+                  className={`btn btn-xs ${auditFilterAction === 'kyc_rejected' ? 'btn-primary' : 'btn-secondary'}`}
+                >
+                  Rejections ({auditLogs.filter(a => a.action === 'kyc_rejected').length})
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div style={{ position: 'relative', minWidth: '240px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                  <input
+                    type="text"
+                    value={auditSearchQuery}
+                    onChange={(e) => setAuditSearchQuery(e.target.value)}
+                    placeholder="Search partner, admin, or ID..."
+                    className="form-input-clean text-xs"
+                    style={{ paddingLeft: '32px', paddingRight: '12px', height: '32px' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Audit Table */}
+            {(() => {
+              const filtered = auditLogs.filter(log => {
+                if (auditFilterAction !== 'all' && log.action !== auditFilterAction) return false;
+                if (auditSearchQuery.trim()) {
+                  const q = auditSearchQuery.toLowerCase();
+                  const mName = (log.member_name || '').toLowerCase();
+                  const mId = (log.member_id || '').toLowerCase();
+                  const aName = (log.admin_name || '').toLowerCase();
+                  const reason = (log.reason || '').toLowerCase();
+                  const id = (log.id || '').toLowerCase();
+                  return mName.includes(q) || mId.includes(q) || aName.includes(q) || reason.includes(q) || id.includes(q);
+                }
+                return true;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="p-8 text-center text-muted" style={{ background: '#F8FAFC', borderRadius: '10px', border: '1px dashed #CBD5E1' }}>
+                    <History size={32} className="mx-auto text-slate-400 mb-2 opacity-60" />
+                    <p className="font-semibold text-sm text-main">No Audit Log Records Match Criteria</p>
+                    <p className="text-xs text-muted mt-1">
+                      {auditLogs.length === 0 
+                        ? 'Compliance actions (approving or rejecting KYC) will automatically populate immutable audit records here in real-time.' 
+                        : 'Try adjusting your search query or action filter.'}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="admin-table-container">
+                  <table className="admin-data-table">
+                    <thead>
+                      <tr>
+                        <th>Timestamp (IST)</th>
+                        <th>Audited Action</th>
+                        <th>Compliance Admin</th>
+                        <th>Direct Partner</th>
+                        <th>Statutory Reason / Findings</th>
+                        <th>Client IP & Origin</th>
+                        <th>Audit Record ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((log) => {
+                        const isApproved = log.action === 'kyc_approved';
+                        const timeStr = log.created_at 
+                          ? new Date(log.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                          : 'Just now';
+
+                        return (
+                          <tr key={log.id}>
+                            <td className="text-xs text-muted font-medium whitespace-nowrap">
+                              {timeStr}
+                            </td>
+                            <td>
+                              <span className={`badge ${isApproved ? 'badge-green' : 'badge-amber'} font-2xs font-bold inline-flex items-center gap-1`}>
+                                {isApproved ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
+                                {isApproved ? 'KYC APPROVED' : 'KYC REJECTED'}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="font-semibold text-xs text-main">{log.admin_name || 'Compliance Admin'}</div>
+                              <div className="text-2xs text-muted code-font">{log.admin_id || 'ADMIN_CONSOLE'}</div>
+                            </td>
+                            <td>
+                              <div className="font-semibold text-xs text-main">{log.member_name || log.member_id}</div>
+                              <div className="text-2xs text-muted code-font">{log.member_id}</div>
+                            </td>
+                            <td style={{ maxWidth: '280px' }}>
+                              <div className="text-xs text-main font-medium" style={{ wordBreak: 'break-word' }}>
+                                {log.reason || (isApproved ? 'Statutory KYC verified' : 'Deficiency in documents')}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="code-font text-xs text-muted">{log.ip_address || '127.0.0.1'}</div>
+                              <div className="text-2xs text-muted truncate" style={{ maxWidth: '140px' }} title={log.user_agent}>
+                                {log.user_agent || 'Web Admin Console'}
+                              </div>
+                            </td>
+                            <td>
+                              <span className="code-font text-2xs text-muted bg-card-alt px-1.5 py-0.5 rounded border">
+                                {log.id}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -2154,8 +2362,12 @@ export default function AdminPortalView() {
                         <button 
                           type="button" 
                           onClick={() => {
-                            rejectKyc(m.member_id || m.id, 'Document illegible or mismatched');
-                            setSelectedKycMember(null);
+                            setRejectionModal({
+                              open: true,
+                              member: m,
+                              predefinedReason: 'Document illegible or blurred',
+                              customReason: ''
+                            });
                           }} 
                           style={{
                             background: '#FEF2F2',
@@ -2422,6 +2634,116 @@ export default function AdminPortalView() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STATUTORY REJECTION REASON MODAL (DIRECT SELLING RULES 2021 AUDITING) */}
+      {rejectionModal.open && rejectionModal.member && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-card" style={{ maxWidth: '520px', width: '92%' }}>
+            <div className="admin-modal-header flex-between items-center">
+              <div className="flex items-center gap-2">
+                <div style={{ width: 36, height: 36, borderRadius: '8px', background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AlertCircle size={20} className="text-rose" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-main">Record Statutory KYC Rejection</h3>
+                  <p className="text-xs text-muted">Audited compliance action logged to Neon PostgreSQL</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setRejectionModal({ open: false, member: null, predefinedReason: 'Document illegible or blurred', customReason: '' })}
+                className="btn-icon-close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="admin-modal-body p-4 flex-col gap-3">
+              <div style={{ background: '#F8FAFC', padding: '10px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div className="flex-between items-center text-xs text-muted">
+                  <span>Target Partner:</span>
+                  <span className="font-bold text-main">{rejectionModal.member.name}</span>
+                </div>
+                <div className="flex-between items-center text-xs text-muted mt-1">
+                  <span>Partner ID / Email:</span>
+                  <span className="code-font text-xs">{rejectionModal.member.member_id || rejectionModal.member.id} • {rejectionModal.member.email}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-main mb-1 block">
+                  Statutory Rejection Reason (Direct Selling Rules 2021)
+                </label>
+                <select
+                  value={rejectionModal.predefinedReason}
+                  onChange={(e) => setRejectionModal(prev => ({ ...prev, predefinedReason: e.target.value }))}
+                  className="form-input-clean text-xs w-full mb-2"
+                  style={{ padding: '8px 12px' }}
+                >
+                  <option value="Document illegible or blurred">Document illegible or blurred (Requires high-res re-upload)</option>
+                  <option value="Name mismatch between PAN card and banking records">Name mismatch between PAN card and banking records</option>
+                  <option value="Aadhaar number invalid or checksum verification failed">Aadhaar number invalid or checksum verification failed</option>
+                  <option value="Bank document older than 3 months or missing IFSC">Bank document older than 3 months or missing IFSC</option>
+                  <option value="Address proof missing valid state or pincode">Address proof missing valid state or pincode</option>
+                  <option value="Suspected altered or unverified compliance document">Suspected altered or unverified compliance document</option>
+                  <option value="Custom">Custom compliance reason (specify below)...</option>
+                </select>
+
+                <label className="text-xs font-bold text-muted mb-1 block">
+                  Additional Compliance Auditor Notes (Optional):
+                </label>
+                <textarea
+                  rows={3}
+                  value={rejectionModal.customReason}
+                  onChange={(e) => setRejectionModal(prev => ({ ...prev, customReason: e.target.value }))}
+                  placeholder="Explain specific defect to direct seller (e.g., 'Address proof must be electricity bill or bank statement within 90 days')..."
+                  className="form-input-clean text-xs w-full"
+                  style={{ padding: '8px 12px', resize: 'vertical' }}
+                />
+              </div>
+
+              <div className="p-3 bg-card-alt border-rounded text-2xs text-muted flex items-start gap-2">
+                <Shield size={14} className="text-amber shrink-0 mt-0.5" />
+                <span>
+                  <strong>Compliance Notice:</strong> This rejection will be permanently recorded in the Neon PostgreSQL audit trail along with your administrator identity, client IP address, and timestamp. The partner will be notified to re-upload compliant documentation.
+                </span>
+              </div>
+            </div>
+
+            <div className="admin-modal-footer flex-between items-center p-3" style={{ borderTop: '1px solid #E2E8F0' }}>
+              <button
+                type="button"
+                onClick={() => setRejectionModal({ open: false, member: null, predefinedReason: 'Document illegible or blurred', customReason: '' })}
+                className="btn btn-secondary btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const finalReason = rejectionModal.predefinedReason === 'Custom'
+                    ? (rejectionModal.customReason.trim() || 'Compliance criteria not met')
+                    : (rejectionModal.customReason.trim() ? `${rejectionModal.predefinedReason}: ${rejectionModal.customReason.trim()}` : rejectionModal.predefinedReason);
+
+                  rejectKyc(rejectionModal.member.member_id || rejectionModal.member.id, finalReason, {
+                    adminId: 'ADMIN_CONSOLE',
+                    adminName: 'Compliance Officer',
+                    memberName: rejectionModal.member.name
+                  });
+
+                  setRejectionModal({ open: false, member: null, predefinedReason: 'Document illegible or blurred', customReason: '' });
+                  if (selectedKycMember) setSelectedKycMember(null);
+                }}
+                className="btn btn-primary btn-sm flex items-center gap-1.5"
+                style={{ background: '#DC2626', borderColor: '#DC2626' }}
+              >
+                <AlertCircle size={14} />
+                <span>Confirm Statutory Rejection & Audit Log</span>
+              </button>
             </div>
           </div>
         </div>

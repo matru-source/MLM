@@ -286,6 +286,7 @@ export async function dbFetchTransactions(memberId = null) {
 
 /**
  * 14. Update Member KYC & Bank Details
+ * Throws an error on desync so caller can rollback optimistic UI updates
  */
 export async function dbUpdateKyc(memberId, kycData) {
   try {
@@ -294,11 +295,18 @@ export async function dbUpdateKyc(memberId, kycData) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update_kyc', memberId, kyc: kycData })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    return await res.json();
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP error ${res.status}`);
+    }
+    const data = await res.json();
+    if (data.ok === false) {
+      throw new Error(data.error || 'Database rejected KYC update');
+    }
+    return data;
   } catch (err) {
     console.error('[Neon DB Bridge] dbUpdateKyc error:', err.message);
-    return { ok: false, error: err.message };
+    throw err;
   }
 }
 
@@ -372,20 +380,80 @@ export async function dbFetchKycDocuments(memberId = null) {
 }
 
 /**
- * 19. Admin Approves Partner KYC in Neon Database
+ * 19. Admin Approves Partner KYC in Neon Database & Writes Audit Log
  */
-export async function dbApproveKyc(memberId) {
+export async function dbApproveKyc(memberId, adminInfo = {}) {
   try {
     const res = await fetch('/api/db/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'approve_kyc', memberId })
+      body: JSON.stringify({ 
+        action: 'approve_kyc', 
+        memberId,
+        adminId: adminInfo.adminId || 'ADMIN_CONSOLE',
+        adminName: adminInfo.adminName || 'Compliance Admin',
+        memberName: adminInfo.memberName || memberId,
+        reason: adminInfo.reason || 'All statutory proofs verified in accordance with Direct Selling Rules 2021',
+        details: adminInfo.details || {}
+      })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    return await res.json();
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP error ${res.status}`);
+    }
+    const data = await res.json();
+    if (data.ok === false) throw new Error(data.error || 'Failed to approve KYC in database');
+    return data;
   } catch (err) {
-    console.warn('[Neon DB Bridge] dbApproveKyc error:', err.message);
-    return { ok: false, error: err.message };
+    console.error('[Neon DB Bridge] dbApproveKyc error:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * 20. Admin Rejects Partner KYC in Neon Database & Writes Audit Log
+ */
+export async function dbRejectKyc(memberId, adminInfo = {}) {
+  try {
+    const reasonText = typeof adminInfo === 'string' ? adminInfo : (adminInfo.reason || 'Document verification failed');
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        action: 'reject_kyc', 
+        memberId,
+        adminId: typeof adminInfo === 'object' ? (adminInfo.adminId || 'ADMIN_CONSOLE') : 'ADMIN_CONSOLE',
+        adminName: typeof adminInfo === 'object' ? (adminInfo.adminName || 'Compliance Admin') : 'Compliance Admin',
+        memberName: typeof adminInfo === 'object' ? (adminInfo.memberName || memberId) : memberId,
+        reason: reasonText,
+        details: typeof adminInfo === 'object' ? (adminInfo.details || {}) : {}
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP error ${res.status}`);
+    }
+    const data = await res.json();
+    if (data.ok === false) throw new Error(data.error || 'Failed to reject KYC in database');
+    return data;
+  } catch (err) {
+    console.error('[Neon DB Bridge] dbRejectKyc error:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * 21. Fetch Compliance Audit Logs from Neon Database
+ */
+export async function dbFetchAuditLogs() {
+  try {
+    const res = await fetch('/api/db/sync?type=audit_logs');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    const data = await res.json();
+    return data.ok && Array.isArray(data.data) ? data.data : [];
+  } catch (err) {
+    console.warn('[Neon DB Bridge] dbFetchAuditLogs error:', err.message);
+    return [];
   }
 }
 

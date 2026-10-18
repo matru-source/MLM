@@ -20,6 +20,31 @@ function getSql() {
   }
 }
 
+let isAuditTableReady = false;
+async function ensureAuditTable(sql) {
+  if (isAuditTableReady || !sql) return;
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id VARCHAR(100) PRIMARY KEY,
+        action VARCHAR(50) NOT NULL,
+        admin_id VARCHAR(100),
+        admin_name VARCHAR(255),
+        member_id VARCHAR(100),
+        member_name VARCHAR(255),
+        reason TEXT,
+        details JSONB,
+        ip_address VARCHAR(100),
+        user_agent TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `;
+    isAuditTableReady = true;
+  } catch (e) {
+    // Non-fatal if table already exists or permission issues
+  }
+}
+
 export default async function handler(req, res) {
   const sql = getSql();
 
@@ -36,6 +61,18 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const type = req.query?.type;
+
+      // Audit Logs resource query
+      if (type === 'audit_logs') {
+        await ensureAuditTable(sql);
+        const rows = await sql`
+          SELECT 
+            id, action, admin_id, admin_name, member_id, member_name,
+            reason, details, ip_address, user_agent, created_at
+          FROM audit_logs ORDER BY created_at DESC LIMIT 200;
+        `.catch(() => []);
+        return res.status(200).json({ ok: true, data: rows });
+      }
 
       // Single resource query
       if (type === 'members') {
@@ -118,7 +155,8 @@ export default async function handler(req, res) {
       }
 
       // Default: Comprehensive full sync for all devices
-      const [members, activations, payouts, orders, transactions] = await Promise.all([
+      await ensureAuditTable(sql);
+      const [members, activations, payouts, orders, transactions, kycDocs, auditLogs] = await Promise.all([
         sql`
           SELECT 
             id as member_id, name, email, phone, avatar, password, rank,
@@ -167,6 +205,12 @@ export default async function handler(req, res) {
           SELECT 
             id, member_id, doc_key, file_name, file_type, file_size, data_url, status, updated_at
           FROM kyc_documents ORDER BY updated_at DESC;
+        `.catch(() => []),
+        sql`
+          SELECT 
+            id, action, admin_id, admin_name, member_id, member_name,
+            reason, details, ip_address, user_agent, created_at
+          FROM audit_logs ORDER BY created_at DESC LIMIT 100;
         `.catch(() => [])
       ]);
 
@@ -188,6 +232,7 @@ export default async function handler(req, res) {
         data: {
           members: formattedMembers,
           kyc_documents: Array.isArray(kycDocs) ? kycDocs : [],
+          audit_logs: Array.isArray(auditLogs) ? auditLogs : [],
           activations: activations.map(a => ({
             ...a,
             amount_paid: Number(a.amount_paid || 0),
@@ -679,16 +724,122 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, document: inserted[0] });
       }
 
-      // 2i-3. Approve Partner KYC in Neon Database
+      // 2i-3. Approve Partner KYC in Neon Database & Log Audit Trail
       if (action === 'approve_kyc') {
-        const { memberId } = body;
+        await ensureAuditTable(sql);
+        const { memberId, adminId, adminName, memberName, reason, details } = body;
         const cleanMemId = String(memberId).trim().toLowerCase();
+        
         await sql`
           UPDATE kyc_documents
           SET status = 'verified', updated_at = NOW()
           WHERE LOWER(member_id) = ${cleanMemId};
         `;
-        return res.status(200).json({ ok: true });
+
+        const clientIp = (
+          req.headers['x-forwarded-for']?.split(',')[0] || 
+          req.headers['x-real-ip'] || 
+          req.socket?.remoteAddress || 
+          '127.0.0.1'
+        ).trim();
+        const userAgent = req.headers['user-agent'] || 'Web Admin Console';
+
+        const auditId = `audit_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        await sql`
+          INSERT INTO audit_logs (
+            id, action, admin_id, admin_name, member_id, member_name, reason, details, ip_address, user_agent, created_at
+          ) VALUES (
+            ${auditId},
+            'kyc_approved',
+            ${adminId || 'ADMIN_CONSOLE'},
+            ${adminName || 'Compliance Admin'},
+            ${cleanMemId},
+            ${memberName || cleanMemId},
+            ${reason || 'All statutory proofs verified in accordance with Direct Selling Rules 2021'},
+            ${JSON.stringify(details || {})},
+            ${clientIp},
+            ${userAgent},
+            NOW()
+          );
+        `;
+
+        return res.status(200).json({ ok: true, auditId });
+      }
+
+      // 2i-4. Reject Partner KYC in Neon Database & Log Audit Trail
+      if (action === 'reject_kyc') {
+        await ensureAuditTable(sql);
+        const { memberId, adminId, adminName, memberName, reason, details } = body;
+        const cleanMemId = String(memberId).trim().toLowerCase();
+
+        await sql`
+          UPDATE kyc_documents
+          SET status = 'rejected', updated_at = NOW()
+          WHERE LOWER(member_id) = ${cleanMemId};
+        `;
+
+        const clientIp = (
+          req.headers['x-forwarded-for']?.split(',')[0] || 
+          req.headers['x-real-ip'] || 
+          req.socket?.remoteAddress || 
+          '127.0.0.1'
+        ).trim();
+        const userAgent = req.headers['user-agent'] || 'Web Admin Console';
+
+        const auditId = `audit_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        await sql`
+          INSERT INTO audit_logs (
+            id, action, admin_id, admin_name, member_id, member_name, reason, details, ip_address, user_agent, created_at
+          ) VALUES (
+            ${auditId},
+            'kyc_rejected',
+            ${adminId || 'ADMIN_CONSOLE'},
+            ${adminName || 'Compliance Admin'},
+            ${cleanMemId},
+            ${memberName || cleanMemId},
+            ${reason || 'KYC document verification failed'},
+            ${JSON.stringify(details || {})},
+            ${clientIp},
+            ${userAgent},
+            NOW()
+          );
+        `;
+
+        return res.status(200).json({ ok: true, auditId });
+      }
+
+      // 2i-5. Generic Audit Log Recorder
+      if (action === 'log_audit') {
+        await ensureAuditTable(sql);
+        const { auditAction, adminId, adminName, memberId, memberName, reason, details } = body;
+        const clientIp = (
+          req.headers['x-forwarded-for']?.split(',')[0] || 
+          req.headers['x-real-ip'] || 
+          req.socket?.remoteAddress || 
+          '127.0.0.1'
+        ).trim();
+        const userAgent = req.headers['user-agent'] || 'Web Admin Console';
+
+        const auditId = `audit_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        await sql`
+          INSERT INTO audit_logs (
+            id, action, admin_id, admin_name, member_id, member_name, reason, details, ip_address, user_agent, created_at
+          ) VALUES (
+            ${auditId},
+            ${auditAction || 'generic_event'},
+            ${adminId || 'ADMIN_CONSOLE'},
+            ${adminName || 'Compliance Admin'},
+            ${memberId || ''},
+            ${memberName || ''},
+            ${reason || ''},
+            ${JSON.stringify(details || {})},
+            ${clientIp},
+            ${userAgent},
+            NOW()
+          );
+        `;
+
+        return res.status(200).json({ ok: true, auditId });
       }
 
       // 2j. Update Member Password

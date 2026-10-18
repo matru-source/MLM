@@ -31,7 +31,9 @@ import {
   dbFetchZexLinkStatus,
   dbUploadKycDocument,
   dbFetchKycDocuments,
-  dbApproveKyc
+  dbApproveKyc,
+  dbRejectKyc,
+  dbFetchAuditLogs
 } from '../services/neonDbService';
 import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
 import { saveDocumentFile, getDocumentFile, syncKycDocsFromServer } from '../utils/documentStorage';
@@ -271,6 +273,7 @@ export function MlmProvider({ children }) {
   }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings]);
 
   const [isDbConnected, setIsDbConnected] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
 
   // Live Neon PostgreSQL Multi-Device Synchronization
   useEffect(() => {
@@ -281,11 +284,23 @@ export function MlmProvider({ children }) {
         const res = await dbFetchAllSync();
         if (!active || !res || !res.ok || !res.data) return;
 
-        const { members: liveMembers, activations: liveActivations, payouts: livePayouts, orders: liveOrders, transactions: liveTxs, kyc_documents: liveKycDocs } = res.data;
+        const { 
+          members: liveMembers, 
+          activations: liveActivations, 
+          payouts: livePayouts, 
+          orders: liveOrders, 
+          transactions: liveTxs, 
+          kyc_documents: liveKycDocs,
+          audit_logs: liveAuditLogs
+        } = res.data;
 
         // Warm local document store with documents fetched from cloud Neon PostgreSQL
         if (Array.isArray(liveKycDocs) && liveKycDocs.length > 0) {
           syncKycDocsFromServer(liveKycDocs);
+        }
+
+        if (Array.isArray(liveAuditLogs)) {
+          setAuditLogs(liveAuditLogs);
         }
 
         if (Array.isArray(liveMembers) && liveMembers.length > 0) {
@@ -1150,10 +1165,11 @@ export function MlmProvider({ children }) {
   };
 
   // Submit / Update Member KYC & Payout Bank Details
-  const submitKyc = (memberId, kycDetails) => {
+  const submitKyc = async (memberId, kycDetails) => {
     const existingMember = members.find(m => m.member_id === memberId || m.id === memberId) || currentMember;
     const existingKyc = existingMember?.kyc || {};
     const existingDocs = existingKyc.documents || {};
+    const previousMemberKyc = JSON.parse(JSON.stringify(existingKyc));
 
     const submittedDocs = kycDetails.documents || {};
     const documents = {
@@ -1199,6 +1215,7 @@ export function MlmProvider({ children }) {
       submitted_at: new Date().toISOString()
     };
 
+    // Optimistic UI update
     setMembers(prev => prev.map(m => {
       if (m.member_id === memberId || m.id === memberId) {
         return { ...m, kyc: updatedKyc };
@@ -1206,15 +1223,31 @@ export function MlmProvider({ children }) {
       return m;
     }));
 
-    // Persist to live Neon PostgreSQL
-    dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
-
-    if (hasDocuments) {
-      addToast('info', 'KYC Documents Submitted for Review', 'Your KYC documents have been submitted to compliance. Verification takes 24-48 hours.');
-    } else {
-      addToast('success', 'Bank & Tax Details Saved', 'Settlement bank account and PAN details successfully linked and saved.');
+    // Persist to live Neon PostgreSQL with UI Rollback on failure
+    try {
+      await dbUpdateKyc(memberId, updatedKyc);
+      if (hasDocuments) {
+        addToast('info', 'KYC Documents Submitted for Review', 'Your KYC documents have been submitted to compliance. Verification takes 24-48 hours.');
+      } else {
+        addToast('success', 'Bank & Tax Details Saved', 'Settlement bank account and PAN details successfully linked and saved.');
+      }
+      return true;
+    } catch (err) {
+      console.error('[Neon DB] dbUpdateKyc failed on submitKyc, rolling back UI state:', err);
+      // Rollback UI state to prevent silent database desync
+      setMembers(prev => prev.map(m => {
+        if (m.member_id === memberId || m.id === memberId) {
+          return { ...m, kyc: previousMemberKyc };
+        }
+        return m;
+      }));
+      addToast(
+        'error',
+        'Database Sync Failed',
+        'Database connection lost or sync timed out. KYC changes could not be saved to Neon PostgreSQL and were rolled back to avoid desync.'
+      );
+      return false;
     }
-    return true;
   };
 
   // Update Member Profile (Name, Phone, DOB, etc.)
@@ -1235,10 +1268,11 @@ export function MlmProvider({ children }) {
   };
 
   // Upload an individual KYC document (Aadhaar, PAN, Address Proof, Bank Proof)
-  const uploadKycDocument = (memberId, docType, fileInfo) => {
+  const uploadKycDocument = async (memberId, docType, fileInfo) => {
     const existingMember = members.find(m => m.member_id === memberId || m.id === memberId) || currentMember;
     const existingKyc = existingMember?.kyc || {};
     const existingDocs = existingKyc.documents || {};
+    const previousMemberKyc = JSON.parse(JSON.stringify(existingKyc));
 
     const docLabel = fileInfo?.name ? `Uploaded (${fileInfo.name})` : 'Uploaded';
     const updatedDocs = {
@@ -1276,6 +1310,7 @@ export function MlmProvider({ children }) {
       submitted_at: new Date().toISOString()
     };
 
+    // Optimistic UI update
     setMembers(prev => prev.map(m => {
       if (m.member_id === memberId || m.id === memberId) {
         return { ...m, kyc: updatedKyc };
@@ -1283,13 +1318,30 @@ export function MlmProvider({ children }) {
       return m;
     }));
 
-    dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
-    addToast('success', 'Document Uploaded', `${docType.toUpperCase()} uploaded. Status updated to Under Review.`);
-    return true;
+    try {
+      await dbUpdateKyc(memberId, updatedKyc);
+      addToast('success', 'Document Uploaded', `${docType.toUpperCase()} uploaded. Status updated to Under Review.`);
+      return true;
+    } catch (err) {
+      console.error('[Neon DB] dbUpdateKyc failed on uploadKycDocument, rolling back UI state:', err);
+      // Rollback UI state to prevent silent database desync
+      setMembers(prev => prev.map(m => {
+        if (m.member_id === memberId || m.id === memberId) {
+          return { ...m, kyc: previousMemberKyc };
+        }
+        return m;
+      }));
+      addToast(
+        'error',
+        'Database Sync Failed',
+        `Failed to sync ${docType.toUpperCase()} to database cloud. Reverted state to prevent desynchronization.`
+      );
+      return false;
+    }
   };
 
-  // Admin Approves Partner KYC (Enforces Direct Selling Rules 2021 Compliance)
-  const approveKyc = (memberId) => {
+  // Admin Approves Partner KYC (Enforces Direct Selling Rules 2021 Compliance & Audit Trail)
+  const approveKyc = async (memberId, adminInfo = {}) => {
     const targetMember = members.find(m => m.member_id === memberId || m.id === memberId);
     if (!targetMember) return false;
 
@@ -1315,75 +1367,169 @@ export function MlmProvider({ children }) {
       return false;
     }
 
-    let isFullyCompliant = false;
+    const previousMemberKyc = JSON.parse(JSON.stringify(kyc));
 
+    // Only mark genuine uploaded files as verified!
+    const verifiedDocs = { ...docs };
+    primaryDocKeys.forEach(k => {
+      if (hasGenuineFile(k)) {
+        verifiedDocs[k] = 'Verified ✓';
+        verifiedDocs[`${k}Status`] = 'verified';
+      }
+    });
+
+    // Statutory Check: PAN + Bank + Aadhaar + Address Proof files must all exist
+    const hasPan = hasGenuineFile('pan') && Boolean(kyc.pan && kyc.pan.trim().length >= 10);
+    const hasBank = hasGenuineFile('bankAccount') && Boolean(kyc.bank_name && kyc.bank_account_number);
+    const hasAadhaar = hasGenuineFile('aadhaar');
+    const hasAddress = hasGenuineFile('addressProof');
+
+    const isFullyCompliant = hasPan && hasBank && hasAadhaar && hasAddress;
+    const finalStatus = isFullyCompliant ? 'verified' : 'under_review';
+
+    const updatedKyc = {
+      ...kyc,
+      verification_status: finalStatus,
+      documents: verifiedDocs,
+      verified_at: isFullyCompliant ? new Date().toISOString() : kyc.verified_at
+    };
+
+    // Optimistic UI update
     setMembers(prev => prev.map(m => {
       if (m.member_id === memberId || m.id === memberId) {
-        const mKyc = m.kyc || {};
-        const mDocs = mKyc.documents || {};
-        const verifiedDocs = { ...mDocs };
-
-        // Only mark genuine uploaded files as verified!
-        primaryDocKeys.forEach(k => {
-          if (hasGenuineFile(k)) {
-            verifiedDocs[k] = 'Verified ✓';
-            verifiedDocs[`${k}Status`] = 'verified';
-          }
-        });
-
-        // Statutory Check: PAN + Bank + Aadhaar + Address Proof files must all exist
-        const hasPan = hasGenuineFile('pan') && Boolean(mKyc.pan && mKyc.pan.trim().length >= 10);
-        const hasBank = hasGenuineFile('bankAccount') && Boolean(mKyc.bank_name && mKyc.bank_account_number);
-        const hasAadhaar = hasGenuineFile('aadhaar');
-        const hasAddress = hasGenuineFile('addressProof');
-
-        isFullyCompliant = hasPan && hasBank && hasAadhaar && hasAddress;
-        const finalStatus = isFullyCompliant ? 'verified' : 'under_review';
-
-        const updatedKyc = {
-          ...mKyc,
-          verification_status: finalStatus,
-          documents: verifiedDocs,
-          verified_at: isFullyCompliant ? new Date().toISOString() : mKyc.verified_at
-        };
-
-        dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
-        if (isFullyCompliant) {
-          dbApproveKyc(memberId).catch(err => console.warn('[Neon DB] dbApproveKyc error:', err));
-        }
         return { ...m, kyc: updatedKyc };
       }
       return m;
     }));
 
-    if (isFullyCompliant) {
-      addToast('success', 'KYC Fully Verified', 'All 4 statutory proofs verified. Partner KYC is now fully verified.');
-    } else {
-      addToast(
-        'info', 
-        `Submitted Proofs Approved (${uploadedDocKeys.length}/4)`, 
-        `Approved ${uploadedDocKeys.length} uploaded proofs. Direct Selling Rules 2021 require all 4 proofs (Aadhaar, PAN, Address, Bank) before overall KYC status becomes Verified.`
-      );
+    const auditAdminId = adminInfo.adminId || 'ADMIN_CONSOLE';
+    const auditAdminName = adminInfo.adminName || 'Compliance Admin';
+    const complianceReason = isFullyCompliant 
+      ? 'All 4 statutory proofs verified (Direct Selling Rules 2021)' 
+      : `Approved ${uploadedDocKeys.length}/4 submitted proofs. Awaiting remaining documents.`;
+
+    const tempAuditId = `audit_${Date.now()}`;
+    const optimisticAuditRecord = {
+      id: tempAuditId,
+      action: 'kyc_approved',
+      admin_id: auditAdminId,
+      admin_name: auditAdminName,
+      member_id: memberId,
+      member_name: targetMember.name || memberId,
+      reason: complianceReason,
+      details: { isFullyCompliant, uploadedDocKeys },
+      ip_address: 'Client Session',
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Web Console',
+      created_at: new Date().toISOString()
+    };
+    setAuditLogs(prev => [optimisticAuditRecord, ...prev]);
+
+    try {
+      await dbUpdateKyc(memberId, updatedKyc);
+      const auditRes = await dbApproveKyc(memberId, {
+        adminId: auditAdminId,
+        adminName: auditAdminName,
+        memberName: targetMember.name,
+        reason: complianceReason,
+        details: { isFullyCompliant, uploadedDocKeys }
+      });
+
+      if (auditRes?.auditId) {
+        setAuditLogs(prev => prev.map(a => a.id === tempAuditId ? { ...a, id: auditRes.auditId } : a));
+      }
+
+      if (isFullyCompliant) {
+        addToast('success', 'KYC Fully Verified & Audited', 'All 4 statutory proofs verified. Compliance audit log generated in Neon PostgreSQL.');
+      } else {
+        addToast(
+          'info', 
+          `Submitted Proofs Approved (${uploadedDocKeys.length}/4)`, 
+          `Approved ${uploadedDocKeys.length} uploaded proofs and logged to audit trail. Direct Selling Rules 2021 require all 4 proofs before overall KYC status becomes Verified.`
+        );
+      }
+      return true;
+    } catch (err) {
+      console.error('[Neon DB] approveKyc error, rolling back UI state:', err);
+      // Rollback UI state
+      setMembers(prev => prev.map(m => {
+        if (m.member_id === memberId || m.id === memberId) {
+          return { ...m, kyc: previousMemberKyc };
+        }
+        return m;
+      }));
+      setAuditLogs(prev => prev.filter(a => a.id !== tempAuditId));
+      addToast('error', 'Database Desync on Approval', 'Failed to synchronize KYC approval with Neon PostgreSQL cloud. Reverted state.');
+      return false;
     }
-    return true;
   };
 
-  // Admin Rejects Partner KYC
-  const rejectKyc = (memberId, reason = 'Document quality unclear') => {
+  // Admin Rejects Partner KYC (With Neon PostgreSQL Audit Logging & Rollback)
+  const rejectKyc = async (memberId, reason = 'Document quality unclear', adminInfo = {}) => {
+    const targetMember = members.find(m => m.member_id === memberId || m.id === memberId);
+    if (!targetMember) return false;
+
+    const previousMemberKyc = JSON.parse(JSON.stringify(targetMember.kyc || {}));
+    const updatedKyc = {
+      ...(targetMember.kyc || {}),
+      verification_status: 'rejected',
+      rejection_reason: reason
+    };
+
+    // Optimistic UI update
     setMembers(prev => prev.map(m => {
       if (m.member_id === memberId || m.id === memberId) {
-        const updatedKyc = {
-          ...(m.kyc || {}),
-          verification_status: 'rejected',
-          rejection_reason: reason
-        };
-        dbUpdateKyc(memberId, updatedKyc).catch(err => console.warn('[Neon DB] dbUpdateKyc error:', err));
         return { ...m, kyc: updatedKyc };
       }
       return m;
     }));
 
-    addToast('error', 'KYC Rejected', `Partner KYC rejected: ${reason}`);
+    const auditAdminId = adminInfo.adminId || 'ADMIN_CONSOLE';
+    const auditAdminName = adminInfo.adminName || 'Compliance Admin';
+
+    const tempAuditId = `audit_${Date.now()}`;
+    const optimisticAuditRecord = {
+      id: tempAuditId,
+      action: 'kyc_rejected',
+      admin_id: auditAdminId,
+      admin_name: auditAdminName,
+      member_id: memberId,
+      member_name: targetMember.name || memberId,
+      reason: reason,
+      details: { rejection_reason: reason },
+      ip_address: 'Client Session',
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Web Console',
+      created_at: new Date().toISOString()
+    };
+    setAuditLogs(prev => [optimisticAuditRecord, ...prev]);
+
+    try {
+      await dbUpdateKyc(memberId, updatedKyc);
+      const auditRes = await dbRejectKyc(memberId, {
+        adminId: auditAdminId,
+        adminName: auditAdminName,
+        memberName: targetMember.name,
+        reason: reason
+      });
+
+      if (auditRes?.auditId) {
+        setAuditLogs(prev => prev.map(a => a.id === tempAuditId ? { ...a, id: auditRes.auditId } : a));
+      }
+
+      addToast('error', 'KYC Rejected & Audited', `Partner KYC rejected: ${reason}. Recorded in Neon compliance audit trail.`);
+      return true;
+    } catch (err) {
+      console.error('[Neon DB] rejectKyc error, rolling back UI state:', err);
+      // Rollback UI state
+      setMembers(prev => prev.map(m => {
+        if (m.member_id === memberId || m.id === memberId) {
+          return { ...m, kyc: previousMemberKyc };
+        }
+        return m;
+      }));
+      setAuditLogs(prev => prev.filter(a => a.id !== tempAuditId));
+      addToast('error', 'Database Desync on Rejection', 'Failed to synchronize KYC rejection with Neon PostgreSQL cloud. Reverted state.');
+      return false;
+    }
   };
 
   // 1. Admin Approves Partner Activation & Software License
@@ -1710,7 +1856,7 @@ export function MlmProvider({ children }) {
       walletLedger: dynamicWalletLedger,
       commissionEntries: [],
       payouts: payoutRequests,
-      auditLogs: [],
+      auditLogs,
       companyReserve: 0,
       payoutRequests,
       pendingActivations,
