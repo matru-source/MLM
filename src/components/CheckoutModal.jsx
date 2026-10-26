@@ -80,9 +80,9 @@ export default function CheckoutModal() {
 
   // Copy UPI ID to clipboard
   const handleCopyUpi = () => {
-    navigator.clipboard.writeText('cybershield.pay@icici');
+    navigator.clipboard.writeText('cybernetworking.pay@icici');
     setCopiedUpi(true);
-    addToast('success', 'UPI ID Copied', 'cybershield.pay@icici copied to clipboard.');
+    addToast('success', 'UPI ID Copied', 'cybernetworking.pay@icici copied to clipboard.');
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
@@ -367,7 +367,7 @@ export default function CheckoutModal() {
                       <div>
                         <span style={{ fontSize: '0.7rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>Official Corporate UPI ID</span>
                         <div className="code-font font-bold text-primary-blue" style={{ fontSize: '0.95rem' }}>
-                          cybershield.pay@icici
+                          cybernetworking.pay@icici
                         </div>
                       </div>
                       <button
