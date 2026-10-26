@@ -30,8 +30,10 @@ import {
   FileText,
   History,
   Search,
-  Filter
+  Filter,
+  GraduationCap
 } from 'lucide-react';
+import AdminLearningManager from './AdminLearningManager';
 import { getDocumentFile, generateDocPlaceholder, saveDocumentFile } from '../utils/documentStorage';
 import { getEffectiveKycStatus, validateAadhaar, maskAadhaar } from '../utils/kycValidation';
 
@@ -57,6 +59,7 @@ export default function AdminPortalView() {
     auditLogs = [],
     releaseCommissionEarly,
     clawbackCommission,
+    learningResources = [],
     addToast 
   } = useMlm();
 
@@ -403,6 +406,12 @@ export default function AdminPortalView() {
             className={`admin-clean-tab ${adminTab === 'webhooks' ? 'active' : ''}`}
           >
             Webhook Simulator
+          </button>
+          <button
+            onClick={() => setAdminTab('learning')}
+            className={`admin-clean-tab ${adminTab === 'learning' ? 'active' : ''}`}
+          >
+            Learning Resources ({learningResources.length})
           </button>
         </div>
 
@@ -1585,6 +1594,11 @@ export default function AdminPortalView() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB 8: CYBER ACADEMY & LEARNING RESOURCES DESK */}
+        {adminTab === 'learning' && (
+          <AdminLearningManager />
         )}
       </main>
 

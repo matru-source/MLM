@@ -596,3 +596,108 @@ export function downloadForm16A({ member, tdsAmount = 50, grossAmount = null }) 
   // Save real PDF
   doc.save(`CyberNetworking_Form16A_TDS_${memberId}.pdf`);
 }
+
+/**
+ * Generates and downloads a clean, multi-page PDF document for any Book or Manual in the Academy
+ */
+export function downloadManualPdf(resource) {
+  if (!resource) return;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const margin = 16;
+  const contentWidth = 178;
+  const pages = resource.pages && resource.pages.length > 0 ? resource.pages : [
+    { pageNumber: 1, title: 'Overview & Document Summary', content: resource.description || 'CyberNetworking Official Training Manual' }
+  ];
+
+  pages.forEach((page, index) => {
+    if (index > 0) doc.addPage();
+
+    // Top Brand Stripe
+    doc.setFillColor(37, 99, 235); // #2563eb
+    doc.rect(margin, 12, contentWidth, 2.5, 'F');
+
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(37, 99, 235);
+    doc.text('CyberNetworking', margin, 21);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`CYBER ACADEMY • ${resource.category?.toUpperCase() || 'MANUAL'}`, margin + 48, 21);
+
+    doc.text(`Document Ref: #DOC-${resource.id || 'CN'}`, margin + contentWidth, 21, { align: 'right' });
+
+    // Divider
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.4);
+    doc.line(margin, 25, margin + contentWidth, 25);
+
+    // Page Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text(page.title || resource.title, margin, 34);
+
+    // Page Meta
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Author: ${resource.author || 'CyberNetworking Desk'}  |  Est. Pages: ${resource.pageCount || pages.length}`, margin, 40);
+
+    // Clean Plaintext extraction from markdown content
+    const cleanLines = (page.content || '')
+      .split('\n')
+      .map(line => line.replace(/^[#*`\-|\s]+/, '').replace(/[*`_]/g, '').trim())
+      .filter(line => line.length > 0 && !line.startsWith('---'));
+
+    let currentY = 48;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+
+    cleanLines.forEach(line => {
+      if (currentY > 265) {
+        doc.addPage();
+        currentY = 25;
+      }
+
+      if (line.endsWith(':') || line.length < 50 && (line.startsWith('Chapter') || line.startsWith('Step'))) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(15, 23, 42);
+        currentY += 2;
+        doc.text(line, margin, currentY);
+        currentY += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(51, 65, 85);
+      } else {
+        const splitText = doc.splitTextToSize(line, contentWidth);
+        doc.text(splitText, margin, currentY);
+        currentY += (splitText.length * 4.5) + 2;
+      }
+    });
+
+    // Page Footer
+    const footerY = 285;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, footerY, margin + contentWidth, footerY);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text('CyberNetworking Private Limited — Confidential Partner Training Material', margin, footerY + 4);
+    doc.text(`Page ${index + 1} of ${pages.length}`, margin + contentWidth, footerY + 4, { align: 'right' });
+  });
+
+  const safeFilename = (resource.title || 'Manual').replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`CyberNetworking_${safeFilename}.pdf`);
+}

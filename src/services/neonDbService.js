@@ -476,8 +476,8 @@ export async function dbReleaseCommissionEarly(transactionId) {
 }
 
 /**
- * 23. Admin Claws Back Commission upon Buyer Refund
- */
+480:  * 23. Admin Claws Back Commission upon Buyer Refund
+481:  */
 export async function dbClawbackCommission(transactionId, reason = 'Buyer Refunded') {
   try {
     const res = await fetch('/api/db/sync', {
@@ -492,5 +492,56 @@ export async function dbClawbackCommission(transactionId, reason = 'Buyer Refund
     throw err;
   }
 }
+
+/**
+ * 24. Fetch All Learning Resources (Videos & PDF Manuals)
+ */
+export async function dbFetchLearningResources() {
+  try {
+    const res = await fetch('/api/db/sync?type=learning_resources');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[Neon DB Bridge] dbFetchLearningResources error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * 25. Save / Upsert Learning Resource (Admin)
+ */
+export async function dbSaveLearningResource(resource) {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save_learning_resource', data: resource })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[Neon DB Bridge] dbSaveLearningResource error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * 26. Delete Learning Resource (Admin)
+ */
+export async function dbDeleteLearningResource(id) {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete_learning_resource', data: { id } })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[Neon DB Bridge] dbDeleteLearningResource error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 
 

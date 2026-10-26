@@ -35,8 +35,11 @@ import {
   dbRejectKyc,
   dbFetchAuditLogs,
   dbReleaseCommissionEarly,
-  dbClawbackCommission
+  dbClawbackCommission,
+  dbSaveLearningResource,
+  dbDeleteLearningResource
 } from '../services/neonDbService';
+import { initialLearningResources } from '../data/learningResources';
 import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
 import { saveDocumentFile, getDocumentFile, syncKycDocsFromServer } from '../utils/documentStorage';
 
@@ -239,6 +242,8 @@ export function MlmProvider({ children }) {
   const [pendingActivations, setPendingActivations] = useState(() => getStored('activations', initialPendingActivations));
   const [availableBalance, setAvailableBalance] = useState(() => getStored('balance', 0));
   const [totalEarnings, setTotalEarnings] = useState(() => getStored('earnings', 0));
+  const [learningResources, setLearningResources] = useState(() => getStored('learning_resources', initialLearningResources));
+  const [completedResources, setCompletedResources] = useState(() => getStored('completed_resources', {}));
   const [commissionRules, setCommissionRules] = useState(initialCommissionRules);
   const [toasts, setToasts] = useState([]);
 
@@ -271,8 +276,10 @@ export function MlmProvider({ children }) {
       localStorage.setItem('cybershield_activations', JSON.stringify(pendingActivations));
       localStorage.setItem('cybershield_balance', JSON.stringify(availableBalance));
       localStorage.setItem('cybershield_earnings', JSON.stringify(totalEarnings));
+      localStorage.setItem('cybershield_learning_resources', JSON.stringify(learningResources));
+      localStorage.setItem('cybershield_completed_resources', JSON.stringify(completedResources));
     } catch (e) {}
-  }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings]);
+  }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings, learningResources, completedResources]);
 
   // Auto-settle cooling-off transactions whose 30-day waiting period has elapsed
   useEffect(() => {
@@ -340,8 +347,13 @@ export function MlmProvider({ children }) {
           orders: liveOrders, 
           transactions: liveTxs, 
           kyc_documents: liveKycDocs,
-          audit_logs: liveAuditLogs
+          audit_logs: liveAuditLogs,
+          learning_resources: liveLearning
         } = res.data;
+
+        if (Array.isArray(liveLearning) && liveLearning.length > 0) {
+          setLearningResources(liveLearning);
+        }
 
         // Warm local document store with documents fetched from cloud Neon PostgreSQL
         if (Array.isArray(liveKycDocs) && liveKycDocs.length > 0) {
@@ -2072,6 +2084,63 @@ export function MlmProvider({ children }) {
     return unusedTiersTotal + (totalCompanySales * 900);
   }, [transactions, orders, pendingActivations]);
 
+  // =========================================================================
+  // Learning Resources Management Actions (Admin & Member Tracking)
+  // =========================================================================
+  const addLearningResource = async (resource) => {
+    const newRes = {
+      ...resource,
+      id: resource.id || `res_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      created_at: new Date().toISOString()
+    };
+    setLearningResources(prev => [newRes, ...prev]);
+    addToast('Learning resource added successfully!', 'success');
+    try {
+      await dbSaveLearningResource(newRes);
+    } catch (e) {
+      console.warn('[Sync] Offline or saving locally');
+    }
+    return newRes;
+  };
+
+  const updateLearningResource = async (id, updatedFields) => {
+    let updatedRes = null;
+    setLearningResources(prev => prev.map(item => {
+      if (item.id === id) {
+        updatedRes = { ...item, ...updatedFields, updated_at: new Date().toISOString() };
+        return updatedRes;
+      }
+      return item;
+    }));
+    if (updatedRes) {
+      addToast('Learning resource updated successfully!', 'success');
+      try {
+        await dbSaveLearningResource(updatedRes);
+      } catch (e) {
+        console.warn('[Sync] Offline or saving locally');
+      }
+    }
+  };
+
+  const deleteLearningResource = async (id) => {
+    setLearningResources(prev => prev.filter(item => item.id !== id));
+    addToast('Learning resource deleted.', 'info');
+    try {
+      await dbDeleteLearningResource(id);
+    } catch (e) {
+      console.warn('[Sync] Offline or deleting locally');
+    }
+  };
+
+  const toggleResourceCompleted = (memberId, resourceId) => {
+    const mId = memberId || currentMemberId || 'guest';
+    const key = `${mId}_${resourceId}`;
+    setCompletedResources(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      return next;
+    });
+  };
+
   return (
     <MlmContext.Provider value={{
       isAdminMode,
@@ -2145,7 +2214,13 @@ export function MlmProvider({ children }) {
       zexLinkStatus,
       refreshZexStatus,
       initiateZexConnect,
-      resetAllData
+      resetAllData,
+      learningResources,
+      completedResources,
+      addLearningResource,
+      updateLearningResource,
+      deleteLearningResource,
+      toggleResourceCompleted
     }}>
       {children}
     </MlmContext.Provider>

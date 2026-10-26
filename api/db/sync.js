@@ -45,6 +45,36 @@ async function ensureAuditTable(sql) {
   }
 }
 
+let isLearningTableReady = false;
+async function ensureLearningTable(sql) {
+  if (isLearningTableReady || !sql) return;
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS learning_resources (
+        id VARCHAR(100) PRIMARY KEY,
+        type VARCHAR(20) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        description TEXT,
+        url TEXT,
+        duration VARCHAR(50),
+        page_count INT,
+        author VARCHAR(255),
+        thumbnail_url TEXT,
+        is_featured BOOLEAN DEFAULT false,
+        chapters JSONB,
+        notes TEXT,
+        pages JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `;
+    isLearningTableReady = true;
+  } catch (e) {
+    // Non-fatal
+  }
+}
+
 let isTransactionColumnsReady = false;
 async function ensureTransactionColumns(sql) {
   if (isTransactionColumnsReady || !sql) return;
@@ -114,6 +144,19 @@ export default async function handler(req, res) {
             id, action, admin_id, admin_name, member_id, member_name,
             reason, details, ip_address, user_agent, created_at
           FROM audit_logs ORDER BY created_at DESC LIMIT 200;
+        `.catch(() => []);
+        return res.status(200).json({ ok: true, data: rows });
+      }
+
+      // Learning Resources query
+      if (type === 'learning_resources') {
+        await ensureLearningTable(sql);
+        const rows = await sql`
+          SELECT 
+            id, type, title, category, description, url as "videoUrl", url,
+            duration, page_count as "pageCount", author, thumbnail_url as thumbnail,
+            is_featured as "isFeatured", chapters, notes, pages, created_at, updated_at
+          FROM learning_resources ORDER BY created_at ASC;
         `.catch(() => []);
         return res.status(200).json({ ok: true, data: rows });
       }
@@ -200,7 +243,8 @@ export default async function handler(req, res) {
 
       // Default: Comprehensive full sync for all devices
       await ensureAuditTable(sql);
-      const [members, activations, payouts, orders, transactions, kycDocs, auditLogs] = await Promise.all([
+      await ensureLearningTable(sql);
+      const [members, activations, payouts, orders, transactions, kycDocs, auditLogs, learningResources] = await Promise.all([
         sql`
           SELECT 
             id as member_id, name, email, phone, avatar, password, rank,
@@ -255,6 +299,13 @@ export default async function handler(req, res) {
             id, action, admin_id, admin_name, member_id, member_name,
             reason, details, ip_address, user_agent, created_at
           FROM audit_logs ORDER BY created_at DESC LIMIT 100;
+        `.catch(() => []),
+        sql`
+          SELECT 
+            id, type, title, category, description, url as "videoUrl", url,
+            duration, page_count as "pageCount", author, thumbnail_url as thumbnail,
+            is_featured as "isFeatured", chapters, notes, pages, created_at, updated_at
+          FROM learning_resources ORDER BY created_at ASC;
         `.catch(() => [])
       ]);
 
@@ -277,6 +328,7 @@ export default async function handler(req, res) {
           members: formattedMembers,
           kyc_documents: Array.isArray(kycDocs) ? kycDocs : [],
           audit_logs: Array.isArray(auditLogs) ? auditLogs : [],
+          learning_resources: Array.isArray(learningResources) ? learningResources : [],
           activations: activations.map(a => ({
             ...a,
             amount_paid: Number(a.amount_paid || 0),
@@ -1009,6 +1061,60 @@ export default async function handler(req, res) {
           return res.status(200).json({ ok: true });
         }
         return res.status(400).json({ ok: false, error: 'Transaction not found' });
+      }
+
+      // 2n. Save / Upsert Learning Resource (Admin)
+      if (action === 'save_learning_resource') {
+        await ensureLearningTable(sql);
+        const item = data || {};
+        const itemId = item.id || `res_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const rows = await sql`
+          INSERT INTO learning_resources (
+            id, type, title, category, description, url, duration, page_count,
+            author, thumbnail_url, is_featured, chapters, notes, pages, updated_at
+          ) VALUES (
+            ${itemId},
+            ${item.type || 'video'},
+            ${item.title || 'Untitled Resource'},
+            ${item.category || 'General'},
+            ${item.description || ''},
+            ${item.videoUrl || item.url || ''},
+            ${item.duration || ''},
+            ${Number(item.pageCount || 0)},
+            ${item.author || 'CyberNetworking Desk'},
+            ${item.thumbnail || item.thumbnail_url || ''},
+            ${Boolean(item.isFeatured)},
+            ${JSON.stringify(item.chapters || [])},
+            ${item.notes || ''},
+            ${JSON.stringify(item.pages || [])},
+            NOW()
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            type = EXCLUDED.type,
+            title = EXCLUDED.title,
+            category = EXCLUDED.category,
+            description = EXCLUDED.description,
+            url = EXCLUDED.url,
+            duration = EXCLUDED.duration,
+            page_count = EXCLUDED.page_count,
+            author = EXCLUDED.author,
+            thumbnail_url = EXCLUDED.thumbnail_url,
+            is_featured = EXCLUDED.is_featured,
+            chapters = EXCLUDED.chapters,
+            notes = EXCLUDED.notes,
+            pages = EXCLUDED.pages,
+            updated_at = NOW()
+          RETURNING *;
+        `;
+        return res.status(200).json({ ok: true, data: rows[0] });
+      }
+
+      // 2o. Delete Learning Resource (Admin)
+      if (action === 'delete_learning_resource') {
+        await ensureLearningTable(sql);
+        const resId = data?.id || body?.id;
+        await sql`DELETE FROM learning_resources WHERE id = ${resId};`;
+        return res.status(200).json({ ok: true, deletedId: resId });
       }
 
       return res.status(400).json({ ok: false, error: `Unrecognized action: ${action}` });

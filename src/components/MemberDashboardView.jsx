@@ -38,8 +38,10 @@ import {
   Building,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  GraduationCap
 } from 'lucide-react';
+import LearningCenterView from './LearningCenterView';
 import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
 import { getDocumentFile } from '../utils/documentStorage';
 import { 
@@ -401,6 +403,14 @@ export default function MemberDashboardView() {
           >
             <UserCheck size={18} />
             <span>Profile & KYC</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('learning')}
+            className={`sidebar-item ${activeTab === 'learning' ? 'active' : ''}`}
+          >
+            <GraduationCap size={18} />
+            <span>Cyber Academy</span>
           </button>
         </nav>
 
@@ -2776,6 +2786,11 @@ export default function MemberDashboardView() {
             )}
           </div>
         )}
+
+        {/* SUBVIEW 6: CYBER ACADEMY & LEARNING HUB */}
+        {activeTab === 'learning' && (
+          <LearningCenterView />
+        )}
       </div>
 
       {/* SHARE REFERRAL MODAL */}
@@ -3006,6 +3021,14 @@ export default function MemberDashboardView() {
         >
           <UserCheck size={19} />
           <span>Profile</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('learning')}
+          className={`bottom-nav-item ${activeTab === 'learning' ? 'active' : ''}`}
+        >
+          <GraduationCap size={19} />
+          <span>Academy</span>
         </button>
       </nav>
     </div>
