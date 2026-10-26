@@ -356,7 +356,7 @@ export default function MemberDashboardView() {
       {/* 1. DARK NAVY SIDEBAR (Desktop) */}
       <aside className="member-sidebar desktop-sidebar">
         <div className="sidebar-brand-box">
-          <img src="/logo.png" alt="CyberShield Logo" className="sidebar-logo-img" />
+          <img src="/logo.png?v=2" alt="CyberShield Logo" className="sidebar-logo-img" />
           <div>
             <div className="sidebar-logo-title">CyberShield</div>
             <div className="sidebar-logo-sub">Security Network</div>
@@ -430,7 +430,7 @@ export default function MemberDashboardView() {
         {/* Mobile Top Header */}
         <div className="mobile-dash-topbar">
           <div className="mobile-dash-brand" onClick={() => setCurrentPage('home')}>
-            <img src="/logo.png" alt="CyberShield Logo" className="mobile-dash-logo-img" />
+            <img src="/logo.png?v=2" alt="CyberShield Logo" className="mobile-dash-logo-img" />
             <span className="mobile-dash-title">CyberShield</span>
           </div>
 

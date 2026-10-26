@@ -115,7 +115,7 @@ export default function PublicHome() {
             {/* Floating Badge 1: Software License */}
             <div className="floating-card float-top-right">
               <div className="float-icon-box" style={{ background: 'transparent', padding: 0 }}>
-                <img src="/logo.png" alt="CyberShield Software" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(6, 182, 212, 0.3)' }} />
+                <img src="/logo.png?v=2" alt="CyberShield Software" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(6, 182, 212, 0.3)' }} />
               </div>
               <div>
                 <div className="float-title">CyberShield Software</div>
