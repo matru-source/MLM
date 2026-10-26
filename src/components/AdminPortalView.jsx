@@ -272,9 +272,7 @@ export default function AdminPortalView() {
       {/* Dedicated Admin Header */}
       <header className="admin-dedicated-header">
         <div className="admin-header-brand">
-          <div className="admin-brand-icon">
-            <Shield size={22} className="shield-brand-svg" />
-          </div>
+          <img src="/logo.png" alt="CyberShield Logo" className="admin-brand-img" />
           <div>
             <h1 className="admin-title-text">CyberShield Network — Admin Operations</h1>
             <div className="flex-center gap-2 mt-1" style={{ justifyContent: 'flex-start' }}>

@@ -381,9 +381,12 @@ export default function AuthModal() {
       <div className={`modal-box ${authMode === 'register' && authStep === 'form' ? 'auth-modal-wide' : 'auth-modal-width'}`}>
         {/* Header */}
         <div className="auth-modal-header" style={{ position: 'relative' }}>
-          <div className="brand-logo-text-small mb-1">
-            <span className="brand-title">CyberShield</span>
-            <span className="brand-subtitle">Security Network</span>
+          <div className="brand-logo-text-small mb-1" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img src="/logo.png" alt="CyberShield Logo" style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 2px 8px rgba(6, 182, 212, 0.25)' }} />
+            <div>
+              <span className="brand-title">CyberShield</span>
+              <span className="brand-subtitle">Security Network</span>
+            </div>
           </div>
 
           <h3 className="auth-title">

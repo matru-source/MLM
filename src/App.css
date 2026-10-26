@@ -38,6 +38,19 @@
   gap: 10px;
 }
 
+.brand-logo-img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.brand-logo:hover .brand-logo-img {
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(6, 182, 212, 0.5);
+}
+
 .brand-logo-icon {
   width: 36px;
   height: 36px;
@@ -929,15 +942,22 @@
   padding-left: 8px;
 }
 
-.sidebar-logo-icon {
-  width: 32px;
-  height: 32px;
-  background: var(--primary);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
+.sidebar-logo-img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+  flex-shrink: 0;
+}
+
+.mobile-dash-logo-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
+  flex-shrink: 0;
 }
 
 .sidebar-logo-title {
@@ -2189,15 +2209,13 @@
   gap: 12px;
 }
 
-.admin-brand-icon {
-  width: 34px;
-  height: 34px;
-  background: var(--primary);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
+.admin-brand-img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+  flex-shrink: 0;
 }
 
 .admin-title-text {

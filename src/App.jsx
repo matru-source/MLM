@@ -103,8 +103,8 @@ function MainApp() {
           <div className="footer-container">
             <div className="footer-top-row">
               <div className="footer-brand">
-                <div className="footer-logo">
-                  <span className="footer-logo-z">🛡️</span>
+                <div className="footer-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img src="/logo.png" alt="CyberShield Logo" className="footer-logo-img" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 2px 10px rgba(6, 182, 212, 0.3)' }} />
                   <span className="footer-logo-title">CyberShield Network</span>
                 </div>
                 <p className="footer-desc">

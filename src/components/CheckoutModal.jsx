@@ -164,9 +164,12 @@ export default function CheckoutModal() {
           justifyContent: 'space-between',
           background: '#FFFFFF'
         }}>
-          <div className="brand-logo-text-small">
-            <span className="brand-title" style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>CyberShield</span>
-            <span className="brand-subtitle" style={{ fontSize: '11px', color: '#64748B', display: 'block' }}>Security Network</span>
+          <div className="brand-logo-text-small" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src="/logo.png" alt="CyberShield Logo" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 2px 10px rgba(6, 182, 212, 0.25)' }} />
+            <div>
+              <span className="brand-title" style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>CyberShield</span>
+              <span className="brand-subtitle" style={{ fontSize: '11px', color: '#64748B', display: 'block' }}>Security Network</span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

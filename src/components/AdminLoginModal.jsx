@@ -83,8 +83,8 @@ export default function AdminLoginModal() {
       <div className="admin-gate-card">
         {/* Top Brand & Security Header */}
         <div className="admin-gate-head">
-          <div className="admin-gate-shield-icon">
-            <Lock size={26} className="text-white" />
+          <div className="admin-gate-shield-icon" style={{ background: 'transparent', padding: 0, boxShadow: 'none' }}>
+            <img src="/logo.png" alt="CyberShield Logo" style={{ width: '56px', height: '56px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 8px 24px rgba(6, 182, 212, 0.35)' }} />
           </div>
           <span className="badge badge-amber font-2xs font-bold mb-2">
             RESTRICTED ACCESS • EXECUTIVE CONSOLE
