@@ -1880,7 +1880,33 @@ export function MlmProvider({ children }) {
 
     // Secure Password Verification
     if (found.password) {
-      const isValid = await verifyPassword(password, found.password);
+      let isValid = await verifyPassword(password, found.password);
+
+      // Resilient Fallback: If in-memory state doesn't match, verify against fresh database record
+      if (!isValid) {
+        try {
+          const freshRes = await fetch('/api/db/sync?type=members');
+          if (freshRes.ok) {
+            const freshJson = await freshRes.json();
+            const freshList = Array.isArray(freshJson?.data) ? freshJson.data : [];
+            const freshUser = freshList.find(m => 
+              (m.email && m.email.toLowerCase() === cleanEmail) || 
+              (m.member_id === found.member_id)
+            );
+            if (freshUser && freshUser.password) {
+              const freshValid = await verifyPassword(password, freshUser.password);
+              if (freshValid) {
+                isValid = true;
+                found.password = freshUser.password;
+                setMembers(prev => prev.map(m => (m.email && m.email.toLowerCase() === cleanEmail) ? { ...m, password: freshUser.password } : m));
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.warn('[Login Sync Check] Error verifying against fresh DB:', syncErr);
+        }
+      }
+
       if (!isValid) {
         return {
           ok: false,
@@ -1898,7 +1924,7 @@ export function MlmProvider({ children }) {
       }
       const newHash = await hashPassword(password);
       found.password = newHash;
-      dbUpdateMemberPassword(found.member_id, newHash).catch(err => console.warn('[Neon DB] dbUpdateMemberPassword error:', err));
+      dbUpdateMemberPassword(found.member_id, newHash, cleanEmail).catch(err => console.warn('[Neon DB] dbUpdateMemberPassword error:', err));
     }
 
     setCurrentMemberId(found.member_id);
@@ -1910,6 +1936,34 @@ export function MlmProvider({ children }) {
     setCurrentPage('dashboard');
     addToast('success', 'Welcome Back!', `Logged in as ${found.name}.`);
     return { ok: true, member: found };
+  };
+
+  // Reset User Password (Forgot Password flow) with dual React state update and Neon DB sync
+  const resetUserPassword = async ({ email, newPassword }) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail || !newPassword) {
+      return { ok: false, error: 'Email and new password are required.' };
+    }
+    const newHash = await hashPassword(newPassword);
+
+    let targetMemberId = null;
+    // 1. Update React state immutably so login succeeds immediately
+    setMembers(prev => prev.map(m => {
+      if (m.email && m.email.toLowerCase() === cleanEmail) {
+        targetMemberId = m.member_id || m.id;
+        return { ...m, password: newHash };
+      }
+      return m;
+    }));
+
+    // 2. Persist to Neon DB matching both ID and clean email
+    try {
+      await dbUpdateMemberPassword(targetMemberId, newHash, cleanEmail);
+    } catch (err) {
+      console.warn('[Neon DB] dbUpdateMemberPassword error:', err);
+    }
+
+    return { ok: true, newHash };
   };
 
   // Logout / Switch to Visitor mode
@@ -2086,6 +2140,7 @@ export function MlmProvider({ children }) {
       getMemberWallet,
       requestPayout,
       loginUserByEmail,
+      resetUserPassword,
       isDbConnected,
       zexLinkStatus,
       refreshZexStatus,

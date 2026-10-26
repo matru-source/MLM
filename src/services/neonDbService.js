@@ -65,12 +65,12 @@ export async function dbRegisterMember(member) {
 /**
  * 2b. Update Member Password Hash
  */
-export async function dbUpdateMemberPassword(memberId, passwordHash) {
+export async function dbUpdateMemberPassword(memberId, passwordHash, email) {
   try {
     const res = await fetch('/api/db/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update_password', memberId, passwordHash })
+      body: JSON.stringify({ action: 'update_password', memberId, passwordHash, email })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();

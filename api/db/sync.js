@@ -932,11 +932,13 @@ export default async function handler(req, res) {
 
       // 2j. Update Member Password
       if (action === 'update_password') {
-        const { memberId, passwordHash } = body;
+        const { memberId, email, passwordHash } = body;
+        const cleanEmail = (email || '').trim().toLowerCase();
         await sql`
           UPDATE members
           SET password = ${passwordHash}
-          WHERE id = ${memberId};
+          WHERE (id IS NOT NULL AND id = ${memberId || ''})
+             OR (email IS NOT NULL AND LOWER(email) = LOWER(${cleanEmail}));
         `;
         return res.status(200).json({ ok: true });
       }

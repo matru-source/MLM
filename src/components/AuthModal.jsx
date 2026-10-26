@@ -36,6 +36,7 @@ export default function AuthModal() {
     getMemberByReferralCode,
     validateReferralCode,
     loginUserByEmail,
+    resetUserPassword,
     members,
     addToast
   } = useMlm();
@@ -98,6 +99,7 @@ export default function AuthModal() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [forgotError, setForgotError] = useState('');
   const [isSendingResetOtp, setIsSendingResetOtp] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetCountdown, setResetCountdown] = useState(60);
   const [canResendReset, setCanResendReset] = useState(false);
 
@@ -351,17 +353,27 @@ export default function AuthModal() {
       return;
     }
 
-    const newHash = await hashPassword(newPassword);
-    foundMember.password = newHash;
-    dbUpdateMemberPassword(foundMember.member_id, newHash).catch(err => console.warn('dbUpdateMemberPassword error:', err));
+    setIsResettingPassword(true);
+    try {
+      const resetRes = await resetUserPassword({ email: cleanEmail, newPassword });
+      if (!resetRes || !resetRes.ok) {
+        setForgotError(resetRes?.error || 'Failed to update password.');
+        return;
+      }
 
-    addToast('success', 'Password Reset Successful!', 'Your password has been updated. Please sign in with your new credentials.');
-    setPassword('');
-    setAuthMode('login');
-    setForgotStep('request');
-    setResetOtp('');
-    setNewPassword('');
-    setConfirmNewPassword('');
+      addToast('success', 'Password Reset Successful!', 'Your password has been updated. Please sign in with your new credentials.');
+      setPassword(newPassword); // Pre-fill new password for 1-click smooth login!
+      setLoginErrorMessage('');
+      setAuthMode('login');
+      setForgotStep('request');
+      setResetOtp('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (err) {
+      setForgotError(err.message || 'Error updating password.');
+    } finally {
+      setIsResettingPassword(false);
+    }
   };
 
   return (
@@ -883,10 +895,11 @@ export default function AuthModal() {
 
                 <button 
                   type="submit" 
+                  disabled={isResettingPassword}
                   className="btn btn-primary full-width btn-lg mt-2 flex-center gap-2"
                 >
                   <Key size={16} />
-                  <span>Reset & Update Password</span>
+                  <span>{isResettingPassword ? 'Updating Password...' : 'Reset & Update Password'}</span>
                 </button>
 
                 <div className="text-center mt-3">
