@@ -873,13 +873,16 @@
    ========================================================================== */
 .member-app-layout {
   display: flex;
-  min-height: 100vh;
-  align-items: stretch;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   position: relative;
+  width: 100%;
 }
 
 .member-sidebar {
   width: 260px;
+  min-width: 260px;
   background: var(--bg-sidebar);
   color: #FFFFFF;
   display: flex;
@@ -887,12 +890,12 @@
   flex-shrink: 0;
   padding: 24px 16px;
   border-right: 1px solid #1E293B;
-  position: sticky;
-  top: 0;
+  position: relative;
   height: 100vh;
   max-height: 100vh;
   overflow-y: auto;
   z-index: 50;
+  box-sizing: border-box;
 }
 
 .member-sidebar::-webkit-scrollbar {
@@ -909,12 +912,12 @@
 @media (max-width: 768px) {
   .member-app-layout {
     flex-direction: column;
-  }
-  .member-sidebar {
-    width: 100%;
-    position: static;
     height: auto;
     max-height: none;
+    overflow: visible;
+  }
+  .member-sidebar {
+    display: none;
   }
 }
 
@@ -1009,12 +1012,31 @@
   background: var(--bg-sidebar-hover);
 }
 
-/* Dashboard Main Content */
+/* Dashboard Main Content (Right Scrollable Area) */
 .member-main-content {
   flex: 1;
+  min-width: 0;
   background: var(--bg-body);
   padding: 32px 36px;
+  height: 100vh;
+  max-height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.member-main-content::-webkit-scrollbar {
+  width: 8px;
+}
+.member-main-content::-webkit-scrollbar-track {
+  background: #F8FAFC;
+}
+.member-main-content::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+.member-main-content::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 .member-topbar {
@@ -4492,9 +4514,18 @@
     cursor: pointer;
   }
 
+  .member-app-layout {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
   .member-main-content {
     padding: 16px 12px 90px 12px !important;
     width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
   }
 
   /* Fixed Mobile Bottom Bar */
