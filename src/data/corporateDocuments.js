@@ -1,4 +1,4 @@
-// Official Corporate Compliance Documents for CyberShield Head Office
+// Official Corporate Compliance Documents for CyberNetworking Head Office
 // Master corporate filing artifacts for MCA, Income Tax Department, HDFC Escrow, and Registered Office Deed
 
 function encodeSvg(svgString) {
@@ -41,7 +41,7 @@ export const corporateAadhaarMcaSvg = encodeSvg(`
 
   <!-- Body Content -->
   <g transform="translate(80, 310)" font-family="Arial, sans-serif" font-size="13" fill="#1E293B" line-height="1.6">
-    <text x="0" y="0">I hereby certify that <tspan font-weight="bold" fill="#0F172A">CYBERSHIELD SECURITY NETWORK PRIVATE LIMITED</tspan> is incorporated</text>
+    <text x="0" y="0">I hereby certify that <tspan font-weight="bold" fill="#0F172A">CYBERNETWORKING PRIVATE LIMITED</tspan> is incorporated</text>
     <text x="0" y="24">on this Tenth day of January Two Thousand Twenty-Six under the Companies Act, 2013 (18 of 2013)</text>
     <text x="0" y="48">and that the company is limited by shares.</text>
 
@@ -66,7 +66,7 @@ export const corporateAadhaarMcaSvg = encodeSvg(`
   <!-- Registered Address -->
   <g transform="translate(80, 680)" font-family="Arial, sans-serif" font-size="12" fill="#334155">
     <text x="0" y="0" font-weight="bold" fill="#0F172A">Registered Office Address:</text>
-    <text x="0" y="20">Level 8, CyberShield Tower, Cyber City, DLF Phase II, Gurugram, HR 122002, India</text>
+    <text x="0" y="20">Level 8, CyberNetworking Tower, Cyber City, DLF Phase II, Gurugram, HR 122002, India</text>
   </g>
 
   <!-- Digital Signature & Seal -->
@@ -116,7 +116,7 @@ export const corporatePanSvg = encodeSvg(`
   <!-- Taxpayer Details -->
   <g transform="translate(70, 220)" font-family="Arial, sans-serif">
     <text x="0" y="0" font-size="11" font-weight="bold" fill="#64748B">NAME / नाम</text>
-    <text x="0" y="24" font-size="17" font-weight="900" fill="#0F172A" letter-spacing="0.5">CYBERSHIELD SECURITY NETWORK PRIVATE LIMITED</text>
+    <text x="0" y="24" font-size="17" font-weight="900" fill="#0F172A" letter-spacing="0.5">CYBERNETWORKING PRIVATE LIMITED</text>
 
     <text x="0" y="60" font-size="11" font-weight="bold" fill="#64748B">DATE OF INCORPORATION / निगमन की तारीख</text>
     <text x="0" y="82" font-size="15" font-weight="bold" fill="#1E293B">10/01/2026</text>
@@ -171,14 +171,14 @@ export const corporateOfficeLeaseSvg = encodeSvg(`
     <text x="0" y="40" font-weight="bold" fill="#0F172A">1. LESSOR: DLF Cyber City Developers Limited,</text>
     <text x="0" y="60" fill="#475569">having registered office at DLF Centre, Sansad Marg, New Delhi 110001.</text>
 
-    <text x="0" y="100" font-weight="bold" fill="#0F172A">2. LESSEE: CyberShield Security Network Private Limited,</text>
+    <text x="0" y="100" font-weight="bold" fill="#0F172A">2. LESSEE: CyberNetworking Private Limited,</text>
     <text x="0" y="120" fill="#475569">represented by authorized signatory Matru Prasad Panda (Managing Director).</text>
 
     <!-- Property Details Box -->
     <rect x="0" y="160" width="640" height="200" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5" rx="8"/>
     <g transform="translate(24, 195)">
       <text x="0" y="0" font-weight="bold" fill="#2563EB">DEMISED PREMISES &amp; CORPORATE HEAD OFFICE ADDRESS:</text>
-      <text x="0" y="28" font-size="15" font-weight="bold" fill="#0F172A">Level 8, Tower B, CyberShield HQ, DLF Cyber City,</text>
+      <text x="0" y="28" font-size="15" font-weight="bold" fill="#0F172A">Level 8, Tower B, CyberNetworking HQ, DLF Cyber City,</text>
       <text x="0" y="50" font-size="14" font-weight="bold" fill="#0F172A">Phase II, Gurugram, Haryana - 122002, India.</text>
 
       <text x="0" y="90" font-size="12" fill="#475569">Permitted Use: Headquarters &amp; Operations of National Cyber Security MLM Network</text>
@@ -196,7 +196,7 @@ export const corporateOfficeLeaseSvg = encodeSvg(`
 
   <g transform="translate(600, 780)" text-anchor="middle">
     <line x1="-100" y1="0" x2="100" y2="0" stroke="#0F172A" stroke-width="1.5"/>
-    <text x="0" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#2563EB">For CyberShield Security Network Pvt Ltd</text>
+    <text x="0" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#2563EB">For CyberNetworking Pvt Ltd</text>
     <text x="0" y="36" font-family="Arial, sans-serif" font-size="10" fill="#64748B">Managing Director (Lessee)</text>
   </g>
 
@@ -231,7 +231,7 @@ export const corporateBankCertificateSvg = encodeSvg(`
 
   <!-- Body -->
   <g transform="translate(80, 270)" font-family="Arial, sans-serif" font-size="13" fill="#1E293B">
-    <text x="0" y="0">This is to certify that <tspan font-weight="bold" fill="#0F172A">CYBERSHIELD SECURITY NETWORK PRIVATE LIMITED</tspan> maintains an</text>
+    <text x="0" y="0">This is to certify that <tspan font-weight="bold" fill="#0F172A">CYBERNETWORKING PRIVATE LIMITED</tspan> maintains an</text>
     <text x="0" y="22">active Corporate Escrow and Multi-Tier Partner Commission Settlement Account with our branch as per</text>
     <text x="0" y="44">the RBI guidelines and Direct Selling Rules 2021.</text>
 
@@ -240,7 +240,7 @@ export const corporateBankCertificateSvg = encodeSvg(`
 
     <g transform="translate(24, 105)">
       <text x="0" y="0" font-weight="bold" fill="#475569">Account Beneficiary Name:</text>
-      <text x="0" y="22" font-size="15" font-weight="bold" fill="#0F172A">CYBERSHIELD SECURITY NETWORK PRIVATE LIMITED</text>
+      <text x="0" y="22" font-size="15" font-weight="bold" fill="#0F172A">CYBERNETWORKING PRIVATE LIMITED</text>
 
       <text x="0" y="60" font-weight="bold" fill="#475569">Corporate Account Number:</text>
       <text x="0" y="84" font-family="monospace" font-size="20" font-weight="bold" fill="#2563EB">50200012345678</text>

@@ -104,8 +104,8 @@ function MainApp() {
             <div className="footer-top-row">
               <div className="footer-brand">
                 <div className="footer-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <img src="/logo.png?v=2" alt="CyberShield Logo" className="footer-logo-img" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 2px 10px rgba(6, 182, 212, 0.3)' }} />
-                  <span className="footer-logo-title">CyberShield Network</span>
+                  <img src="/logo.png?v=2" alt="CyberNetworking Logo" className="footer-logo-img" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 2px 10px rgba(6, 182, 212, 0.3)' }} />
+                  <span className="footer-logo-title">CyberNetworking</span>
                 </div>
                 <p className="footer-desc">
                   Empowering authorized partners with enterprise cyber defense software tools, verified cloud security licenses, and transparent referral rewards.
@@ -130,14 +130,14 @@ function MainApp() {
 
               <div className="footer-col-links">
                 <h4 className="footer-title">Support & Portals</h4>
-                <span>support@cybershield.network</span>
+                <span>support@cybernetworking.in</span>
                 <span>+91 80 4900 1234</span>
                 <span className="text-muted font-xs">Authorized Enterprise Network</span>
               </div>
             </div>
 
             <div className="footer-bottom-row">
-              <span>© 2026 CyberShield Network. All rights reserved.</span>
+              <span>© 2026 CyberNetworking. All rights reserved.</span>
               <div className="footer-security-pills">
                 <span className="badge badge-green">✓ Verified Enterprise Security Engine</span>
                 <span className="badge badge-blue">100% Compliant Direct Selling</span>

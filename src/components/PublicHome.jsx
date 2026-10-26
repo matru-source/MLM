@@ -39,7 +39,7 @@ export default function PublicHome() {
 
           <h1 className="hero-coach-title">
             Automate. Grow. <span className="text-primary-blue">Earn</span> <br />
-            with CyberShield Security Network
+            with CyberNetworking
           </h1>
 
           <p className="hero-coach-subtitle">
@@ -62,7 +62,7 @@ export default function PublicHome() {
             </div>
             <div className="pill-item">
               <ShieldCheck size={15} className="text-primary-blue" />
-              <span>Verified CyberShield Engine</span>
+              <span>Verified CyberNetworking Engine</span>
             </div>
           </div>
 
@@ -108,17 +108,17 @@ export default function PublicHome() {
           <div className="hero-image-frame">
             <img 
               src="/hero-student.png" 
-              alt="CyberShield Security Partner" 
+              alt="CyberNetworking Partner" 
               className="hero-main-photo"
             />
 
             {/* Floating Badge 1: Software License */}
             <div className="floating-card float-top-right">
               <div className="float-icon-box" style={{ background: 'transparent', padding: 0 }}>
-                <img src="/logo.png?v=2" alt="CyberShield Software" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(6, 182, 212, 0.3)' }} />
+                <img src="/logo.png?v=2" alt="CyberNetworking Software" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(6, 182, 212, 0.3)' }} />
               </div>
               <div>
-                <div className="float-title">CyberShield Software</div>
+                <div className="float-title">CyberNetworking Software</div>
                 <div className="float-sub">Institutional License</div>
               </div>
             </div>
@@ -157,7 +157,7 @@ export default function PublicHome() {
           </div>
           <h2 className="section-title-large">Official Joining & Partner Membership</h2>
           <p className="section-subtitle">
-            Only one standard pricing for joining. Get authorized access to the CyberShield enterprise cyber defense suite and start earning multi-tier direct selling commissions.
+            Only one standard pricing for joining. Get authorized access to the CyberNetworking enterprise cyber defense suite and start earning multi-tier direct selling commissions.
           </p>
         </div>
 
@@ -173,7 +173,7 @@ export default function PublicHome() {
                     <ShieldCheck size={16} className="text-primary-blue" />
                     <span>Authorized Partner License</span>
                   </div>
-                  <h3 className="single-plan-title">CyberShield Partner Membership</h3>
+                  <h3 className="single-plan-title">CyberNetworking Partner Membership</h3>
                   <p className="single-plan-sub">
                     Complete institutional endpoint protection software suite and authorized direct selling distribution rights.
                   </p>
@@ -202,7 +202,7 @@ export default function PublicHome() {
                 <ul className="single-features-list">
                   <li>
                     <CheckCircle2 size={16} className="text-success flex-shrink-0" />
-                    <span>Full CyberShield Cloud Endpoint Protection & AI Scanner</span>
+                    <span>Full CyberNetworking Cloud Endpoint Protection & AI Scanner</span>
                   </li>
                   <li>
                     <CheckCircle2 size={16} className="text-success flex-shrink-0" />
@@ -331,7 +331,7 @@ export default function PublicHome() {
                 <ShieldCheck size={20} className="text-primary-blue" />
               </div>
               <div className="callout-text">
-                <div className="callout-title">Commission after CyberShield activation and cooling-off period</div>
+                <div className="callout-title">Commission after CyberNetworking activation and cooling-off period</div>
                 <div className="callout-sub">Guarantees complete legal protection and consumer cooling-off rights.</div>
               </div>
             </div>
@@ -391,7 +391,7 @@ export default function PublicHome() {
           <div className="faq-card card-white">
             <h4 className="faq-question">Can I use this purely as a software customer?</h4>
             <p className="faq-answer">
-              Yes, absolutely! You can choose the "Customer" option and enjoy all CyberShield Security Network software tools without participating in the partner network.
+              Yes, absolutely! You can choose the "Customer" option and enjoy all CyberNetworking software tools without participating in the partner network.
             </p>
           </div>
         </div>

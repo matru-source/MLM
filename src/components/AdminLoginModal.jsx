@@ -62,7 +62,7 @@ export default function AdminLoginModal() {
 
     if (res.ok) {
       localStorage.removeItem('cybershield_admin_lockout_until');
-      addToast('success', 'Admin Access Granted', 'Welcome to CyberShield Executive Operations.');
+      addToast('success', 'Admin Access Granted', 'Welcome to CyberNetworking Executive Operations.');
     } else {
       if (res.locked) {
         const secs = res.remainingSeconds || 900;
@@ -84,7 +84,7 @@ export default function AdminLoginModal() {
         {/* Top Brand & Security Header */}
         <div className="admin-gate-head">
           <div className="admin-gate-shield-icon" style={{ background: 'transparent', padding: 0, boxShadow: 'none' }}>
-            <img src="/logo.png?v=2" alt="CyberShield Logo" style={{ width: '56px', height: '56px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 8px 24px rgba(6, 182, 212, 0.35)' }} />
+            <img src="/logo.png?v=2" alt="CyberNetworking Logo" style={{ width: '56px', height: '56px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 8px 24px rgba(6, 182, 212, 0.35)' }} />
           </div>
           <span className="badge badge-amber font-2xs font-bold mb-2">
             RESTRICTED ACCESS • EXECUTIVE CONSOLE

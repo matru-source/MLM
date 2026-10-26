@@ -272,9 +272,9 @@ export default function AdminPortalView() {
       {/* Dedicated Admin Header */}
       <header className="admin-dedicated-header">
         <div className="admin-header-brand">
-          <img src="/logo.png?v=2" alt="CyberShield Logo" className="admin-brand-img" />
+          <img src="/logo.png?v=2" alt="CyberNetworking Logo" className="admin-brand-img" />
           <div>
-            <h1 className="admin-title-text">CyberShield Network — Admin Operations</h1>
+            <h1 className="admin-title-text">CyberNetworking — Admin Operations</h1>
             <div className="flex-center gap-2 mt-1" style={{ justifyContent: 'flex-start' }}>
               <span className="admin-badge-role">Operations, Payouts & Compliance Desk</span>
               <span className={`badge ${isDbConnected ? 'badge-green' : 'badge-amber'} flex-center gap-1 font-xs`} style={{ padding: '3px 8px' }}>
@@ -311,7 +311,7 @@ export default function AdminPortalView() {
           <div className="admin-stat-card card-white">
             <span className="stat-label-muted">Total Sales Volume</span>
             <div className="stat-number-bold">₹{((orders.length) * 2950).toLocaleString('en-IN')}</div>
-            <span className="stat-badge-tag text-success">✓ CyberShield Engine</span>
+            <span className="stat-badge-tag text-success">✓ CyberNetworking Engine</span>
           </div>
 
           <div className="admin-stat-card card-white">
@@ -520,7 +520,7 @@ export default function AdminPortalView() {
                           </div>
                           <div className="spec-item-compact">
                             <span className="spec-k">Software Suite:</span>
-                            <span className="spec-v">CyberShield Pro Enterprise Suite</span>
+                            <span className="spec-v">CyberNetworking Pro Enterprise Suite</span>
                           </div>
                           <div className="spec-item-compact">
                             <span className="spec-k">Client Portal User:</span>
@@ -666,7 +666,7 @@ export default function AdminPortalView() {
           <div className="admin-panel-card card-white">
             <div className="admin-panel-header">
               <div>
-                <h3 className="admin-panel-title">Retail Orders & CyberShield Billing</h3>
+                <h3 className="admin-panel-title">Retail Orders & CyberNetworking Billing</h3>
                 <p className="admin-panel-subtitle">
                   Real-time direct sales transactions, enterprise licenses, and recurring customer orders across all active partners.
                 </p>
@@ -700,7 +700,7 @@ export default function AdminPortalView() {
                         <td>{o.product_name}</td>
                         <td className="font-bold">₹{o.total_amount?.toLocaleString('en-IN') || '2,950'}</td>
                         <td>{o.payment_method}</td>
-                        <td><span className="badge badge-green">Paid (CyberShield)</span></td>
+                        <td><span className="badge badge-green">Paid (CyberNetworking)</span></td>
                         <td>
                           <button 
                             onClick={() => addToast('info', 'Invoice Exported', `Exported invoice for #${o.order_id}`)}
@@ -1282,7 +1282,7 @@ export default function AdminPortalView() {
                     Statutory Company Reserve Fund Ledger (Head Office Retention)
                   </h4>
                   <p className="text-xs text-muted">
-                    Direct Selling Rules 2021: ₹900 base company margin + unallocated/unused upline commission tiers (from ₹1,600 network allocation) credited to CyberShield Head Office.
+                    Direct Selling Rules 2021: ₹900 base company margin + unallocated/unused upline commission tiers (from ₹1,600 network allocation) credited to CyberNetworking Head Office.
                   </p>
                 </div>
                 <div className="text-right">
@@ -1341,7 +1341,7 @@ export default function AdminPortalView() {
           <div className="admin-panel-card card-white">
             <div className="admin-panel-header">
               <div>
-                <h3 className="admin-panel-title">CyberShield Gateway & Webhook Hub</h3>
+                <h3 className="admin-panel-title">CyberNetworking Gateway & Webhook Hub</h3>
                 <p className="admin-panel-subtitle">Cryptographic server-to-server HMAC-SHA256 webhooks, API endpoints & event dispatcher.</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">

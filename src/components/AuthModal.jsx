@@ -382,10 +382,9 @@ export default function AuthModal() {
         {/* Header */}
         <div className="auth-modal-header" style={{ position: 'relative' }}>
           <div className="brand-logo-text-small mb-1" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/logo.png?v=2" alt="CyberShield Logo" style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 2px 8px rgba(6, 182, 212, 0.25)' }} />
+            <img src="/logo.png?v=2" alt="CyberNetworking Logo" style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 2px 8px rgba(6, 182, 212, 0.25)' }} />
             <div>
-              <span className="brand-title">CyberShield</span>
-              <span className="brand-subtitle">Security Network</span>
+              <span className="brand-title">CyberNetworking</span>
             </div>
           </div>
 

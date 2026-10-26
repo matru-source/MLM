@@ -35,10 +35,9 @@ export default function Navbar() {
           onClick={() => handleNavClick('home')} 
           style={{ cursor: 'pointer' }}
         >
-          <img src="/logo.png?v=2" alt="CyberShield Logo" className="brand-logo-img" />
+          <img src="/logo.png?v=2" alt="CyberNetworking Logo" className="brand-logo-img" />
           <div className="brand-logo-text">
-            <span className="brand-title">CyberShield</span>
-            <span className="brand-subtitle">Security Network</span>
+            <span className="brand-title">CyberNetworking</span>
           </div>
         </div>
 

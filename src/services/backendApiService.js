@@ -1,7 +1,7 @@
 /**
  * Central Database & Backend API Service
  * Centralizes all REST API calls and database synchronization for:
- * 1. Dual Accounts Provisioning (MLM Partner Account + CyberShield License)
+ * 1. Dual Accounts Provisioning (MLM Partner Account + CyberNetworking License)
  * 2. Real-time Network Hierarchy (Strictly filtering active, approved partners)
  * 3. Administrative Approvals & Activations
  * 4. Commission Wallets & Payout Processing
@@ -105,7 +105,7 @@ export async function syncProvisionDualAccounts({ mlmAccount, softwareAccount })
     body: JSON.stringify(mlmAccount)
   });
 
-  // Account 2: CyberShield Software License
+  // Account 2: CyberNetworking Software License
   results.software = await apiRequest('/api/v1/software/provision-license-account', {
     method: 'POST',
     body: JSON.stringify(softwareAccount)
@@ -134,7 +134,7 @@ export async function apiApproveActivation(activationId, adminDetails = {}) {
     method: 'POST',
     body: JSON.stringify({
       approved_at: new Date().toISOString(),
-      admin_user: adminDetails.username || 'admin@cybershield.network',
+      admin_user: adminDetails.username || 'admin@cybernetworking.in',
       license_action: 'activate_and_dispatch_keys'
     })
   });

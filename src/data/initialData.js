@@ -1,4 +1,4 @@
-// Production Initial Baseline Data for CyberShield Security Network
+// Production Initial Baseline Data for CyberNetworking
 // Real baseline synced with Neon PostgreSQL database
 import { 
   corporateAadhaarMcaSvg, 
@@ -23,8 +23,8 @@ export const initialCommissionRules = [
 export const initialMembers = [
   {
     member_id: 'mem_matru',
-    name: 'CyberShield Head Office',
-    email: 'headoffice@cybershield.in',
+    name: 'CyberNetworking Head Office',
+    email: 'headoffice@cybernetworking.in',
     phone: '+91 9876543210',
     avatar: '/matru-avatar.jpg',
     rank: 'Head Office Partner',
@@ -38,7 +38,7 @@ export const initialMembers = [
     total_earnings: 0,
     joined_at: '2026-01-10T10:00:00Z',
     kyc: {
-      legal_name: 'CyberShield Enterprise Head Office',
+      legal_name: 'CyberNetworking Enterprise Head Office',
       pan: 'AAACC1234F',
       aadhaar: 'XXXX-XXXX-0001',
       bank_name: 'HDFC Corporate Bank',
@@ -55,7 +55,7 @@ export const initialMembers = [
         aadhaarStatus: 'verified',
         aadhaarFile: corporateAadhaarMcaSvg,
         pan: 'Corporate Tax Assessment (PAN: AAACC1234F)',
-        panName: 'Corporate_PAN_CyberShield.pdf',
+        panName: 'Corporate_PAN_CyberNetworking.pdf',
         panType: 'image/svg+xml',
         panSize: '180 KB',
         panStatus: 'verified',

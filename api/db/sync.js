@@ -387,7 +387,7 @@ export default async function handler(req, res) {
             ${o.cs_order_id || 'ord_' + o.order_id},
             ${o.buyer_member_id},
             ${o.product_code || 'CS-PRO-SUITE'},
-            ${o.product_name || 'CyberShield Partner Joining Membership License'},
+            ${o.product_name || 'CyberNetworking Partner Joining Membership License'},
             ${o.amount || 2500},
             ${o.gst || 450},
             ${o.total_amount || 2950},
@@ -590,7 +590,7 @@ export default async function handler(req, res) {
             if (!paidLevels.includes(lvl)) unusedLevels.push(lvl);
           }
 
-          // Credit CyberShield Head Office Reserve Account
+          // Credit CyberNetworking Head Office Reserve Account
           await sql`
             UPDATE members
             SET 

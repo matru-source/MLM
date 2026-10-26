@@ -72,7 +72,7 @@ export default function PendingActivationView() {
               {isRejected ? (
                 <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>. Your previous payment submission was rejected: <span className="text-rose font-semibold">{rejectionReason}</span>. Please click below to re-submit your valid UTR reference.</>
               ) : hasSubmittedPayment ? (
-                <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>! Your joining application and payment {utrNumber ? `(UTR: ${utrNumber})` : ''} have been submitted to CyberShield Administration for verification.</>
+                <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>! Your joining application and payment {utrNumber ? `(UTR: ${utrNumber})` : ''} have been submitted to CyberNetworking Administration for verification.</>
               ) : (
                 <>Welcome, <strong>{currentMember?.name || 'Partner'}</strong>! Your partner profile has been created. Please complete the ₹2,500 (+ 18% GST) plan purchase to unlock your license and distributor link.</>
               )}
@@ -171,7 +171,7 @@ export default function PendingActivationView() {
                 🔒 Member Profile & Personal Referral Link are Currently Locked
               </h4>
               <p className="locked-banner-desc">
-                Under Direct Selling compliance guidelines, your distributor referral code and 10-tier hierarchy will be <strong>unlocked automatically</strong> once CyberShield Administration verifies your bank credit.
+                Under Direct Selling compliance guidelines, your distributor referral code and 10-tier hierarchy will be <strong>unlocked automatically</strong> once CyberNetworking Administration verifies your bank credit.
               </p>
             </div>
           </div>
@@ -238,7 +238,7 @@ export default function PendingActivationView() {
             <div className="pending-ac-specs">
               <div className="pending-spec-row">
                 <span className="spec-label">Software Suite:</span>
-                <span className="spec-val font-bold">CyberShield Pro Enterprise</span>
+                <span className="spec-val font-bold">CyberNetworking Pro Enterprise</span>
               </div>
               <div className="pending-spec-row">
                 <span className="spec-label">Endpoint Device Seats:</span>

@@ -48,7 +48,7 @@ export async function provisionDualAccounts({ memberDetails, paymentDetails }) {
     sponsor_code: memberDetails.sponsor_code || memberDetails.sponsor_member_id || memberDetails.sponsorId || 'CS123456',
     referral_code: generatePartnerCode(),
     commission_wallet_id: `WAL-CS-${Math.floor(100000 + Math.random() * 900000)}`,
-    membership_plan: 'CyberShield Partner Membership (₹2,500)',
+    membership_plan: 'CyberNetworking Partner Membership (₹2,500)',
     joining_fee_paid: paymentDetails.amount || 2500,
     gst_paid: 450,
     total_order_amount: 2950,
@@ -60,7 +60,7 @@ export async function provisionDualAccounts({ memberDetails, paymentDetails }) {
   // Generated metadata for Account 2 (Enterprise Software License Account)
   const softwareAccountPayload = {
     license_id: `LIC-${Math.floor(1000000 + Math.random() * 9000000)}`,
-    software_suite: 'CyberShield Pro Enterprise Security Suite',
+    software_suite: 'CyberNetworking Pro Enterprise Security Suite',
     license_key: generateLicenseKey(),
     client_portal_username: memberDetails.email,
     endpoint_protection_seats: 5, // 5 device protection seats

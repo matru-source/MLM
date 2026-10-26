@@ -356,10 +356,9 @@ export default function MemberDashboardView() {
       {/* 1. DARK NAVY SIDEBAR (Desktop) */}
       <aside className="member-sidebar desktop-sidebar">
         <div className="sidebar-brand-box">
-          <img src="/logo.png?v=2" alt="CyberShield Logo" className="sidebar-logo-img" />
+          <img src="/logo.png?v=2" alt="CyberNetworking Logo" className="sidebar-logo-img" />
           <div>
-            <div className="sidebar-logo-title">CyberShield</div>
-            <div className="sidebar-logo-sub">Security Network</div>
+            <div className="sidebar-logo-title">CyberNetworking</div>
           </div>
         </div>
 
@@ -430,8 +429,8 @@ export default function MemberDashboardView() {
         {/* Mobile Top Header */}
         <div className="mobile-dash-topbar">
           <div className="mobile-dash-brand" onClick={() => setCurrentPage('home')}>
-            <img src="/logo.png?v=2" alt="CyberShield Logo" className="mobile-dash-logo-img" />
-            <span className="mobile-dash-title">CyberShield</span>
+            <img src="/logo.png?v=2" alt="CyberNetworking Logo" className="mobile-dash-logo-img" />
+            <span className="mobile-dash-title">CyberNetworking</span>
           </div>
 
           <div className="mobile-dash-actions">
@@ -1671,7 +1670,7 @@ export default function MemberDashboardView() {
                     <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'} mb-2`}>
                       {isUserActive ? 'Active' : (myLatestOrder ? 'Pending Admin Verification' : 'Pending Plan Purchase')}
                     </span>
-                    <h3 className="sub-title-bold">CyberShield Partner Joining Membership</h3>
+                    <h3 className="sub-title-bold">CyberNetworking Partner Joining Membership</h3>
                     <p className="text-muted text-sm">Official Authorized Member License • ₹2,500 Joining Plan</p>
                   </div>
                   <div className="sub-price-callout">
@@ -1694,7 +1693,7 @@ export default function MemberDashboardView() {
                   <div className="date-item">
                     <span className="text-muted text-xs">Official Activation</span>
                     <span className={isUserActive ? 'text-success font-semibold' : 'text-amber font-semibold'}>
-                      {isUserActive ? 'CyberShield Defense Engine (Active)' : (myLatestOrder ? 'Pending Admin Bank Verification' : 'Pending Plan Purchase')}
+                      {isUserActive ? 'CyberNetworking Defense Engine (Active)' : (myLatestOrder ? 'Pending Admin Bank Verification' : 'Pending Plan Purchase')}
                     </span>
                   </div>
                 </div>
@@ -1775,7 +1774,7 @@ export default function MemberDashboardView() {
                     <button 
                       onClick={() => {
                         downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
-                        addToast('success', 'Invoice Downloaded', `CyberShield GST Tax Invoice #${orderNum} downloaded.`);
+                        addToast('success', 'Invoice Downloaded', `CyberNetworking GST Tax Invoice #${orderNum} downloaded.`);
                       }} 
                       className="btn btn-primary btn-sm"
                     >
@@ -1858,7 +1857,7 @@ export default function MemberDashboardView() {
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Software Suite:</span>
-                      <span className="spec-v">CyberShield Pro Enterprise Suite</span>
+                      <span className="spec-v">CyberNetworking Pro Enterprise Suite</span>
                     </div>
                     <div className="spec-item-compact">
                       <span className="spec-k">Client Portal Access:</span>
@@ -2734,13 +2733,13 @@ export default function MemberDashboardView() {
 
                   <h5 className="font-bold text-base mb-2">Direct Seller Contract Confirmation</h5>
                   <p className="text-muted text-sm leading-relaxed mb-4">
-                    Executed electronically between <strong>{currentMember?.name || 'Authorized Member'}</strong> and <strong>CyberShield Network Direct Selling Entity</strong> on <strong>{currentMember?.joined_at ? new Date(currentMember.joined_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Registration Date'}</strong>.
+                    Executed electronically between <strong>{currentMember?.name || 'Authorized Member'}</strong> and <strong>CyberNetworking Direct Selling Entity</strong> on <strong>{currentMember?.joined_at ? new Date(currentMember.joined_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Registration Date'}</strong>.
                   </p>
 
                   <div className="agreement-clauses-list">
                     <div className="clause-item">
                       <CheckCircle2 size={16} className="text-success" />
-                      <span><strong>Retail Sales Commission:</strong> Earnings are paid solely upon verified retail subscription sales of CyberShield enterprise software licenses.</span>
+                      <span><strong>Retail Sales Commission:</strong> Earnings are paid solely upon verified retail subscription sales of CyberNetworking enterprise software licenses.</span>
                     </div>
                     <div className="clause-item">
                       <CheckCircle2 size={16} className="text-success" />
@@ -2819,7 +2818,7 @@ export default function MemberDashboardView() {
                   type="button"
                   onClick={() => {
                     const url = `${window.location.origin}/?ref=${currentMember?.referral_code || 'CS123456'}`;
-                    const text = `Join CyberShield Network with my verified partner link to access enterprise cybersecurity software and earn direct sales commissions: ${url}`;
+                    const text = `Join CyberNetworking with my verified partner link to access enterprise cybersecurity software and earn direct sales commissions: ${url}`;
                     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
                   }}
                   className="share-channel-btn whatsapp-channel"
@@ -2832,7 +2831,7 @@ export default function MemberDashboardView() {
                   type="button"
                   onClick={() => {
                     const url = `${window.location.origin}/?ref=${currentMember?.referral_code || 'CS123456'}`;
-                    const text = `Join CyberShield Network with my verified partner link: ${url}`;
+                    const text = `Join CyberNetworking with my verified partner link: ${url}`;
                     window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
                   }}
                   className="share-channel-btn telegram-channel"
@@ -2845,7 +2844,7 @@ export default function MemberDashboardView() {
                   type="button"
                   onClick={() => {
                     const url = `${window.location.origin}/?ref=${currentMember?.referral_code || 'CS123456'}`;
-                    const text = `Get enterprise cyber defense software with transparent affiliate rewards on CyberShield Network: ${url}`;
+                    const text = `Get enterprise cyber defense software with transparent affiliate rewards on CyberNetworking: ${url}`;
                     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
                   }}
                   className="share-channel-btn twitter-channel"
@@ -2858,8 +2857,8 @@ export default function MemberDashboardView() {
                   type="button"
                   onClick={() => {
                     const url = `${window.location.origin}/?ref=${currentMember?.referral_code || 'CS123456'}`;
-                    const subject = `Join CyberShield Network - Authorized Security Software Partner`;
-                    const body = `Hi,\n\nI invite you to join CyberShield Network. Use my partner link to sign up:\n${url}\n\nBest regards,\n${currentMember?.name}`;
+                    const subject = `Join CyberNetworking - Authorized Security Software Partner`;
+                    const body = `Hi,\n\nI invite you to join CyberNetworking. Use my partner link to sign up:\n${url}\n\nBest regards,\n${currentMember?.name}`;
                     window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
                   }}
                   className="share-channel-btn email-channel"

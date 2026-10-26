@@ -59,7 +59,7 @@ export default function CheckoutModal() {
       setIsCheckoutOpen(false);
       if (step === 'confirmed') {
         setCurrentPage('dashboard');
-        addToast('success', 'Activation Approved!', 'Admin has verified your payment. Welcome to your active CyberShield Dashboard!');
+        addToast('success', 'Activation Approved!', 'Admin has verified your payment. Welcome to your active CyberNetworking Dashboard!');
       }
     }
   }, [currentMember?.seller_status, isCheckoutOpen]);
@@ -165,10 +165,9 @@ export default function CheckoutModal() {
           background: '#FFFFFF'
         }}>
           <div className="brand-logo-text-small" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/logo.png?v=2" alt="CyberShield Logo" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 2px 10px rgba(6, 182, 212, 0.25)' }} />
+            <img src="/logo.png?v=2" alt="CyberNetworking Logo" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 2px 10px rgba(6, 182, 212, 0.25)' }} />
             <div>
-              <span className="brand-title" style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>CyberShield</span>
-              <span className="brand-subtitle" style={{ fontSize: '11px', color: '#64748B', display: 'block' }}>Security Network</span>
+              <span className="brand-title" style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>CyberNetworking</span>
             </div>
           </div>
 
@@ -236,7 +235,7 @@ export default function CheckoutModal() {
             </h3>
 
             <p style={{ color: '#64748B', fontSize: '0.9rem', lineHeight: '1.55', maxWidth: '400px', margin: '0 auto 24px' }}>
-              Please create or log into your authorized CyberShield partner account so your software license and multi-tier commission wallet are provisioned in your name.
+              Please create or log into your authorized CyberNetworking partner account so your software license and multi-tier commission wallet are provisioned in your name.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -296,7 +295,7 @@ export default function CheckoutModal() {
                   <span className="order-icon-letter">🛡️</span>
                 </div>
                 <div>
-                  <h4 className="order-item-name">CyberShield Partner Joining Membership</h4>
+                  <h4 className="order-item-name">CyberNetworking Partner Joining Membership</h4>
                   <p className="order-item-sub">One-Time Joining Fee • Enterprise Security Suite License</p>
                 </div>
               </div>
@@ -654,7 +653,7 @@ export default function CheckoutModal() {
                   </div>
                   <div style={{ fontSize: '0.82rem' }}>
                     <span style={{ color: '#64748B' }}>Endpoint Suite: </span>
-                    <strong className="text-primary-blue">CyberShield Pro</strong>
+                    <strong className="text-primary-blue">CyberNetworking Pro</strong>
                   </div>
                 </div>
               </div>

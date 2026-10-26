@@ -44,7 +44,7 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.BREVO_API_KEY || process.env.VITE_BREVO_API_KEY;
   const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.VITE_BREVO_SENDER_EMAIL || 'matruprasadpanda497@gmail.com';
-  const senderName = process.env.BREVO_SENDER_NAME || process.env.VITE_BREVO_SENDER_NAME || 'CyberShield Security Network';
+  const senderName = process.env.BREVO_SENDER_NAME || process.env.VITE_BREVO_SENDER_NAME || 'CyberNetworking';
 
   if (!apiKey) {
     console.warn('[Brevo Serverless] BREVO_API_KEY not configured.');
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
             name: cleanName
           }
         ],
-        subject: `[CyberShield Network] Your Registration Verification OTP: ${otpCode}`,
+        subject: `[CyberNetworking] Your Registration Verification OTP: ${otpCode}`,
         htmlContent: `
           <!DOCTYPE html>
           <html>
@@ -95,9 +95,9 @@ export default async function handler(req, res) {
           </head>
           <body>
             <div class="container">
-              <div class="logo">🛡️ CyberShield Network</div>
+              <div class="logo">CyberNetworking</div>
               <h1 class="title">Verify Your Email Address</h1>
-              <p class="subtitle">Hi ${cleanName}, thank you for registering with CyberShield Network. Use the verification code below to complete your partner enrollment:</p>
+              <p class="subtitle">Hi ${cleanName}, thank you for registering with CyberNetworking. Use the verification code below to complete your partner enrollment:</p>
               
               <div class="otp-box">
                 <div class="otp-number">${otpCode}</div>
@@ -105,7 +105,7 @@ export default async function handler(req, res) {
               </div>
 
               <div class="footer">
-                © 2026 CyberShield Security Network. All rights reserved.<br>
+                © 2026 CyberNetworking. All rights reserved.<br>
                 Direct Selling Rules, 2021 & Section 194H Compliant Architecture.
               </div>
             </div>

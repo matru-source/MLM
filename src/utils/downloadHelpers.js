@@ -51,12 +51,12 @@ export function downloadTaxInvoice({ order, member }) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.setTextColor(37, 99, 235);
-  doc.text('CyberShield', margin, 26);
+  doc.text('CyberNetworking', margin, 26);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
-  doc.text('SECURITY NETWORK PVT. LTD.', margin, 31);
+  doc.text('PRIVATE LIMITED', margin, 31);
   doc.text('GSTIN: 21AAACC1234D1Z5  |  CIN: U72900OR2026PTC048291  |  PAN: AABCC5544K', margin, 36);
 
   // Invoice Title & Meta (Right aligned)
@@ -167,7 +167,7 @@ export function downloadTaxInvoice({ order, member }) {
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
   doc.text('1', margin + 3, rowY);
-  doc.text('CyberShield Partner Joining Membership License', margin + 14, rowY);
+  doc.text('CyberNetworking Partner Joining Membership License', margin + 14, rowY);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
@@ -246,13 +246,13 @@ export function downloadTaxInvoice({ order, member }) {
   if (isApproved) {
     doc.text('This is a computer-generated statutory tax invoice issued under Section 31 of the CGST Act, 2017.', margin + contentWidth / 2, footerY + 5, { align: 'center' });
     doc.text('Consumer Protection (Direct Selling) Rules, 2021 Compliant  |  7-Day Cooling-off Guarantee Active.', margin + contentWidth / 2, footerY + 9, { align: 'center' });
-    doc.text('Inquiries: support@cybershield.network  |  Plot 42, Cyber Gateway Tech Zone, PIN: 751024', margin + contentWidth / 2, footerY + 13, { align: 'center' });
-    doc.save(`CyberShield_Tax_Invoice_${orderId}.pdf`);
+    doc.text('Inquiries: support@cybernetworking.in  |  Plot 42, Cyber Gateway Tech Zone, PIN: 751024', margin + contentWidth / 2, footerY + 13, { align: 'center' });
+    doc.save(`CyberNetworking_Tax_Invoice_${orderId}.pdf`);
   } else {
     doc.text('PROVISIONAL SUBMISSION: This is an interim payment acknowledgment receipt.', margin + contentWidth / 2, footerY + 5, { align: 'center' });
     doc.text('Official GST Tax Invoice and unlocked software licenses are issued immediately upon Admin Bank Verification.', margin + contentWidth / 2, footerY + 9, { align: 'center' });
-    doc.text('Inquiries: support@cybershield.network  |  Plot 42, Cyber Gateway Tech Zone, PIN: 751024', margin + contentWidth / 2, footerY + 13, { align: 'center' });
-    doc.save(`CyberShield_Payment_Acknowledgment_${orderId}.pdf`);
+    doc.text('Inquiries: support@cybernetworking.in  |  Plot 42, Cyber Gateway Tech Zone, PIN: 751024', margin + contentWidth / 2, footerY + 13, { align: 'center' });
+    doc.save(`CyberNetworking_Payment_Acknowledgment_${orderId}.pdf`);
   }
 }
 
@@ -356,7 +356,7 @@ export function downloadForm16A({ member, tdsAmount = 50, grossAmount = null }) 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
-  doc.text('CyberShield Security Network Pvt. Ltd.', col1X + 4, cardY + 11.5);
+  doc.text('CyberNetworking Private Limited', col1X + 4, cardY + 11.5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -367,7 +367,7 @@ export function downloadForm16A({ member, tdsAmount = 50, grossAmount = null }) 
   doc.text(`PAN of Deductor: ${deductorPan}`, col1X + 46, cardY + 22);
   doc.setFont('helvetica', 'normal');
   doc.text('CIT (TDS) Jurisdiction: Aayakar Bhawan, Bhubaneswar', col1X + 4, cardY + 27.5);
-  doc.text('CIN: U72900OR2026PTC048291  |  Email: compliance@cybershield.network', col1X + 4, cardY + 31.5);
+  doc.text('CIN: U72900OR2026PTC048291  |  Email: compliance@cybernetworking.in', col1X + 4, cardY + 31.5);
 
   // Box 2: Deductee
   doc.setFillColor(248, 250, 252);
@@ -517,7 +517,7 @@ export function downloadForm16A({ member, tdsAmount = 50, grossAmount = null }) 
   doc.setFontSize(7.5);
   doc.setTextColor(22, 101, 52);
   doc.text(
-    `I, Dr. Matru Prasad Mohanty, in my capacity as Principal Director & Head of Compliance of CyberShield Security Network Pvt. Ltd., do hereby certify that a sum of Rs. ${tdsAmount.toLocaleString('en-IN')}.00 has been deducted at source (${tdsRatePercent}% under ${hasValidPan ? 'Sec 194H' : 'Sec 206AA'}) and deposited to the credit of the Central Government via Challan CIN ${challanCin}.`,
+    `I, Dr. Matru Prasad Mohanty, in my capacity as Principal Director & Head of Compliance of CyberNetworking Private Limited, do hereby certify that a sum of Rs. ${tdsAmount.toLocaleString('en-IN')}.00 has been deducted at source (${tdsRatePercent}% under ${hasValidPan ? 'Sec 194H' : 'Sec 206AA'}) and deposited to the credit of the Central Government via Challan CIN ${challanCin}.`,
     margin + 4,
     certBoxY + 10.5,
     { maxWidth: contentWidth - 8 }
@@ -575,7 +575,7 @@ export function downloadForm16A({ member, tdsAmount = 50, grossAmount = null }) 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text('For CyberShield Security Network Pvt. Ltd.', margin + contentWidth - 4, signBoxY + 6, { align: 'right' });
+  doc.text('For CyberNetworking Private Limited', margin + contentWidth - 4, signBoxY + 6, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.text('Dr. Matru Prasad Mohanty', margin + contentWidth - 4, signBoxY + 14, { align: 'right' });
@@ -594,5 +594,5 @@ export function downloadForm16A({ member, tdsAmount = 50, grossAmount = null }) 
   doc.text('Direct Sellers may quote this Certificate & BSR Challan CIN when filing their Income Tax Return (ITR-3 / ITR-4).', margin + contentWidth / 2, footerY + 7.2, { align: 'center' });
 
   // Save real PDF
-  doc.save(`CyberShield_Form16A_TDS_${memberId}.pdf`);
+  doc.save(`CyberNetworking_Form16A_TDS_${memberId}.pdf`);
 }

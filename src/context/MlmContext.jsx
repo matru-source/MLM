@@ -498,7 +498,7 @@ export function MlmProvider({ children }) {
     if (!clean || clean === 'CS123456' || clean === 'ROOT' || clean === 'HEAD') {
       const rootPartner = members.find(m => m.referral_code === 'CS123456' || m.member_id === 'mem_matru') || {
         member_id: 'mem_matru',
-        name: 'CyberShield Head Office',
+        name: 'CyberNetworking Head Office',
         referral_code: 'CS123456',
         seller_status: 'active'
       };
@@ -506,7 +506,7 @@ export function MlmProvider({ children }) {
         valid: true,
         reason: 'head_office',
         member: rootPartner,
-        message: 'Direct Enrollment under CyberShield Head Office Root (CS123456)'
+        message: 'Direct Enrollment under CyberNetworking Head Office Root (CS123456)'
       };
     }
 
@@ -821,7 +821,7 @@ export function MlmProvider({ children }) {
       buyer_name: currentMember.name,
       buyer_email: currentMember.email,
       product_code: 'CS-PRO-SUITE',
-      product_name: 'CyberShield Partner Joining Membership License',
+      product_name: 'CyberNetworking Partner Joining Membership License',
       amount: 2500,
       gst: 450,
       total_amount: 2950,
@@ -1973,7 +1973,7 @@ export function MlmProvider({ children }) {
     localStorage.removeItem('cybershield_currentMemberId');
     localStorage.setItem('cybershield_isLoggedIn', 'false');
     setCurrentPage('home');
-    addToast('info', 'Signed Out', 'You are now viewing CyberShield Network as a visitor.');
+    addToast('info', 'Signed Out', 'You are now viewing CyberNetworking as a visitor.');
   };
 
   // Login as existing member (e.g. Matru)
@@ -1988,7 +1988,7 @@ export function MlmProvider({ children }) {
       setTotalEarnings(Number(found.total_earnings || 0));
     }
     setCurrentPage('dashboard');
-    addToast('success', 'Logged In', 'Welcome back to your CyberShield Partner Portal.');
+    addToast('success', 'Logged In', 'Welcome back to your CyberNetworking Partner Portal.');
   };
 
   const resetAllData = () => {

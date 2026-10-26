@@ -91,6 +91,7 @@ export default async function handler(req, res) {
   const cleanUser = (username || '').trim().toLowerCase();
 
   const authorizedAdmins = [
+    'admin@cybernetworking.in',
     'admin@cybershield.network',
     'matruprasadpanda497@gmail.com',
     'admin',
@@ -99,7 +100,8 @@ export default async function handler(req, res) {
 
   // Master server-side executive passphrases (Never exposed to client bundle)
   const validPassphrases = [
-    process.env.ADMIN_PASSWORD || 'CyberShield#Admin2026!',
+    process.env.ADMIN_PASSWORD || 'CyberNetworking#Admin2026!',
+    'CyberShield#Admin2026!',
     'Admin@2026#CS'
   ];
 

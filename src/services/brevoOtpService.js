@@ -92,7 +92,7 @@ export async function sendEmailOtp({ email, fullName }) {
     try {
       const emailPayload = {
         sender: {
-          name: 'CyberShield Security Network',
+          name: 'CyberNetworking',
           email: senderEmail
         },
         to: [
@@ -101,7 +101,7 @@ export async function sendEmailOtp({ email, fullName }) {
             name: fullName || 'Partner Member'
           }
         ],
-        subject: `Your CyberShield Verification Code: ${otpCode}`,
+        subject: `Your CyberNetworking Verification Code: ${otpCode}`,
         htmlContent: `
           <!DOCTYPE html>
           <html>
@@ -120,11 +120,11 @@ export async function sendEmailOtp({ email, fullName }) {
           </head>
           <body>
             <div class="card">
-              <div class="logo">CyberShield Security</div>
+              <div class="logo">CyberNetworking</div>
               <div class="title">Verify Your Partner Account</div>
               <div class="desc">
                 Hello ${fullName || 'Partner'},<br><br>
-                Thank you for joining CyberShield Security Network. Please use the verification code below to confirm your email and complete your enrollment.
+                Thank you for joining CyberNetworking. Please use the verification code below to confirm your email and complete your enrollment.
               </div>
 
               <div class="otp-box">
@@ -133,11 +133,11 @@ export async function sendEmailOtp({ email, fullName }) {
               </div>
 
               <div class="warning">
-                <strong>Security Alert:</strong> CyberShield staff will never ask you for your verification code or password via phone, email, or WhatsApp.
+                <strong>Security Alert:</strong> CyberNetworking staff will never ask you for your verification code or password via phone, email, or WhatsApp.
               </div>
 
               <div class="footer">
-                © 2026 CyberShield Network. All rights reserved.<br>
+                © 2026 CyberNetworking. All rights reserved.<br>
                 Consumer Protection (Direct Selling) Rules, 2021 Compliant.
               </div>
             </div>
