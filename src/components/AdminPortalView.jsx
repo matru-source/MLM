@@ -31,7 +31,8 @@ import {
   History,
   Search,
   Filter,
-  GraduationCap
+  GraduationCap,
+  Menu
 } from 'lucide-react';
 import AdminLearningManager from './AdminLearningManager';
 import { getDocumentFile, generateDocPlaceholder, saveDocumentFile } from '../utils/documentStorage';
@@ -63,7 +64,19 @@ export default function AdminPortalView() {
     addToast 
   } = useMlm();
 
-  const [adminTab, setAdminTab] = useState('activations'); // 'activations' | 'payouts' | 'escrow' | 'orders' | 'kyc' | 'audit' | 'webhooks'
+  const [adminTab, setAdminTab] = useState('activations'); // 'activations' | 'payouts' | 'escrow' | 'orders' | 'kyc' | 'audit' | 'webhooks' | 'learning'
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const tabMeta = {
+    activations: { title: 'New Partner Activations', section: 'Core Operations' },
+    payouts: { title: 'Bank Payout Disbursements', section: 'Core Operations' },
+    orders: { title: 'Orders & Subscriptions', section: 'Core Operations' },
+    kyc: { title: 'Partner KYC Review', section: 'Core Operations' },
+    escrow: { title: 'Cooling-Off Escrow', section: 'Governance & Tools' },
+    audit: { title: 'Compliance & Audit Trail', section: 'Governance & Tools' },
+    learning: { title: 'Learning Resources Manager', section: 'Governance & Tools' },
+    webhooks: { title: 'ZEX Webhook Simulator', section: 'Governance & Tools' }
+  };
   const [selectedPayoutForManualPay, setSelectedPayoutForManualPay] = useState(null);
   const [selectedPayoutToView, setSelectedPayoutToView] = useState(null);
   const [selectedKycMember, setSelectedKycMember] = useState(null);
@@ -271,149 +284,261 @@ export default function AdminPortalView() {
   const reserveTransactionsTotal = reserveTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
   return (
-    <div className="admin-dedicated-app">
-      {/* Dedicated Admin Header */}
-      <header className="admin-dedicated-header">
-        <div className="admin-header-brand">
-          <img src="/logo.png?v=2" alt="CyberNetworking Logo" className="admin-brand-img" />
-          <div>
-            <h1 className="admin-title-text">CyberNetworking — Admin Operations</h1>
-            <div className="flex-center gap-2 mt-1" style={{ justifyContent: 'flex-start' }}>
-              <span className="admin-badge-role">Operations, Payouts & Compliance Desk</span>
-              <span className={`badge ${isDbConnected ? 'badge-green' : 'badge-amber'} flex-center gap-1 font-xs`} style={{ padding: '3px 8px' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: isDbConnected ? '#10B981' : '#F59E0B', display: 'inline-block' }}></span>
-                {isDbConnected ? 'Live Neon PostgreSQL Connected' : 'Syncing Neon Database...'}
+    <div className="admin-app-layout">
+      {/* Mobile Backdrop */}
+      <div 
+        className={`admin-sidebar-backdrop ${mobileSidebarOpen ? 'open' : ''}`} 
+        onClick={() => setMobileSidebarOpen(false)} 
+      />
+
+      {/* LEFT SIDEBAR NAVIGATION */}
+      <aside className={`admin-sidebar ${mobileSidebarOpen ? 'open' : ''}`}>
+        {/* Sidebar Brand Header */}
+        <div className="admin-sidebar-header">
+          <div className="admin-sidebar-brand" onClick={navigateToUserSite} style={{ cursor: 'pointer' }}>
+            <img src="/logo.png?v=2" alt="CyberNetworking Logo" className="admin-sidebar-logo" />
+            <div>
+              <div className="admin-sidebar-title">CyberNetworking</div>
+              <div className="admin-sidebar-role">Admin Operations</div>
+            </div>
+          </div>
+          
+          <div className="admin-sidebar-db-status">
+            <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: isDbConnected ? '#10B981' : '#F59E0B', display: 'inline-block' }}></span>
+            <span>{isDbConnected ? 'Live Neon DB Connected' : 'Syncing Neon Database...'}</span>
+          </div>
+        </div>
+
+        {/* Sidebar Navigation Items */}
+        <nav className="admin-sidebar-nav">
+          <div className="admin-nav-section-title">Core Operations</div>
+
+          <button
+            onClick={() => { setAdminTab('activations'); setMobileSidebarOpen(false); }}
+            className={`admin-nav-item ${adminTab === 'activations' ? 'active' : ''}`}
+          >
+            <div className="admin-nav-item-left">
+              <Users size={17} />
+              <span>Partner Activations</span>
+            </div>
+            {pendingActivationList.length > 0 ? (
+              <span className="admin-nav-badge badge-pending">{pendingActivationList.length} Pending</span>
+            ) : (
+              <span className="admin-nav-badge">{pendingActivations.length}</span>
+            )}
+          </button>
+
+          <button
+            onClick={() => { setAdminTab('payouts'); setMobileSidebarOpen(false); }}
+            className={`admin-nav-item ${adminTab === 'payouts' ? 'active' : ''}`}
+          >
+            <div className="admin-nav-item-left">
+              <CreditCard size={17} />
+              <span>Bank Disbursements</span>
+            </div>
+            {pendingRequests.length > 0 ? (
+              <span className="admin-nav-badge badge-pending">{pendingRequests.length} Pending</span>
+            ) : (
+              <span className="admin-nav-badge">{payoutRequests.length}</span>
+            )}
+          </button>
+
+          <button
+            onClick={() => { setAdminTab('orders'); setMobileSidebarOpen(false); }}
+            className={`admin-nav-item ${adminTab === 'orders' ? 'active' : ''}`}
+          >
+            <div className="admin-nav-item-left">
+              <Receipt size={17} />
+              <span>Orders & Subscriptions</span>
+            </div>
+            <span className="admin-nav-badge">{orders.length}</span>
+          </button>
+
+          <button
+            onClick={() => { setAdminTab('kyc'); setMobileSidebarOpen(false); }}
+            className={`admin-nav-item ${adminTab === 'kyc' ? 'active' : ''}`}
+          >
+            <div className="admin-nav-item-left">
+              <ShieldCheck size={17} />
+              <span>Partner KYC Review</span>
+            </div>
+            <span className="admin-nav-badge">{members.length}</span>
+          </button>
+
+          <div className="admin-nav-section-title" style={{ marginTop: '10px' }}>Governance & Tools</div>
+
+          <button
+            onClick={() => { setAdminTab('escrow'); setMobileSidebarOpen(false); }}
+            className={`admin-nav-item ${adminTab === 'escrow' ? 'active' : ''}`}
+          >
+            <div className="admin-nav-item-left">
+              <Clock size={17} />
+              <span>Cooling-Off Escrow</span>
+            </div>
+            {coolingOffTransactions.length > 0 ? (
+              <span className="admin-nav-badge" style={{ backgroundColor: '#F59E0B', color: '#0F172A', fontWeight: 800 }}>
+                ₹{coolingOffTotalAmount.toLocaleString('en-IN')}
+              </span>
+            ) : (
+              <span className="admin-nav-badge">{coolingOffTransactions.length}</span>
+            )}
+          </button>
+
+          <button
+            onClick={() => { setAdminTab('audit'); setMobileSidebarOpen(false); }}
+            className={`admin-nav-item ${adminTab === 'audit' ? 'active' : ''}`}
+          >
+            <div className="admin-nav-item-left">
+              <History size={17} />
+              <span>Compliance & Audit</span>
+            </div>
+            <span className="admin-nav-badge">{auditLogs.length}</span>
+          </button>
+
+          <button
+            onClick={() => { setAdminTab('learning'); setMobileSidebarOpen(false); }}
+            className={`admin-nav-item ${adminTab === 'learning' ? 'active' : ''}`}
+          >
+            <div className="admin-nav-item-left">
+              <GraduationCap size={17} />
+              <span>Learning Resources</span>
+            </div>
+            <span className="admin-nav-badge">{learningResources.length}</span>
+          </button>
+
+          <button
+            onClick={() => { setAdminTab('webhooks'); setMobileSidebarOpen(false); }}
+            className={`admin-nav-item ${adminTab === 'webhooks' ? 'active' : ''}`}
+          >
+            <div className="admin-nav-item-left">
+              <Terminal size={17} />
+              <span>Webhook Simulator</span>
+            </div>
+            <span className="admin-nav-badge">Test</span>
+          </button>
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="admin-sidebar-footer">
+          <div className="admin-profile-chip">
+            <div className="admin-profile-avatar">AD</div>
+            <div className="admin-profile-info">
+              <div className="admin-profile-name">Executive Console</div>
+              <div className="admin-profile-email">admin@cybernetworking.in</div>
+            </div>
+          </div>
+
+          <div className="admin-footer-actions">
+            <button
+              onClick={logoutAdmin}
+              className="admin-footer-btn"
+              title="Lock executive console"
+            >
+              <Lock size={13} />
+              <span>Lock</span>
+            </button>
+
+            <button
+              onClick={navigateToUserSite}
+              className="admin-footer-btn"
+              title="Exit to User Website"
+            >
+              <ArrowLeft size={13} />
+              <span>Exit</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* RIGHT MAIN WRAPPER */}
+      <div className="admin-main-wrapper">
+        {/* Sticky Executive Top Bar */}
+        <header className="admin-topbar">
+          <div className="admin-topbar-left">
+            <button
+              type="button"
+              className="admin-mobile-toggle"
+              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+              aria-label="Toggle Navigation"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="admin-topbar-breadcrumb">
+              <span className="admin-topbar-tag">{tabMeta[adminTab]?.section || 'Admin Desk'}</span>
+              <span className="admin-topbar-slash">/</span>
+              <h2 className="admin-topbar-current">{tabMeta[adminTab]?.title || 'Operations Desk'}</h2>
+            </div>
+          </div>
+
+          <div className="admin-topbar-right">
+            <span className={`badge ${isDbConnected ? 'badge-green' : 'badge-amber'} flex-center gap-1 font-xs`} style={{ padding: '6px 12px' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: isDbConnected ? '#10B981' : '#F59E0B', display: 'inline-block' }}></span>
+              <span className="hide-on-mobile">{isDbConnected ? 'Live Neon DB Connected' : 'Syncing Neon Database...'}</span>
+            </span>
+            <button
+              onClick={logoutAdmin}
+              className="btn btn-secondary btn-sm flex-center gap-1.5 hide-on-mobile"
+              title="Lock executive console and require passphrase"
+              style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#1E293B', fontWeight: 600 }}
+            >
+              <Lock size={14} />
+              <span>Lock Console</span>
+            </button>
+            <button
+              onClick={navigateToUserSite}
+              className="btn btn-secondary btn-sm flex-center gap-1.5 hide-on-mobile"
+              style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#1E293B', fontWeight: 600 }}
+            >
+              <ArrowLeft size={14} />
+              <span>Exit Website</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Main Body Content */}
+        <main className="admin-main-body">
+          {/* 5 Admin Stat Cards in a Single Row */}
+          <div className="admin-metrics-row">
+            <div className="admin-stat-card card-white">
+              <span className="stat-label-muted">Total Sales Volume</span>
+              <div className="stat-number-bold">₹{((orders.length) * 2950).toLocaleString('en-IN')}</div>
+              <span className="stat-badge-tag text-success">✓ CyberNetworking Engine</span>
+            </div>
+
+            <div className="admin-stat-card card-white">
+              <span className="stat-label-muted">New Partner Activations</span>
+              <div className={`stat-number-bold ${pendingActivationList.length > 0 ? 'text-amber' : 'text-success'}`}>
+                {pendingActivationList.length} Pending
+              </div>
+              <span className="stat-badge-tag text-primary-blue">Dual Accounts (API)</span>
+            </div>
+
+            <div className="admin-stat-card card-white">
+              <span className="stat-label-muted">Active Direct Partners</span>
+              <div className="stat-number-bold">{members.length}</div>
+              <span className="stat-badge-tag text-purple">Verified Partners</span>
+            </div>
+
+            <div className="admin-stat-card card-white">
+              <span className="stat-label-muted">Pending Payouts</span>
+              <div className={`stat-number-bold ${pendingRequests.length > 0 ? 'text-amber' : 'text-success'}`}>
+                ₹{pendingTotalAmount.toLocaleString('en-IN')}
+              </div>
+              <span className={`stat-badge-tag ${pendingRequests.length > 0 ? 'text-amber' : 'text-success'}`}>
+                {pendingRequests.length} {pendingRequests.length === 1 ? 'Request' : 'Requests'} Pending
+              </span>
+            </div>
+
+            <div className="admin-stat-card card-white">
+              <span className="stat-label-muted">Company Reserve Fund</span>
+              <div className="stat-number-bold text-success">
+                ₹{Number(companyReserve || 0).toLocaleString('en-IN')}
+              </div>
+              <span className="stat-badge-tag text-success">
+                ₹900 Base + Unused Tiers
               </span>
             </div>
           </div>
-        </div>
-
-        <div className="flex-center gap-2">
-          <button
-            onClick={logoutAdmin}
-            className="btn btn-secondary btn-sm admin-exit-btn"
-            title="Lock executive console and require passphrase"
-          >
-            <Lock size={15} />
-            <span>Lock Console</span>
-          </button>
-          <button
-            onClick={navigateToUserSite}
-            className="btn btn-secondary btn-sm admin-exit-btn"
-          >
-            <ArrowLeft size={16} />
-            <span>Exit to User Website</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Admin Body Content */}
-      <main className="admin-dedicated-body">
-        {/* 5 Admin Stat Cards in a Single Row */}
-        <div className="admin-metrics-row">
-          <div className="admin-stat-card card-white">
-            <span className="stat-label-muted">Total Sales Volume</span>
-            <div className="stat-number-bold">₹{((orders.length) * 2950).toLocaleString('en-IN')}</div>
-            <span className="stat-badge-tag text-success">✓ CyberNetworking Engine</span>
-          </div>
-
-          <div className="admin-stat-card card-white">
-            <span className="stat-label-muted">New Partner Activations</span>
-            <div className={`stat-number-bold ${pendingActivationList.length > 0 ? 'text-amber' : 'text-success'}`}>
-              {pendingActivationList.length} Pending
-            </div>
-            <span className="stat-badge-tag text-primary-blue">Dual Accounts (API)</span>
-          </div>
-
-          <div className="admin-stat-card card-white">
-            <span className="stat-label-muted">Active Direct Partners</span>
-            <div className="stat-number-bold">{members.length}</div>
-            <span className="stat-badge-tag text-purple">Verified Partners</span>
-          </div>
-
-          <div className="admin-stat-card card-white">
-            <span className="stat-label-muted">Pending Payouts</span>
-            <div className={`stat-number-bold ${pendingRequests.length > 0 ? 'text-amber' : 'text-success'}`}>
-              ₹{pendingTotalAmount.toLocaleString('en-IN')}
-            </div>
-            <span className={`stat-badge-tag ${pendingRequests.length > 0 ? 'text-amber' : 'text-success'}`}>
-              {pendingRequests.length} {pendingRequests.length === 1 ? 'Request' : 'Requests'} Pending
-            </span>
-          </div>
-
-          <div className="admin-stat-card card-white">
-            <span className="stat-label-muted">Company Reserve Fund</span>
-            <div className="stat-number-bold text-success">
-              ₹{Number(companyReserve || 0).toLocaleString('en-IN')}
-            </div>
-            <span className="stat-badge-tag text-success">
-              ₹900 Base + Unused Tiers
-            </span>
-          </div>
-        </div>
-
-        {/* Admin Navigation Tabs */}
-        <div className="admin-tabs-bar-clean card-white">
-          <button
-            onClick={() => setAdminTab('activations')}
-            className={`admin-clean-tab ${adminTab === 'activations' ? 'active' : ''}`}
-          >
-            New Partner Activations ({pendingActivations.length})
-            {pendingActivationList.length > 0 && (
-              <span className="admin-tab-alert-badge">{pendingActivationList.length} Pending</span>
-            )}
-          </button>
-          <button
-            onClick={() => setAdminTab('payouts')}
-            className={`admin-clean-tab ${adminTab === 'payouts' ? 'active' : ''}`}
-          >
-            Bank Payout Disbursements ({payoutRequests.length})
-            {pendingRequests.length > 0 && (
-              <span className="admin-tab-alert-badge">{pendingRequests.length} Pending</span>
-            )}
-          </button>
-          <button
-            onClick={() => setAdminTab('orders')}
-            className={`admin-clean-tab ${adminTab === 'orders' ? 'active' : ''}`}
-          >
-            Orders & Subscriptions ({orders.length})
-          </button>
-          <button
-            onClick={() => setAdminTab('kyc')}
-            className={`admin-clean-tab ${adminTab === 'kyc' ? 'active' : ''}`}
-          >
-            Partner KYC Review ({members.length})
-          </button>
-          <button
-            onClick={() => setAdminTab('audit')}
-            className={`admin-clean-tab ${adminTab === 'audit' ? 'active' : ''}`}
-          >
-            Compliance & Audit Trail ({auditLogs.length})
-          </button>
-          <button
-            onClick={() => setAdminTab('escrow')}
-            className={`admin-clean-tab ${adminTab === 'escrow' ? 'active' : ''}`}
-          >
-            Cooling-Off Escrow ({coolingOffTransactions.length})
-            {coolingOffTransactions.length > 0 && (
-              <span className="admin-tab-alert-badge" style={{ backgroundColor: '#f59e0b', color: '#fff' }}>
-                ₹{coolingOffTotalAmount.toLocaleString('en-IN')} Hold
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setAdminTab('webhooks')}
-            className={`admin-clean-tab ${adminTab === 'webhooks' ? 'active' : ''}`}
-          >
-            Webhook Simulator
-          </button>
-          <button
-            onClick={() => setAdminTab('learning')}
-            className={`admin-clean-tab ${adminTab === 'learning' ? 'active' : ''}`}
-          >
-            Learning Resources ({learningResources.length})
-          </button>
-        </div>
 
         {/* TAB 0: NEW PARTNER ACTIVATIONS & DUAL ACCOUNTS PROVISIONING */}
         {adminTab === 'activations' && (
@@ -1601,6 +1726,7 @@ export default function AdminPortalView() {
           <AdminLearningManager />
         )}
       </main>
+    </div>
 
       {/* ADMIN MANUAL PAYMENT & SCREENSHOT MODAL */}
       {selectedPayoutForManualPay && (
