@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const partnerId = process.env.MLM_PARTNER_ID || 'cybernetworking';
+  const partnerId = process.env.MLM_PARTNER_ID || process.env.ZEX_PARTNER_ID || 'cybernetworking';
 
   let rawBody;
   try {

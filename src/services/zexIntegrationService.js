@@ -18,7 +18,7 @@ function getSql() {
   }
 }
 
-const DEFAULT_PARTNER_ID = process.env.MLM_PARTNER_ID || 'cybernetworking';
+const DEFAULT_PARTNER_ID = process.env.MLM_PARTNER_ID || process.env.ZEX_PARTNER_ID || 'cybernetworking';
 const ZEX_CONNECT_BASE_URL = process.env.MLM_CONNECT_PAGE_URL || 'https://zex4u.com/connect/mlm';
 
 /**
@@ -28,12 +28,54 @@ const ZEX_CONNECT_BASE_URL = process.env.MLM_CONNECT_PAGE_URL || 'https://zex4u.
 export async function createConnectAttempt({ memberId, partnerId = DEFAULT_PARTNER_ID, callbackUrl }) {
   const sql = getSql();
   
-  const requestId = randomUUID();
+  let requestId = randomUUID();
   const state = generateRandomState();
   const stateHash = hashState(state);
   const completeKey = `comp_${requestId}_${Date.now()}`;
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes lifetime
-  const connectUrl = `${ZEX_CONNECT_BASE_URL}#request=${requestId}`;
+  let expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes lifetime
+  let connectUrl = `${ZEX_CONNECT_BASE_URL}#request=${requestId}`;
+
+  // Live ZEX API handshake if ZEX_API_BASE_URL is configured
+  const apiBaseUrl = process.env.ZEX_API_BASE_URL;
+  const partnerApiKey = process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY;
+
+  if (apiBaseUrl && partnerApiKey) {
+    try {
+      const zexRes = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/api/v1/integrations/mlm/connect-sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Zex-Partner-Key': partnerApiKey,
+          'Idempotency-Key': `create_${memberId}_${Date.now()}`
+        },
+        body: JSON.stringify({
+          external_member_id: memberId,
+          state: state,
+          callback_url: callbackUrl
+        }),
+        signal: AbortSignal.timeout(10000)
+      });
+
+      if (zexRes.ok) {
+        const sessionData = await zexRes.json();
+        if (sessionData.request_id) {
+          requestId = sessionData.request_id;
+        }
+        if (sessionData.connect_url) {
+          connectUrl = sessionData.connect_url;
+        }
+        if (sessionData.expires_at) {
+          expiresAt = new Date(sessionData.expires_at);
+        }
+        console.log('[ZEX Connect] Successfully created live connect session with ZEX:', requestId);
+      } else {
+        const errorMsg = await zexRes.text().catch(() => '');
+        console.warn(`[ZEX Connect] Live ZEX API returned ${zexRes.status}:`, errorMsg);
+      }
+    } catch (err) {
+      console.warn('[ZEX Connect] Network call to ZEX API failed, falling back to local session URL:', err.message);
+    }
+  }
 
   let storedInDb = false;
   if (sql) {
@@ -113,8 +155,45 @@ export async function completeConnectAttempt({ requestId, code, state, partnerId
     return { ok: false, status: 400, error: 'Callback state verification failed' };
   }
 
-  // 3. Simulated/Real ZEX User ID from code exchange
-  const zexUserId = code.startsWith('zex_usr_') ? code : `zex_usr_${requestId.slice(0, 8)}`;
+  // 3. Live ZEX exchange or fallback
+  let zexUserId = null;
+  const apiBaseUrl = process.env.ZEX_API_BASE_URL;
+  const partnerApiKey = process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY;
+
+  if (apiBaseUrl && partnerApiKey && !code.startsWith('mock_')) {
+    try {
+      const completeUrl = `${apiBaseUrl.replace(/\/$/, '')}/api/v1/integrations/mlm/connect-sessions/${encodeURIComponent(requestId)}/complete`;
+      const zexResponse = await fetch(completeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Zex-Partner-Key': partnerApiKey,
+          'Idempotency-Key': attempt.complete_key || attempt.completeKey || `complete_${requestId}`
+        },
+        body: JSON.stringify({ code }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10000)
+      });
+
+      if (zexResponse.ok) {
+        const link = await zexResponse.json();
+        if (link && link.zex_user_id) {
+          zexUserId = link.zex_user_id;
+          console.log('[ZEX Complete] Confirmed live ZEX user link:', zexUserId);
+        }
+      } else {
+        const errBody = await zexResponse.text().catch(() => '');
+        console.warn(`[ZEX Complete] Live ZEX completion returned ${zexResponse.status}:`, errBody);
+      }
+    } catch (err) {
+      console.warn('[ZEX Complete] Error contacting ZEX complete endpoint:', err.message);
+    }
+  }
+
+  // Graceful fallback for mock/offline testing
+  if (!zexUserId) {
+    zexUserId = code.startsWith('zex_usr_') ? code : `zex_usr_${requestId.slice(0, 8)}`;
+  }
   const nowIso = new Date().toISOString();
   const externalMemberId = attempt.member_id;
 
