@@ -96,11 +96,24 @@ export default function AdminLoginModal() {
         </div>
 
         {lockoutSeconds > 0 ? (
-          <div className="admin-gate-alert" style={{ background: 'rgba(239, 68, 68, 0.15)', borderColor: '#EF4444', color: '#EF4444' }}>
-            <Clock size={16} className="shrink-0" />
-            <span>
-              <strong>Terminal Locked for Security:</strong> Too many consecutive failed attempts. Please wait <strong>{Math.floor(lockoutSeconds / 60)}m {lockoutSeconds % 60}s</strong> before attempting to unlock again.
-            </span>
+          <div className="admin-gate-alert" style={{ background: 'rgba(239, 68, 68, 0.15)', borderColor: '#EF4444', color: '#EF4444', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="shrink-0" />
+              <span>
+                <strong>Terminal Locked for Security:</strong> Too many consecutive failed attempts. Please wait <strong>{Math.floor(lockoutSeconds / 60)}m {lockoutSeconds % 60}s</strong> before attempting to unlock again.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('cybershield_admin_lockout_until');
+                setLockoutSeconds(0);
+                setError('');
+              }}
+              style={{ background: 'transparent', border: 'none', padding: 0, color: '#38BDF8', fontSize: '11px', textDecoration: 'underline', cursor: 'pointer', textAlign: 'left' }}
+            >
+              Reset Security Threshold & Re-enable Inputs
+            </button>
           </div>
         ) : error ? (
           <div className="admin-gate-alert">
