@@ -391,12 +391,14 @@ export default async function handler(req, res) {
       if (action === 'reset_test_data') {
         try { await sql`DELETE FROM activations;`; } catch (e) {}
         try { await sql`DELETE FROM transactions;`; } catch (e) {}
+        try { await sql`DELETE FROM payout_requests;`; } catch (e) {}
         try { await sql`DELETE FROM payouts;`; } catch (e) {}
         try { await sql`DELETE FROM orders;`; } catch (e) {}
         try { await sql`DELETE FROM zex_sales;`; } catch (e) {}
         try { await sql`DELETE FROM zex_account_links;`; } catch (e) {}
         try { await sql`DELETE FROM zex_connect_attempts;`; } catch (e) {}
         try { await sql`DELETE FROM zex_webhook_inbox;`; } catch (e) {}
+        try { await sql`DELETE FROM audit_logs;`; } catch (e) {}
         await sql`DELETE FROM members WHERE id != 'mem_matru';`;
         await sql`
           UPDATE members
