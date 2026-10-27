@@ -17,7 +17,8 @@ import {
   UserCheck,
   AlertCircle,
   Sparkles,
-  Clock
+  Clock,
+  ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { downloadTaxInvoice } from '../utils/downloadHelpers';
@@ -33,7 +34,10 @@ export default function CheckoutModal() {
     setIsAuthModalOpen,
     setAuthMode,
     setCurrentPage,
-    addToast
+    addToast,
+    initiateZexConnect,
+    zexLinkStatus,
+    refreshZexStatus
   } = useMlm();
 
   const [step, setStep] = useState('payment'); // 'payment' | 'confirmed'
@@ -135,6 +139,30 @@ export default function CheckoutModal() {
     downloadTaxInvoice({ order: paymentResult?.order, member: currentMember });
     const orderId = paymentResult?.order?.order_id || 'CS20261010';
     addToast('info', 'Payment Acknowledgment Downloaded', `Provisional payment submission receipt #${orderId} generated & downloaded. Official GST Tax Invoice is issued upon Admin clearance.`);
+  };
+
+  const [isConnectingZex, setIsConnectingZex] = useState(false);
+
+  // One-click ZEX connect redirection
+  const handleProceedToZex = async () => {
+    setIsConnectingZex(true);
+    try {
+      const activeMemberId = currentMember?.member_id || currentMember?.id;
+      if (!activeMemberId) {
+        addToast('error', 'Authentication Error', 'No active member session found. Please register or log in first.');
+        setIsConnectingZex(false);
+        return;
+      }
+      addToast('info', 'Connecting to ZEX 4U...', 'Redirecting you to the official ZEX authentication page to link your license.');
+      const res = await initiateZexConnect(activeMemberId);
+      if (!res?.ok) {
+        addToast('error', 'Connection Error', res?.error || 'Failed to start ZEX connection session.');
+        setIsConnectingZex(false);
+      }
+    } catch (err) {
+      addToast('error', 'Error', err.message);
+      setIsConnectingZex(false);
+    }
   };
 
   const isAuthPrompt = !isLoggedIn || !currentMember;
@@ -610,80 +638,189 @@ export default function CheckoutModal() {
               </div>
             </div>
 
-            {/* Dual Accounts Provisioned Box */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                Dual Accounts Pre-Configured via Official API
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                {/* Account 1: MLM Account */}
-                <div style={{ background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: '12px', padding: '12px 16px' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    Account 1: Partner MLM Account
-                  </div>
-                  <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
-                    <span style={{ color: '#64748B' }}>Member ID: </span>
-                    <strong className="code-font">{currentMember?.member_id || 'mem_pending'}</strong>
-                  </div>
-                  <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
-                    <span style={{ color: '#64748B' }}>Distributor Code: </span>
-                    <strong className="code-font text-primary-blue">{currentMember?.referral_code || 'CS-PENDING'}</strong>
-                  </div>
-                  <div style={{ fontSize: '0.82rem' }}>
-                    <span style={{ color: '#64748B' }}>Status: </span>
-                    <strong className="text-amber font-semibold">Pending Admin Verification ⏳</strong>
-                  </div>
-                </div>
+            {/* Step 2: ZEX 4U Linking Card */}
+            {(() => {
+              const isZexLinked = Boolean(
+                zexLinkStatus?.linked || 
+                currentMember?.mlm_account?.zex_user_id || 
+                currentMember?.zex_user_id
+              );
+              const zexUserId = zexLinkStatus?.data?.zex_user_id || currentMember?.mlm_account?.zex_user_id || currentMember?.zex_user_id;
 
-                {/* Account 2: Software License */}
-                <div style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '12px 16px' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    Account 2: Cyber Defense License
-                  </div>
-                  <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
-                    <span style={{ color: '#64748B' }}>License Key: </span>
-                    <strong className="code-font text-muted" style={{ fontSize: '0.75rem' }}>
-                      Locked (Unlocks Upon Bank Verification)
-                    </strong>
-                  </div>
-                  <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
-                    <span style={{ color: '#64748B' }}>Device Seats: </span>
-                    <strong>5 Protected Devices</strong>
-                  </div>
-                  <div style={{ fontSize: '0.82rem' }}>
-                    <span style={{ color: '#64748B' }}>Endpoint Suite: </span>
-                    <strong className="text-primary-blue">CyberNetworking Pro</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
+              return (
+                <>
+                  <div style={{
+                    background: isZexLinked 
+                      ? 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)' 
+                      : 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+                    border: isZexLinked ? '1.5px solid #86EFAC' : '1.5px solid #06B6D4',
+                    borderRadius: '14px',
+                    padding: '16px 20px',
+                    marginBottom: '16px',
+                    color: isZexLinked ? '#166534' : '#FFFFFF',
+                    boxShadow: isZexLinked ? '0 4px 12px rgba(34, 197, 94, 0.15)' : '0 8px 24px rgba(6, 182, 212, 0.22)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+                      <div style={{ flex: 1, minWidth: '240px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                          <span style={{ 
+                            background: isZexLinked ? '#22C55E' : '#06B6D4', 
+                            color: isZexLinked ? '#FFFFFF' : '#0F172A', 
+                            fontSize: '11px', 
+                            fontWeight: 800, 
+                            padding: '2px 8px', 
+                            borderRadius: '6px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            {isZexLinked ? 'Step 2: Completed ✓' : 'Step 2: Action Required'}
+                          </span>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: isZexLinked ? '#15803D' : '#FFFFFF' }}>
+                            {isZexLinked ? 'ZEX 4U Account Linked' : 'Link Your ZEX 4U Account'}
+                          </h4>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.83rem', color: isZexLinked ? '#166534' : '#94A3B8', lineHeight: 1.45 }}>
+                          {isZexLinked 
+                            ? `Your ZEX user account (${zexUserId}) is successfully mapped! Your 5-device software license will activate automatically upon admin bank clearance.`
+                            : 'Authorize your mobile number or Google account on ZEX 4U to bind your 5-device Cyber Defense Software License.'}
+                        </p>
+                      </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={handleDownloadInvoice}
-                className="btn btn-secondary"
-                style={{ flex: 1, padding: '11px 18px', fontSize: '0.88rem' }}
-              >
-                <Download size={16} />
-                <span>Download Payment Acknowledgment (PDF)</span>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCheckoutOpen(false);
-                  setCurrentPage('dashboard');
-                }}
-                className="btn btn-primary"
-                style={{ flex: 1.2, padding: '11px 22px', fontSize: '0.88rem', fontWeight: 700 }}
-              >
-                <span>Track Verification Status</span>
-                <ArrowRight size={16} />
-              </button>
-            </div>
+                      {!isZexLinked ? (
+                        <button
+                          type="button"
+                          onClick={handleProceedToZex}
+                          disabled={isConnectingZex}
+                          className="btn"
+                          style={{
+                            background: 'linear-gradient(135deg, #06B6D4 0%, #0284C7 100%)',
+                            color: '#FFFFFF',
+                            fontWeight: 800,
+                            fontSize: '0.92rem',
+                            padding: '12px 22px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 14px rgba(6, 182, 212, 0.45)',
+                            transition: 'all 0.2s ease',
+                            flexShrink: 0
+                          }}
+                        >
+                          <span>{isConnectingZex ? 'Connecting to ZEX...' : 'Proceed to Link ZEX 4U'}</span>
+                          <ExternalLink size={16} />
+                        </button>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFFFFF', padding: '8px 14px', borderRadius: '8px', border: '1px solid #BBF7D0', color: '#15803D', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
+                          <CheckCircle2 size={18} style={{ color: '#22C55E' }} />
+                          <span>Identity Linked</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dual Accounts Provisioned Box */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      Dual Accounts Pre-Configured via Official API
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      {/* Account 1: MLM Account */}
+                      <div style={{ background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: '12px', padding: '12px 16px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                          Account 1: Partner MLM Account
+                        </div>
+                        <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
+                          <span style={{ color: '#64748B' }}>Member ID: </span>
+                          <strong className="code-font">{currentMember?.member_id || 'mem_pending'}</strong>
+                        </div>
+                        <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
+                          <span style={{ color: '#64748B' }}>Distributor Code: </span>
+                          <strong className="code-font text-primary-blue">{currentMember?.referral_code || 'CS-PENDING'}</strong>
+                        </div>
+                        <div style={{ fontSize: '0.82rem' }}>
+                          <span style={{ color: '#64748B' }}>Status: </span>
+                          <strong className="text-amber font-semibold">Pending Admin Verification ⏳</strong>
+                        </div>
+                      </div>
+
+                      {/* Account 2: Software License */}
+                      <div style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '12px 16px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>
+                          Account 2: Cyber Defense License
+                        </div>
+                        <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
+                          <span style={{ color: '#64748B' }}>License Key: </span>
+                          <strong className="code-font text-muted" style={{ fontSize: '0.75rem' }}>
+                            Locked (Unlocks Upon Bank Verification)
+                          </strong>
+                        </div>
+                        <div style={{ fontSize: '0.82rem', marginBottom: '3px' }}>
+                          <span style={{ color: '#64748B' }}>ZEX Identity: </span>
+                          <strong className={isZexLinked ? 'text-success font-semibold code-font' : 'text-amber font-semibold'} style={{ fontSize: '0.78rem' }}>
+                            {isZexLinked ? `✓ ${zexUserId}` : '⏳ Not Linked Yet'}
+                          </strong>
+                        </div>
+                        <div style={{ fontSize: '0.82rem' }}>
+                          <span style={{ color: '#64748B' }}>Seats: </span>
+                          <strong className="text-primary-blue">5 Protected Devices (Pro)</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={handleDownloadInvoice}
+                      className="btn btn-secondary"
+                      style={{ flex: 1, minWidth: '220px', padding: '12px 18px', fontSize: '0.88rem' }}
+                    >
+                      <Download size={16} />
+                      <span>Download Payment Receipt (PDF)</span>
+                    </button>
+                    
+                    {!isZexLinked ? (
+                      <button
+                        type="button"
+                        onClick={handleProceedToZex}
+                        disabled={isConnectingZex}
+                        className="btn btn-primary"
+                        style={{ 
+                          flex: 1.2, 
+                          minWidth: '240px', 
+                          padding: '12px 22px', 
+                          fontSize: '0.92rem', 
+                          fontWeight: 800,
+                          background: 'linear-gradient(135deg, #06B6D4 0%, #2563EB 100%)',
+                          boxShadow: '0 4px 14px rgba(6, 182, 212, 0.35)'
+                        }}
+                      >
+                        <ExternalLink size={16} />
+                        <span>{isConnectingZex ? 'Redirecting to ZEX...' : 'Proceed to Link ZEX 4U ➔'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCheckoutOpen(false);
+                          setCurrentPage('dashboard');
+                        }}
+                        className="btn btn-primary"
+                        style={{ flex: 1.2, minWidth: '220px', padding: '12px 22px', fontSize: '0.88rem', fontWeight: 700 }}
+                      >
+                        <span>Track Verification Status</span>
+                        <ArrowRight size={16} />
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>

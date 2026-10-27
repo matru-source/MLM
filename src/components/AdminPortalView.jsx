@@ -564,105 +564,127 @@ export default function AdminPortalView() {
                   No partner activation requests in queue.
                 </div>
               ) : (
-                pendingActivations.map((act) => (
-                  <div key={act.id} className={`admin-activation-card ${act.status === 'pending' ? 'border-pending' : 'border-approved'}`}>
-                    <div className="activation-card-top">
-                      <div className="activation-user-meta">
-                        <div className="avatar-chip">
-                          <Users size={18} />
+                pendingActivations.map((act) => {
+                  const targetMember = members.find(m => m.member_id === act.member_id || m.id === act.member_id);
+                  const zexId = targetMember?.mlm_account?.zex_user_id || targetMember?.zex_user_id || act.account2_software?.zex_user_id;
+
+                  return (
+                    <div key={act.id} className={`admin-activation-card ${act.status === 'pending' ? 'border-pending' : 'border-approved'}`}>
+                      <div className="activation-card-top">
+                        <div className="activation-user-meta">
+                          <div className="avatar-chip">
+                            <Users size={18} />
+                          </div>
+                          <div>
+                            <h4 className="activation-user-name">{act.member_name}</h4>
+                            <span className="activation-user-sub">{act.member_email} • {act.member_phone}</span>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="activation-user-name">{act.member_name}</h4>
-                          <span className="activation-user-sub">{act.member_email} • {act.member_phone}</span>
+
+                        <div className="activation-status-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {zexId ? (
+                            <span className="badge badge-green font-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              🛡️ ZEX Linked: <span className="code-font">{zexId.slice(0, 16)}...</span>
+                            </span>
+                          ) : (
+                            <span className="badge badge-amber font-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              ⏳ ZEX Link Pending
+                            </span>
+                          )}
+
+                          {act.status === 'pending' ? (
+                            <span className="badge badge-amber font-xs">Pending Admin Verification</span>
+                          ) : act.status === 'approved' ? (
+                            <span className="badge badge-green font-xs">Active & Verified ✓</span>
+                          ) : (
+                            <span className="badge badge-rose font-xs">Rejected</span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="activation-status-pill">
-                        {act.status === 'pending' ? (
-                          <span className="badge badge-amber font-xs">Pending Admin Verification</span>
-                        ) : act.status === 'approved' ? (
-                          <span className="badge badge-green font-xs">Active & Verified ✓</span>
-                        ) : (
-                          <span className="badge badge-rose font-xs">Rejected</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="activation-meta-strip">
-                      <div className="meta-strip-item">
-                        <span className="meta-strip-label">Joining Fee</span>
-                        <strong className="meta-strip-val text-primary-blue">₹{act.total_paid?.toLocaleString('en-IN') || '2,950'} (₹2,500 + GST)</strong>
-                      </div>
-                      <div className="meta-strip-item">
-                        <span className="meta-strip-label">Payment Mode</span>
-                        <span className="meta-strip-val">{act.payment_method || 'UPI'}</span>
-                      </div>
-                      <div className="meta-strip-item">
-                        <span className="meta-strip-label">Order / Ref ID</span>
-                        <span className="meta-strip-val code-font">{act.payment_ref}</span>
-                      </div>
-                      <div className="meta-strip-item">
-                        <span className="meta-strip-label">UTR Number</span>
-                        <span className="meta-strip-val code-font">{act.utr_number}</span>
-                      </div>
-                      <div className="meta-strip-item">
-                        <span className="meta-strip-label">Sponsor Code</span>
-                        <span className="meta-strip-val code-font">{act.sponsor_code}</span>
-                      </div>
-                    </div>
-
-                    {/* DUAL ACCOUNTS PROVISIONED VIA API */}
-                    <div className="dual-accounts-container">
-                      {/* Account 1: Partner MLM Account */}
-                      <div className="dual-account-box mlm-account-box">
-                        <div className="account-box-badge">
-                          <span>Account 1: Partner MLM Account</span>
+                      <div className="activation-meta-strip">
+                        <div className="meta-strip-item">
+                          <span className="meta-strip-label">Joining Fee</span>
+                          <strong className="meta-strip-val text-primary-blue">₹{act.total_paid?.toLocaleString('en-IN') || '2,950'} (₹2,500 + GST)</strong>
                         </div>
-                        <div className="account-specs-compact">
-                          <div className="spec-item-compact">
-                            <span className="spec-k">Partner ID:</span>
-                            <span className="spec-v code-font">{act.account1_mlm?.partner_id || act.member_id}</span>
-                          </div>
-                          <div className="spec-item-compact">
-                            <span className="spec-k">Referral Code:</span>
-                            <span className="spec-v code-font font-bold text-primary-blue">{act.account1_mlm?.referral_code || 'CS-NEW01'}</span>
-                          </div>
-                          <div className="spec-item-compact">
-                            <span className="spec-k">Commission Wallet:</span>
-                            <span className="spec-v code-font">{act.account1_mlm?.commission_wallet_id || 'WAL-CS-NEW'}</span>
-                          </div>
-                          <div className="spec-item-compact">
-                            <span className="spec-k">Matrix Hierarchy:</span>
-                            <span className="spec-v">10-Tier Unilevel Matrix</span>
-                          </div>
+                        <div className="meta-strip-item">
+                          <span className="meta-strip-label">Payment Mode</span>
+                          <span className="meta-strip-val">{act.payment_method || 'UPI'}</span>
+                        </div>
+                        <div className="meta-strip-item">
+                          <span className="meta-strip-label">Order / Ref ID</span>
+                          <span className="meta-strip-val code-font">{act.payment_ref}</span>
+                        </div>
+                        <div className="meta-strip-item">
+                          <span className="meta-strip-label">UTR Number</span>
+                          <span className="meta-strip-val code-font">{act.utr_number}</span>
+                        </div>
+                        <div className="meta-strip-item">
+                          <span className="meta-strip-label">Sponsor Code</span>
+                          <span className="meta-strip-val code-font">{act.sponsor_code}</span>
+                        </div>
+                        <div className="meta-strip-item">
+                          <span className="meta-strip-label">ZEX Identity</span>
+                          <span className={`meta-strip-val font-semibold ${zexId ? 'text-success' : 'text-amber'}`}>
+                            {zexId ? `✓ ${zexId.slice(0, 14)}...` : 'Pending Link'}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Account 2: Software License Account */}
-                      <div className="dual-account-box software-account-box">
-                        <div className="account-box-badge software-badge">
-                          <span>Account 2: Enterprise Cyber Defense License</span>
+                      {/* DUAL ACCOUNTS PROVISIONED VIA API */}
+                      <div className="dual-accounts-container">
+                        {/* Account 1: Partner MLM Account */}
+                        <div className="dual-account-box mlm-account-box">
+                          <div className="account-box-badge">
+                            <span>Account 1: Partner MLM Account</span>
+                          </div>
+                          <div className="account-specs-compact">
+                            <div className="spec-item-compact">
+                              <span className="spec-k">Partner ID:</span>
+                              <span className="spec-v code-font">{act.account1_mlm?.partner_id || act.member_id}</span>
+                            </div>
+                            <div className="spec-item-compact">
+                              <span className="spec-k">Referral Code:</span>
+                              <span className="spec-v code-font font-bold text-primary-blue">{act.account1_mlm?.referral_code || 'CS-NEW01'}</span>
+                            </div>
+                            <div className="spec-item-compact">
+                              <span className="spec-k">Commission Wallet:</span>
+                              <span className="spec-v code-font">{act.account1_mlm?.commission_wallet_id || 'WAL-CS-NEW'}</span>
+                            </div>
+                            <div className="spec-item-compact">
+                              <span className="spec-k">Matrix Hierarchy:</span>
+                              <span className="spec-v">10-Tier Unilevel Matrix</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="account-specs-compact">
-                          <div className="spec-item-compact">
-                            <span className="spec-k">License Key:</span>
-                            <span className="spec-v code-font font-bold text-success">{act.account2_software?.license_key || 'CS-PRO-XXXX-XXXX'}</span>
+
+                        {/* Account 2: Software License Account */}
+                        <div className="dual-account-box software-account-box">
+                          <div className="account-box-badge software-badge">
+                            <span>Account 2: Enterprise Cyber Defense License</span>
                           </div>
-                          <div className="spec-item-compact">
-                            <span className="spec-k">Endpoint Seats:</span>
-                            <span className="spec-v font-bold">{act.account2_software?.endpoint_protection_seats || 5} Protected Devices</span>
-                          </div>
-                          <div className="spec-item-compact">
-                            <span className="spec-k">Software Suite:</span>
-                            <span className="spec-v">CyberNetworking Pro Enterprise Suite</span>
-                          </div>
-                          <div className="spec-item-compact">
-                            <span className="spec-k">Client Portal User:</span>
-                            <span className="spec-v">{act.account2_software?.client_portal_username || act.member_email}</span>
+                          <div className="account-specs-compact">
+                            <div className="spec-item-compact">
+                              <span className="spec-k">License Key:</span>
+                              <span className="spec-v code-font font-bold text-success">{act.account2_software?.license_key || 'CS-PRO-XXXX-XXXX'}</span>
+                            </div>
+                            <div className="spec-item-compact">
+                              <span className="spec-k">Endpoint Seats:</span>
+                              <span className="spec-v font-bold">{act.account2_software?.endpoint_protection_seats || 5} Protected Devices</span>
+                            </div>
+                            <div className="spec-item-compact">
+                              <span className="spec-k">ZEX 4U Identity:</span>
+                              <span className={`spec-v font-bold ${zexId ? 'text-success' : 'text-amber'}`}>
+                                {zexId ? `✓ Linked (${zexId})` : 'Pending User Authorisation'}
+                              </span>
+                            </div>
+                            <div className="spec-item-compact">
+                              <span className="spec-k">Client Portal User:</span>
+                              <span className="spec-v">{act.account2_software?.client_portal_username || act.member_email}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
                     {/* Actions */}
                     <div className="activation-actions-footer">
@@ -697,7 +719,8 @@ export default function AdminPortalView() {
                       )}
                     </div>
                   </div>
-                ))
+                );
+              })
               )}
             </div>
           </div>
