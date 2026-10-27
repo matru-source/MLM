@@ -51,15 +51,10 @@ export default async function handler(req, res) {
       expires_at: attempt.expiresAt
     });
   } catch (err) {
-    console.warn('[ZEX Connect] Error initiating connection:', err.message);
-    const fallbackId = `req_${Date.now()}`;
-    const connectUrl = `${process.env.MLM_CONNECT_PAGE_URL || 'https://zex4u.com/connect/mlm'}#request=${fallbackId}`;
-    return res.status(200).json({
-      ok: true,
-      request_id: fallbackId,
-      connect_url: connectUrl,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      warning: 'Operating in fallback session mode'
+    console.error('[ZEX Connect] Error initiating connection with ZEX Gateway:', err.message);
+    return res.status(502).json({
+      ok: false,
+      error: `ZEX Gateway Connection Failed: ${err.message}`
     });
   }
 }

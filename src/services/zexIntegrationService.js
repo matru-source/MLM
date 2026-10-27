@@ -35,45 +35,47 @@ export async function createConnectAttempt({ memberId, partnerId = DEFAULT_PARTN
   let expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes lifetime
   let connectUrl = `${ZEX_CONNECT_BASE_URL}#request=${requestId}`;
 
+  // Exact registered callback URL required by ZEX contract
+  const targetCallback = (callbackUrl || 'https://cybernetworking.vercel.app/api/integrations/zex/callback')
+    .trim()
+    .replace(/([^:]\/)\/+/g, '$1');
+
   // Live ZEX API handshake
-  const apiBaseUrl = process.env.ZEX_API_BASE_URL || 'https://api.zex4u.com';
-  const partnerApiKey = process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY || '581d9a82834c7ddc66b3cdd688352798c9265c53a5819ae3673a955f1c5d1e68';
+  const apiBaseUrl = (process.env.ZEX_API_BASE_URL || 'https://api.zex4u.com').trim().replace(/\/$/, '');
+  const partnerApiKey = (process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY || '581d9a82834c7ddc66b3cdd688352798c9265c53a5819ae3673a955f1c5d1e68').trim();
 
   if (apiBaseUrl && partnerApiKey) {
-    try {
-      const zexRes = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/api/v1/integrations/mlm/connect-sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Zex-Partner-Key': partnerApiKey,
-          'Idempotency-Key': `create_${memberId}_${Date.now()}`
-        },
-        body: JSON.stringify({
-          external_member_id: memberId,
-          state: state,
-          callback_url: callbackUrl
-        }),
-        signal: AbortSignal.timeout(10000)
-      });
+    const zexRes = await fetch(`${apiBaseUrl}/api/v1/integrations/mlm/connect-sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Zex-Partner-Key': partnerApiKey,
+        'Idempotency-Key': `create_${memberId}_${Date.now()}`
+      },
+      body: JSON.stringify({
+        external_member_id: memberId,
+        state: state,
+        callback_url: targetCallback
+      }),
+      signal: AbortSignal.timeout(10000)
+    });
 
-      if (zexRes.ok) {
-        const sessionData = await zexRes.json();
-        if (sessionData.request_id) {
-          requestId = sessionData.request_id;
-        }
-        if (sessionData.connect_url) {
-          connectUrl = sessionData.connect_url;
-        }
-        if (sessionData.expires_at) {
-          expiresAt = new Date(sessionData.expires_at);
-        }
-        console.log('[ZEX Connect] Successfully created live connect session with ZEX:', requestId);
-      } else {
-        const errorMsg = await zexRes.text().catch(() => '');
-        console.warn(`[ZEX Connect] Live ZEX API returned ${zexRes.status}:`, errorMsg);
+    if (zexRes.ok) {
+      const sessionData = await zexRes.json();
+      if (sessionData.request_id) {
+        requestId = sessionData.request_id;
       }
-    } catch (err) {
-      console.warn('[ZEX Connect] Network call to ZEX API failed, falling back to local session URL:', err.message);
+      if (sessionData.connect_url) {
+        connectUrl = sessionData.connect_url;
+      }
+      if (sessionData.expires_at) {
+        expiresAt = new Date(sessionData.expires_at);
+      }
+      console.log('[ZEX Connect] Successfully created live connect session with ZEX:', requestId, connectUrl);
+    } else {
+      const errorMsg = await zexRes.text().catch(() => '');
+      console.error(`[ZEX Connect] Live ZEX API returned ${zexRes.status}:`, errorMsg);
+      throw new Error(`ZEX Gateway error (${zexRes.status}): ${errorMsg}`);
     }
   }
 
