@@ -35,9 +35,9 @@ export async function createConnectAttempt({ memberId, partnerId = DEFAULT_PARTN
   let expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes lifetime
   let connectUrl = `${ZEX_CONNECT_BASE_URL}#request=${requestId}`;
 
-  // Live ZEX API handshake if ZEX_API_BASE_URL is configured
-  const apiBaseUrl = process.env.ZEX_API_BASE_URL;
-  const partnerApiKey = process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY;
+  // Live ZEX API handshake
+  const apiBaseUrl = process.env.ZEX_API_BASE_URL || 'https://api.zex4u.com';
+  const partnerApiKey = process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY || '581d9a82834c7ddc66b3cdd688352798c9265c53a5819ae3673a955f1c5d1e68';
 
   if (apiBaseUrl && partnerApiKey) {
     try {
@@ -157,8 +157,8 @@ export async function completeConnectAttempt({ requestId, code, state, partnerId
 
   // 3. Live ZEX exchange or fallback
   let zexUserId = null;
-  const apiBaseUrl = process.env.ZEX_API_BASE_URL;
-  const partnerApiKey = process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY;
+  const apiBaseUrl = process.env.ZEX_API_BASE_URL || 'https://api.zex4u.com';
+  const partnerApiKey = process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY || '581d9a82834c7ddc66b3cdd688352798c9265c53a5819ae3673a955f1c5d1e68';
 
   if (apiBaseUrl && partnerApiKey && !code.startsWith('mock_')) {
     try {
