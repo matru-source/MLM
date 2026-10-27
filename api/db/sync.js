@@ -389,6 +389,16 @@ export default async function handler(req, res) {
     try {
       // 2-0. Reset / Clean Test Data
       if (action === 'reset_test_data') {
+        await sql`DELETE FROM activations;`;
+        await sql`DELETE FROM transactions;`;
+        await sql`DELETE FROM payouts;`;
+        await sql`DELETE FROM orders;`;
+        try {
+          await sql`DELETE FROM zex_sales;`;
+          await sql`DELETE FROM zex_account_links;`;
+          await sql`DELETE FROM zex_connect_attempts;`;
+          await sql`DELETE FROM zex_webhook_inbox;`;
+        } catch (e) {}
         await sql`DELETE FROM members WHERE id != 'mem_matru';`;
         await sql`
           UPDATE members
@@ -404,16 +414,6 @@ export default async function handler(req, res) {
             total_earnings = 0
           WHERE id = 'mem_matru';
         `;
-        await sql`DELETE FROM activations;`;
-        await sql`DELETE FROM transactions;`;
-        await sql`DELETE FROM payouts;`;
-        await sql`DELETE FROM orders;`;
-        try {
-          await sql`DELETE FROM zex_sales;`;
-          await sql`DELETE FROM zex_account_links;`;
-          await sql`DELETE FROM zex_connect_attempts;`;
-          await sql`DELETE FROM zex_webhook_inbox;`;
-        } catch (e) {}
         return res.status(200).json({ ok: true, message: 'Test data cleared successfully' });
       }
 
