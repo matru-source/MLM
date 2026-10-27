@@ -704,14 +704,28 @@ export function MlmProvider({ children }) {
   });
 
   const refreshZexStatus = async (memberId = currentMemberId) => {
-    if (!memberId) return;
+    const targetId = memberId || currentMemberId;
+    if (!targetId) return;
     setZexLinkStatus(prev => ({ ...prev, loading: true }));
     try {
-      const res = await dbFetchZexLinkStatus(memberId);
-      if (res.ok && res.linked) {
-        setZexLinkStatus({ linked: true, loading: false, data: res.data });
+      const res = await dbFetchZexLinkStatus(targetId);
+      const isLinked = Boolean(res.ok && (res.linked || res.status?.linked));
+      const linkData = res.data || res.status?.data || null;
+      if (isLinked) {
+        setZexLinkStatus({ linked: true, loading: false, data: linkData });
       } else {
-        setZexLinkStatus({ linked: false, loading: false, data: null });
+        // Dynamic fallback: cross-check if member has zex_user_id populated from database
+        const mem = members.find(m => m.id === targetId || m.member_id === targetId || m.mlm_account?.partner_id === targetId || m.email === targetId);
+        const zId = mem?.zex_user_id || mem?.mlm_account?.zex_user_id || mem?.software_license?.zex_user_id;
+        if (zId) {
+          setZexLinkStatus({ 
+            linked: true, 
+            loading: false, 
+            data: { zex_user_id: zId, external_member_id: targetId, partner_id: 'cybernetworking', status: 'active' } 
+          });
+        } else {
+          setZexLinkStatus({ linked: false, loading: false, data: null });
+        }
       }
     } catch (e) {
       setZexLinkStatus({ linked: false, loading: false, data: null });
@@ -1721,7 +1735,12 @@ export function MlmProvider({ children }) {
     }));
 
     setMembers(prev => prev.map(m => {
-      if (m.member_id === act.member_id) {
+      if (
+        m.member_id === act.member_id || 
+        m.id === act.member_id || 
+        (m.email && act.member_email && m.email.toLowerCase() === act.member_email.toLowerCase()) ||
+        m.mlm_account?.partner_id === act.member_id
+      ) {
         return {
           ...m,
           rank: 'Active Partner',

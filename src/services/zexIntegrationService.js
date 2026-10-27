@@ -233,12 +233,23 @@ export async function completeConnectAttempt({ requestId, code, state, partnerId
       // 6. Update member record in members table
       await sql`
         UPDATE members
-        SET mlm_account = jsonb_set(
-          COALESCE(mlm_account, '{}'::jsonb),
+        SET 
+          mlm_account = jsonb_set(COALESCE(mlm_account, '{}'::jsonb), '{zex_user_id}', to_jsonb(${zexUserId}::text)),
+          software_license = jsonb_set(COALESCE(software_license, '{}'::jsonb), '{zex_user_id}', to_jsonb(${zexUserId}::text))
+        WHERE id = ${externalMemberId} OR mlm_account->>'partner_id' = ${externalMemberId};
+      `;
+
+      // 7. Update activations table
+      await sql`
+        UPDATE activations
+        SET account2_software = jsonb_set(
+          COALESCE(account2_software, '{}'::jsonb),
           '{zex_user_id}',
           to_jsonb(${zexUserId}::text)
         )
-        WHERE id = ${externalMemberId};
+        WHERE member_id = ${externalMemberId}
+           OR member_id = (SELECT mlm_account->>'partner_id' FROM members WHERE id = ${externalMemberId} LIMIT 1)
+           OR member_email = (SELECT email FROM members WHERE id = ${externalMemberId} LIMIT 1);
       `;
 
       return {
@@ -484,9 +495,14 @@ export async function getMemberZexStatus(memberId) {
     const sql = getSql();
     if (sql) {
       const rows = await sql`
-        SELECT partner_id, external_member_id, zex_user_id, status, linked_at
-        FROM zex_account_links
-        WHERE external_member_id = ${memberId}
+        SELECT zal.partner_id, zal.external_member_id, zal.zex_user_id, zal.status, zal.linked_at
+        FROM zex_account_links zal
+        LEFT JOIN members m ON (m.id = zal.external_member_id OR m.mlm_account->>'partner_id' = zal.external_member_id)
+        WHERE zal.external_member_id = ${memberId}
+           OR m.id = ${memberId}
+           OR m.mlm_account->>'partner_id' = ${memberId}
+           OR m.email = ${memberId}
+        ORDER BY zal.linked_at DESC
         LIMIT 1;
       `;
       if (rows.length > 0) {

@@ -91,6 +91,33 @@ export default function MemberDashboardView() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedReceiptModal, setSelectedReceiptModal] = useState(null);
 
+  const memberInList = useMemo(() => {
+    return members.find(m => 
+      m.id === currentMember?.id || 
+      m.member_id === currentMember?.member_id || 
+      (m.email && currentMember?.email && m.email.toLowerCase() === currentMember?.email.toLowerCase())
+    );
+  }, [members, currentMember]);
+
+  const isZexConnected = useMemo(() => {
+    return Boolean(
+      zexLinkStatus?.linked ||
+      currentMember?.zex_user_id ||
+      currentMember?.mlm_account?.zex_user_id ||
+      currentMember?.software_license?.zex_user_id ||
+      memberInList?.zex_user_id ||
+      memberInList?.mlm_account?.zex_user_id ||
+      memberInList?.software_license?.zex_user_id
+    );
+  }, [zexLinkStatus, currentMember, memberInList]);
+
+  useEffect(() => {
+    const targetId = currentMember?.id || currentMember?.member_id;
+    if (targetId) {
+      refreshZexStatus(targetId);
+    }
+  }, [currentMember?.id, currentMember?.member_id]);
+
   const coolingOffTotal = (transactions || [])
     .filter(t => (t.member_id === currentMember?.member_id || t.member_id === currentMember?.id || !t.member_id) && t.status === 'Pending' && t.type === 'credit')
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -354,7 +381,11 @@ export default function MemberDashboardView() {
   };
 
   return (
-    <div className="member-app-layout">
+    <>
+      <div 
+        className="member-app-layout"
+        style={!isZexConnected ? { filter: 'blur(12px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.15 } : {}}
+      >
       {/* 1. DARK NAVY SIDEBAR (Desktop) */}
       <aside className="member-sidebar desktop-sidebar">
         <div className="sidebar-brand-box">
@@ -758,84 +789,43 @@ export default function MemberDashboardView() {
               </div>
             )}
 
-            {/* ZEX Cloud Platform Integration Card */}
-            <div className="zex-integration-card card-white mt-4">
-              <div className="card-head-between">
-                <div className="flex-align gap-3">
-                  <div className="kpi-icon-box bg-purple-dim">
-                    <Zap size={22} className="text-purple" />
-                  </div>
-                  <div>
-                    <div className="flex-align gap-2">
-                      <h3 className="chart-card-title m-0">ZEX Cloud Platform Integration</h3>
-                      <span className="badge badge-purple font-xs">Official API</span>
+            {/* ZEX Cloud Platform Integration Card - Completely removed if user already connected with ZEX */}
+            {!isZexConnected && (
+              <div className="zex-integration-card card-white mt-4">
+                <div className="card-head-between">
+                  <div className="flex-align gap-3">
+                    <div className="kpi-icon-box bg-purple-dim">
+                      <Zap size={22} className="text-purple" />
                     </div>
-                    <p className="chart-card-sub m-0 mt-1">
-                      Session-bound cryptographic link for real-time 10-tier unilevel commission distribution
-                    </p>
+                    <div>
+                      <div className="flex-align gap-2">
+                        <h3 className="chart-card-title m-0">ZEX Cloud Platform Integration</h3>
+                        <span className="badge badge-purple font-xs">Official API</span>
+                      </div>
+                      <p className="chart-card-sub m-0 mt-1">
+                        Session-bound cryptographic link for real-time 10-tier unilevel commission distribution
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex-align gap-2">
-                  {zexLinkStatus?.linked ? (
-                    <span className="badge badge-green flex-align gap-1 font-xs">
-                      <CheckCircle2 size={13} />
-                      <span>Connected</span>
-                    </span>
-                  ) : (
+                  <div className="flex-align gap-2">
                     <span className="badge badge-amber flex-align gap-1 font-xs">
                       <AlertCircle size={13} />
                       <span>Not Linked</span>
                     </span>
-                  )}
-                  <button
-                    type="button"
-                    title="Refresh connection status"
-                    onClick={() => refreshZexStatus(currentMember?.member_id)}
-                    className="btn btn-secondary btn-sm p-1"
-                    style={{ minWidth: '32px', height: '32px' }}
-                  >
-                    <RefreshCw size={13} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="zex-card-content mt-3">
-                {zexLinkStatus?.linked ? (
-                  <div className="zex-linked-details">
-                    <div className="zex-stats-grid">
-                      <div className="zex-stat-box">
-                        <div className="text-xs text-muted mb-1">Linked ZEX User ID</div>
-                        <div className="code-font font-sm text-primary-blue font-bold">
-                          {zexLinkStatus.data?.zex_user_id || 'zex_usr_active'}
-                        </div>
-                      </div>
-                      <div className="zex-stat-box">
-                        <div className="text-xs text-muted mb-1">Partner Identifier</div>
-                        <div className="code-font font-sm text-primary">
-                          {zexLinkStatus.data?.partner_id || 'cybernetworking'}
-                        </div>
-                      </div>
-                      <div className="zex-stat-box">
-                        <div className="text-xs text-muted mb-1">External Member ID</div>
-                        <div className="code-font font-sm text-primary">
-                          {currentMember?.member_id}
-                        </div>
-                      </div>
-                      <div className="zex-stat-box">
-                        <div className="text-xs text-muted mb-1">Real-Time Commission Hook</div>
-                        <div className="text-success font-sm font-bold flex-align gap-1">
-                          <CheckCircle2 size={14} />
-                          <span>Active (10-Tier Payouts)</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="zex-live-stream-note mt-3 p-2 bg-card-alt border-rounded text-xs text-muted flex-between">
-                      <span>⚡ Webhook stream active at <code className="code-font">/api/integrations/zex/webhook</code>. Qualifying subscription sales trigger instant credits across 10 upline tiers (₹1000 / ₹300 / ₹150 / ₹50 / ₹25 / ₹25 / ₹25 / ₹10 / ₹10 / ₹5).</span>
-                      <span className="text-success font-bold">100% Synced</span>
-                    </div>
+                    <button
+                      type="button"
+                      title="Refresh connection status"
+                      onClick={() => refreshZexStatus(currentMember?.id || currentMember?.member_id)}
+                      className="btn btn-secondary btn-sm p-1"
+                      style={{ minWidth: '32px', height: '32px' }}
+                    >
+                      <RefreshCw size={13} />
+                    </button>
                   </div>
-                ) : (
+                </div>
+
+                <div className="zex-card-content mt-3">
                   <div className="zex-unlinked-cta flex-between flex-wrap gap-3 p-3 bg-card-alt border-rounded">
                     <div style={{ maxWidth: '640px' }}>
                       <h4 className="font-sm font-bold text-primary mb-1">Connect Your ZEX Platform Account</h4>
@@ -849,7 +839,7 @@ export default function MemberDashboardView() {
                         disabled={connectingZex}
                         onClick={async () => {
                           setConnectingZex(true);
-                          await initiateZexConnect(currentMember?.member_id);
+                          await initiateZexConnect(currentMember?.id || currentMember?.member_id);
                           setConnectingZex(false);
                         }}
                         className="btn btn-primary btn-sm flex-center gap-1"
@@ -859,9 +849,9 @@ export default function MemberDashboardView() {
                       </button>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -3032,5 +3022,198 @@ export default function MemberDashboardView() {
         </button>
       </nav>
     </div>
+
+    {/* MANDATORY NON-DISMISSIBLE ZEX CONNECTION POPUP (CANNOT BE CLOSED UNTIL CONNECTED) */}
+    {!isZexConnected && (
+      <div 
+        className="mandatory-zex-overlay" 
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 999999,
+          backgroundColor: 'rgba(15, 23, 42, 0.88)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          overflowY: 'auto'
+        }}
+      >
+        <div 
+          className="mandatory-zex-card"
+          style={{
+            maxWidth: '560px',
+            width: '100%',
+            background: '#FFFFFF',
+            borderRadius: '20px',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Header with CyberNetworking & ZEX branding */}
+          <div 
+            style={{
+              background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+              padding: '28px 28px 24px',
+              color: '#FFFFFF',
+              position: 'relative'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: 42, height: 42, borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap size={22} style={{ color: '#38BDF8' }} />
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8', fontWeight: 700 }}>
+                    Dual-Account Provisioning • Step 2
+                  </span>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
+                    Connect Your ZEX Platform Account
+                  </h3>
+                </div>
+              </div>
+              <span 
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '4px 10px',
+                  borderRadius: '20px',
+                  background: 'rgba(245, 158, 11, 0.2)',
+                  color: '#FBBF24',
+                  border: '1px solid rgba(245, 158, 11, 0.4)'
+                }}
+              >
+                Mandatory Link
+              </span>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '13px', color: '#CBD5E1', lineHeight: 1.55 }}>
+              Your partner joining fee has been approved by CyberNetworking administration. To unlock your dashboard, commission wallet, and 10-tier unilevel distribution, you must complete your session-bound cryptographic link with ZEX.
+            </p>
+          </div>
+
+          {/* Modal Body */}
+          <div style={{ padding: '24px 28px' }}>
+            {/* Partner Credentials Summary */}
+            <div 
+              style={{
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                marginBottom: '20px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '8px' }}>
+                <span style={{ color: '#64748B' }}>Direct Selling Partner:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{currentMember?.name || 'Authorized Direct Seller'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '8px' }}>
+                <span style={{ color: '#64748B' }}>Registered Email:</span>
+                <span style={{ fontFamily: 'monospace', color: '#334155' }}>{currentMember?.email}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '8px' }}>
+                <span style={{ color: '#64748B' }}>Partner Referral Code:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#2563EB' }}>
+                  {currentMember?.referral_code || currentMember?.mlm_account?.referral_code || 'CS-ACTIVE'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                <span style={{ color: '#64748B' }}>Account Approval:</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#16A34A', fontWeight: 700 }}>
+                  <CheckCircle2 size={13} />
+                  <span>Approved by Admin (Dashboard Locked Pending ZEX Link)</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Informational checklist */}
+            <div style={{ marginBottom: '22px' }}>
+              <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                Why is ZEX connection mandatory?
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#334155' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                    <Check size={12} />
+                  </div>
+                  <span><strong>10-Tier Commission Sync:</strong> Real-time webhook distribution for ₹1,000 / ₹300 / ₹150 matrix tiers.</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#334155' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                    <Check size={12} />
+                  </div>
+                  <span><strong>License Key Provisioning:</strong> Enterprise software defense suite endpoint seats automatically bound to your identity.</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#334155' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                    <Check size={12} />
+                  </div>
+                  <span><strong>Neon Wallet Security:</strong> Non-repudiable payout tracking in accordance with Direct Selling Rules 2021.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                type="button"
+                disabled={connectingZex}
+                onClick={async () => {
+                  setConnectingZex(true);
+                  await initiateZexConnect(currentMember?.id || currentMember?.member_id);
+                  setConnectingZex(false);
+                }}
+                className="btn btn-primary"
+                style={{
+                  width: '100%',
+                  padding: '12px 18px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
+                }}
+              >
+                <Zap size={16} />
+                <span>{connectingZex ? 'Initiating ZEX Connection...' : 'Connect ZEX Account Now'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => refreshZexStatus(currentMember?.id || currentMember?.member_id)}
+                className="btn btn-secondary btn-sm"
+                style={{
+                  width: '100%',
+                  padding: '9px 14px',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <RefreshCw size={13} className={zexLinkStatus?.loading ? 'spin' : ''} />
+                <span>Already connected in another window? Click to verify</span>
+              </button>
+            </div>
+
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <span style={{ fontSize: '11px', color: '#94A3B8' }}>
+                🔒 This mandatory verification popup cannot be dismissed until your ZEX account link is verified.
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }

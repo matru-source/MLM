@@ -316,10 +316,13 @@ export async function dbUpdateKyc(memberId, kycData) {
 export async function dbFetchZexLinkStatus(memberId) {
   try {
     const res = await fetch(`/api/integrations/zex/status?member_id=${encodeURIComponent(memberId)}`);
-    if (!res.ok) return { ok: true, linked: false };
-    return await res.json();
+    if (!res.ok) return { ok: true, linked: false, data: null };
+    const data = await res.json();
+    const isLinked = Boolean(data.linked || data.status?.linked);
+    const linkData = data.data || data.status?.data || null;
+    return { ok: true, linked: isLinked, data: linkData, status: data.status };
   } catch (err) {
-    return { ok: true, linked: false };
+    return { ok: true, linked: false, data: null };
   }
 }
 

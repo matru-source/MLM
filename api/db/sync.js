@@ -117,6 +117,38 @@ async function autoSettleMaturedCommissions(sql) {
   }
 }
 
+async function ensureZexLinksSync(sql) {
+  if (!sql) return;
+  try {
+    // 1. Sync zex_user_id from zex_account_links into members table
+    await sql`
+      UPDATE members m
+      SET 
+        mlm_account = jsonb_set(COALESCE(m.mlm_account, '{}'::jsonb), '{zex_user_id}', to_jsonb(zal.zex_user_id::text)),
+        software_license = jsonb_set(COALESCE(m.software_license, '{}'::jsonb), '{zex_user_id}', to_jsonb(zal.zex_user_id::text))
+      FROM zex_account_links zal
+      WHERE (m.id = zal.external_member_id OR m.mlm_account->>'partner_id' = zal.external_member_id)
+        AND zal.zex_user_id IS NOT NULL;
+    `;
+
+    // 2. Sync zex_user_id into activations table
+    await sql`
+      UPDATE activations a
+      SET account2_software = jsonb_set(COALESCE(a.account2_software, '{}'::jsonb), '{zex_user_id}', to_jsonb(zal.zex_user_id::text))
+      FROM zex_account_links zal
+      LEFT JOIN members m ON (m.id = zal.external_member_id OR m.mlm_account->>'partner_id' = zal.external_member_id)
+      WHERE (
+        a.member_id = zal.external_member_id 
+        OR a.member_id = m.id 
+        OR a.member_id = m.mlm_account->>'partner_id' 
+        OR (a.member_email IS NOT NULL AND a.member_email = m.email)
+      ) AND zal.zex_user_id IS NOT NULL;
+    `;
+  } catch (e) {
+    // Non-fatal if table doesn't exist
+  }
+}
+
 export default async function handler(req, res) {
   const sql = getSql();
 
@@ -134,6 +166,7 @@ export default async function handler(req, res) {
     try {
       await ensureTransactionColumns(sql);
       await autoSettleMaturedCommissions(sql);
+      await ensureZexLinksSync(sql);
       const type = req.query?.type;
 
       // Audit Logs resource query
@@ -165,13 +198,22 @@ export default async function handler(req, res) {
       if (type === 'members') {
         const rows = await sql`
           SELECT 
-            id as member_id, name, email, phone, avatar, password, rank,
-            cs_customer_id, sponsor_member_id, sponsor_code, sponsor_name,
-            customer_status, seller_status, referral_code,
-            COALESCE(wallet_balance, 0)::numeric as wallet_balance,
-            COALESCE(total_earnings, 0)::numeric as total_earnings,
-            kyc_data as kyc, software_license, mlm_account, created_at as joined_at
-          FROM members ORDER BY created_at ASC;
+            m.id as member_id, m.id, m.name, m.email, m.phone, m.avatar, m.password, m.rank,
+            m.cs_customer_id, m.sponsor_member_id, m.sponsor_code, m.sponsor_name,
+            m.customer_status, m.seller_status, m.referral_code,
+            COALESCE(m.wallet_balance, 0)::numeric as wallet_balance,
+            COALESCE(m.total_earnings, 0)::numeric as total_earnings,
+            m.kyc_data as kyc, m.software_license, m.mlm_account, m.created_at as joined_at,
+            COALESCE(zal.zex_user_id, m.mlm_account->>'zex_user_id', m.software_license->>'zex_user_id') as zex_user_id,
+            zal.linked_at as zex_linked_at,
+            CASE WHEN zal.zex_user_id IS NOT NULL OR m.mlm_account->>'zex_user_id' IS NOT NULL THEN TRUE ELSE FALSE END as is_zex_linked
+          FROM members m
+          LEFT JOIN zex_account_links zal ON (
+            m.id = zal.external_member_id OR 
+            m.mlm_account->>'partner_id' = zal.external_member_id OR 
+            zal.external_member_id = m.id
+          )
+          ORDER BY m.created_at ASC;
         `;
         return res.status(200).json({ ok: true, data: rows });
       }
@@ -179,11 +221,20 @@ export default async function handler(req, res) {
       if (type === 'activations') {
         const rows = await sql`
           SELECT 
-            id, member_id, member_name, member_email, member_phone, sponsor_code,
-            amount_paid::numeric, gst_paid::numeric, total_paid::numeric,
-            payment_method, payment_ref, utr_number, status, rejection_reason,
-            account1_mlm, account2_software, requested_at, approved_at
-          FROM activations ORDER BY requested_at DESC;
+            a.id, a.member_id, a.member_name, a.member_email, a.member_phone, a.sponsor_code,
+            a.amount_paid::numeric, a.gst_paid::numeric, a.total_paid::numeric,
+            a.payment_method, a.payment_ref, a.utr_number, a.status, a.rejection_reason,
+            a.account1_mlm, a.account2_software, a.requested_at, a.approved_at,
+            COALESCE(zal.zex_user_id, a.account2_software->>'zex_user_id', m.mlm_account->>'zex_user_id') as zex_user_id,
+            CASE WHEN zal.zex_user_id IS NOT NULL OR a.account2_software->>'zex_user_id' IS NOT NULL THEN TRUE ELSE FALSE END as is_zex_linked
+          FROM activations a
+          LEFT JOIN members m ON (a.member_id = m.id OR a.member_id = m.mlm_account->>'partner_id' OR (a.member_email IS NOT NULL AND a.member_email = m.email))
+          LEFT JOIN zex_account_links zal ON (
+            a.member_id = zal.external_member_id OR 
+            m.id = zal.external_member_id OR 
+            m.mlm_account->>'partner_id' = zal.external_member_id
+          )
+          ORDER BY a.requested_at DESC;
         `;
         return res.status(200).json({ ok: true, data: rows });
       }
@@ -247,21 +298,39 @@ export default async function handler(req, res) {
       const [members, activations, payouts, orders, transactions, kycDocs, auditLogs, learningResources] = await Promise.all([
         sql`
           SELECT 
-            id as member_id, name, email, phone, avatar, password, rank,
-            cs_customer_id, sponsor_member_id, sponsor_code, sponsor_name,
-            customer_status, seller_status, referral_code,
-            COALESCE(wallet_balance, 0)::numeric as wallet_balance,
-            COALESCE(total_earnings, 0)::numeric as total_earnings,
-            kyc_data as kyc, software_license, mlm_account, created_at as joined_at
-          FROM members ORDER BY created_at ASC;
+            m.id as member_id, m.id, m.name, m.email, m.phone, m.avatar, m.password, m.rank,
+            m.cs_customer_id, m.sponsor_member_id, m.sponsor_code, m.sponsor_name,
+            m.customer_status, m.seller_status, m.referral_code,
+            COALESCE(m.wallet_balance, 0)::numeric as wallet_balance,
+            COALESCE(m.total_earnings, 0)::numeric as total_earnings,
+            m.kyc_data as kyc, m.software_license, m.mlm_account, m.created_at as joined_at,
+            COALESCE(zal.zex_user_id, m.mlm_account->>'zex_user_id', m.software_license->>'zex_user_id') as zex_user_id,
+            zal.linked_at as zex_linked_at,
+            CASE WHEN zal.zex_user_id IS NOT NULL OR m.mlm_account->>'zex_user_id' IS NOT NULL THEN TRUE ELSE FALSE END as is_zex_linked
+          FROM members m
+          LEFT JOIN zex_account_links zal ON (
+            m.id = zal.external_member_id OR 
+            m.mlm_account->>'partner_id' = zal.external_member_id OR 
+            zal.external_member_id = m.id
+          )
+          ORDER BY m.created_at ASC;
         `,
         sql`
           SELECT 
-            id, member_id, member_name, member_email, member_phone, sponsor_code,
-            amount_paid::numeric, gst_paid::numeric, total_paid::numeric,
-            payment_method, payment_ref, utr_number, status, rejection_reason,
-            account1_mlm, account2_software, requested_at, approved_at
-          FROM activations ORDER BY requested_at DESC;
+            a.id, a.member_id, a.member_name, a.member_email, a.member_phone, a.sponsor_code,
+            a.amount_paid::numeric, a.gst_paid::numeric, a.total_paid::numeric,
+            a.payment_method, a.payment_ref, a.utr_number, a.status, a.rejection_reason,
+            a.account1_mlm, a.account2_software, a.requested_at, a.approved_at,
+            COALESCE(zal.zex_user_id, a.account2_software->>'zex_user_id', m.mlm_account->>'zex_user_id') as zex_user_id,
+            CASE WHEN zal.zex_user_id IS NOT NULL OR a.account2_software->>'zex_user_id' IS NOT NULL THEN TRUE ELSE FALSE END as is_zex_linked
+          FROM activations a
+          LEFT JOIN members m ON (a.member_id = m.id OR a.member_id = m.mlm_account->>'partner_id' OR (a.member_email IS NOT NULL AND a.member_email = m.email))
+          LEFT JOIN zex_account_links zal ON (
+            a.member_id = zal.external_member_id OR 
+            m.id = zal.external_member_id OR 
+            m.mlm_account->>'partner_id' = zal.external_member_id
+          )
+          ORDER BY a.requested_at DESC;
         `,
         sql`
           SELECT 

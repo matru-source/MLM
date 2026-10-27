@@ -8,6 +8,7 @@ import {
   DollarSign, 
   CheckCircle2, 
   AlertCircle,
+  AlertTriangle,
   RotateCcw,
   Send,
   Download,
@@ -90,6 +91,11 @@ export default function AdminPortalView() {
     member: null,
     predefinedReason: 'Document illegible or blurred',
     customReason: ''
+  });
+  const [unlinkedApprovalModal, setUnlinkedApprovalModal] = useState({
+    open: false,
+    act: null,
+    zexId: null
   });
 
   const getDocFileInfo = (member, docKey) => {
@@ -565,8 +571,17 @@ export default function AdminPortalView() {
                 </div>
               ) : (
                 pendingActivations.map((act) => {
-                  const targetMember = members.find(m => m.member_id === act.member_id || m.id === act.member_id);
-                  const zexId = targetMember?.mlm_account?.zex_user_id || targetMember?.zex_user_id || act.account2_software?.zex_user_id;
+                  const targetMember = members.find(m => 
+                    m.member_id === act.member_id || 
+                    m.id === act.member_id ||
+                    (m.email && act.member_email && m.email.toLowerCase() === act.member_email.toLowerCase()) ||
+                    m.mlm_account?.partner_id === act.member_id
+                  );
+                  const zexId = act.zex_user_id || 
+                                targetMember?.zex_user_id || 
+                                targetMember?.mlm_account?.zex_user_id || 
+                                targetMember?.software_license?.zex_user_id || 
+                                act.account2_software?.zex_user_id;
 
                   return (
                     <div key={act.id} className={`admin-activation-card ${act.status === 'pending' ? 'border-pending' : 'border-approved'}`}>
@@ -704,7 +719,17 @@ export default function AdminPortalView() {
 
                           <button
                             type="button"
-                            onClick={() => approveMemberActivation(act.id)}
+                            onClick={() => {
+                              if (!zexId) {
+                                setUnlinkedApprovalModal({
+                                  open: true,
+                                  act,
+                                  targetMember
+                                });
+                              } else {
+                                approveMemberActivation(act.id);
+                              }
+                            }}
                             className="btn btn-primary btn-sm flex-center gap-1"
                           >
                             <CheckCircle2 size={16} />
@@ -3100,6 +3125,96 @@ export default function AdminPortalView() {
               >
                 <AlertCircle size={14} />
                 <span>Confirm Statutory Rejection & Audit Log</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UNLINKED ZEX APPROVAL WARNING MODAL */}
+      {unlinkedApprovalModal.open && unlinkedApprovalModal.act && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-card" style={{ maxWidth: '540px', width: '92%' }}>
+            <div className="admin-modal-header flex-between items-center" style={{ borderBottom: '1px solid #FEF3C7', background: '#FFFDF5' }}>
+              <div className="flex items-center gap-2">
+                <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AlertTriangle size={22} className="text-amber" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-main">User Not Connected to ZEX</h3>
+                  <p className="text-xs text-muted">Direct Selling Partner Dual Provisioning Pre-Check</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setUnlinkedApprovalModal({ open: false, act: null, targetMember: null })}
+                className="btn-icon-close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="admin-modal-body p-4 flex-col gap-3">
+              <div style={{ background: '#FFFBEB', padding: '14px 16px', borderRadius: '10px', border: '1px solid #FDE68A' }}>
+                <p className="font-bold text-sm m-0 mb-1" style={{ color: '#92400E' }}>
+                  User not yet connected with ZEX — do you still want to approve?
+                </p>
+                <p className="text-xs m-0" style={{ color: '#B45309', lineHeight: 1.5 }}>
+                  The user has not completed Step 2 (Session-bound ZEX Platform linking). If you approve now, their partner account will be marked active, but when they log in to the dashboard, a <strong>mandatory popup will block the dashboard</strong> and cannot be closed until they successfully connect with ZEX.
+                </p>
+              </div>
+
+              <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div className="flex-between items-center text-xs text-muted mb-1.5">
+                  <span>Target Partner:</span>
+                  <span className="font-bold text-main">{unlinkedApprovalModal.act.member_name}</span>
+                </div>
+                <div className="flex-between items-center text-xs text-muted mb-1.5">
+                  <span>Partner Email:</span>
+                  <span className="font-semibold text-main">{unlinkedApprovalModal.act.member_email}</span>
+                </div>
+                <div className="flex-between items-center text-xs text-muted mb-1.5">
+                  <span>Phone:</span>
+                  <span className="code-font text-xs">{unlinkedApprovalModal.act.member_phone}</span>
+                </div>
+                <div className="flex-between items-center text-xs text-muted mb-1.5">
+                  <span>Payment Ref / UTR:</span>
+                  <span className="code-font text-xs">{unlinkedApprovalModal.act.payment_ref} ({unlinkedApprovalModal.act.utr_number})</span>
+                </div>
+                <div className="flex-between items-center text-xs text-muted">
+                  <span>Current ZEX Status:</span>
+                  <span className="badge badge-amber font-xs">⏳ ZEX Link Pending (Unlinked)</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-card-alt border-rounded text-2xs text-muted flex items-start gap-2">
+                <Shield size={14} className="text-primary-blue shrink-0 mt-0.5" />
+                <span>
+                  <strong>Dynamic Compliance Policy:</strong> Commission distribution, wallet payouts, and team matrix remain locked on the user dashboard until cryptographic session handshake with ZEX Cloud is verified.
+                </span>
+              </div>
+            </div>
+
+            <div className="admin-modal-footer flex-between items-center p-3" style={{ borderTop: '1px solid #E2E8F0' }}>
+              <button
+                type="button"
+                onClick={() => setUnlinkedApprovalModal({ open: false, act: null, targetMember: null })}
+                className="btn btn-secondary btn-sm"
+              >
+                Cancel & Keep Pending
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const actId = unlinkedApprovalModal.act.id;
+                  setUnlinkedApprovalModal({ open: false, act: null, targetMember: null });
+                  approveMemberActivation(actId);
+                }}
+                className="btn btn-primary btn-sm flex items-center gap-1.5"
+                style={{ background: '#D97706', borderColor: '#D97706' }}
+              >
+                <CheckCircle2 size={15} />
+                <span>Confirm & Approve Partner</span>
               </button>
             </div>
           </div>
