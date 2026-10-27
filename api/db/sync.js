@@ -387,6 +387,36 @@ export default async function handler(req, res) {
     const { action, data } = body;
 
     try {
+      // 2-0. Reset / Clean Test Data
+      if (action === 'reset_test_data') {
+        await sql`DELETE FROM members WHERE id != 'mem_matru';`;
+        await sql`
+          UPDATE members
+          SET 
+            name = 'CyberNetworking Head Office',
+            email = 'admin@cybernetworking.in',
+            phone = '+91 9876543210',
+            rank = 'Executive Director',
+            customer_status = 'active_subscriber',
+            seller_status = 'active',
+            referral_code = 'CS123456',
+            wallet_balance = 0,
+            total_earnings = 0
+          WHERE id = 'mem_matru';
+        `;
+        await sql`DELETE FROM activations;`;
+        await sql`DELETE FROM transactions;`;
+        await sql`DELETE FROM payouts;`;
+        await sql`DELETE FROM orders;`;
+        try {
+          await sql`DELETE FROM zex_sales;`;
+          await sql`DELETE FROM zex_account_links;`;
+          await sql`DELETE FROM zex_connect_attempts;`;
+          await sql`DELETE FROM zex_webhook_inbox;`;
+        } catch (e) {}
+        return res.status(200).json({ ok: true, message: 'Test data cleared successfully' });
+      }
+
       // 2a. Register New Member
       if (action === 'register_member') {
         const mem = data;
