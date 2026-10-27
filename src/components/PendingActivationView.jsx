@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useMlm } from '../context/MlmContext';
 import { 
   Clock, 
@@ -10,7 +10,8 @@ import {
   LogOut,
   Zap,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 
 export default function PendingActivationView() {
@@ -19,8 +20,14 @@ export default function PendingActivationView() {
     setCurrentPage, 
     logout,
     openCheckout,
-    pendingActivations = []
+    pendingActivations = [],
+    initiateZexConnect,
+    zexLinkStatus,
+    refreshZexStatus,
+    addToast
   } = useMlm();
+
+  const [isConnectingZex, setIsConnectingZex] = useState(false);
 
   // Find strictly this member's activation record; NEVER fall back to another customer's record
   const activationRecord = pendingActivations.find(a => 
@@ -33,6 +40,35 @@ export default function PendingActivationView() {
   const hasSubmittedPayment = isPending;
   const utrNumber = activationRecord?.utr_number;
   const rejectionReason = activationRecord?.rejection_reason || 'Payment credit could not be matched with our bank statement. Please verify your UTR and re-submit.';
+
+  const isZexLinked = Boolean(
+    zexLinkStatus?.linked || 
+    currentMember?.mlm_account?.zex_user_id || 
+    currentMember?.zex_user_id
+  );
+  const zexUserId = zexLinkStatus?.data?.zex_user_id || currentMember?.mlm_account?.zex_user_id || currentMember?.zex_user_id;
+
+  // One-click ZEX connect redirection
+  const handleProceedToZex = async () => {
+    setIsConnectingZex(true);
+    try {
+      const activeMemberId = currentMember?.member_id || currentMember?.id;
+      if (!activeMemberId) {
+        addToast('error', 'Authentication Error', 'No active member session found. Please register or log in first.');
+        setIsConnectingZex(false);
+        return;
+      }
+      addToast('info', 'Connecting to ZEX 4U...', 'Redirecting you to official ZEX authentication page to link your license.');
+      const res = await initiateZexConnect(activeMemberId);
+      if (!res?.ok) {
+        addToast('error', 'Connection Error', res?.error || 'Failed to start ZEX connection session.');
+        setIsConnectingZex(false);
+      }
+    } catch (err) {
+      addToast('error', 'Error', err.message);
+      setIsConnectingZex(false);
+    }
+  };
 
   return (
     <div className="pending-activation-page">
@@ -57,8 +93,8 @@ export default function PendingActivationView() {
                 {isRejected 
                   ? 'ACTION REQUIRED • PAYMENT VERIFICATION REJECTED' 
                   : hasSubmittedPayment 
-                    ? 'STEP 2 OF 2 • AWAITING ADMIN APPROVAL' 
-                    : 'STEP 1 OF 2 • PLAN PAYMENT REQUIRED'}
+                    ? (isZexLinked ? 'STEP 3 OF 3 • AWAITING ADMIN APPROVAL' : 'STEP 2 OF 3 • ACTION REQUIRED: LINK ZEX 4U')
+                    : 'STEP 1 OF 3 • PLAN PAYMENT REQUIRED'}
               </span>
             </div>
             <h2 className="pending-main-title">
@@ -177,6 +213,95 @@ export default function PendingActivationView() {
           </div>
         )}
 
+        {/* Step 2: ZEX 4U Account Linking Banner for Paid Users */}
+        {hasSubmittedPayment && (
+          <div className="zex-linking-hero-banner" style={{
+            background: isZexLinked 
+              ? 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)' 
+              : 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+            border: isZexLinked ? '2px solid #86EFAC' : '2px solid #06B6D4',
+            borderRadius: '16px',
+            padding: '24px 28px',
+            marginBottom: '24px',
+            color: isZexLinked ? '#166534' : '#FFFFFF',
+            boxShadow: isZexLinked ? '0 8px 24px rgba(34, 197, 94, 0.15)' : '0 12px 36px rgba(6, 182, 212, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '20px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ flex: 1, minWidth: '280px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <span style={{
+                  background: isZexLinked ? '#22C55E' : '#06B6D4',
+                  color: isZexLinked ? '#FFFFFF' : '#0F172A',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '3px 10px',
+                  borderRadius: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.6px'
+                }}>
+                  {isZexLinked ? 'STEP 2: COMPLETED ✓' : 'STEP 2 OF 3: ACTION REQUIRED'}
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: isZexLinked ? '#15803D' : '#FFFFFF' }}>
+                  {isZexLinked ? 'ZEX 4U License Identity Linked' : 'Link Your ZEX 4U Account'}
+                </h3>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.92rem', color: isZexLinked ? '#166534' : '#CBD5E1', lineHeight: 1.5, maxWidth: '640px' }}>
+                {isZexLinked 
+                  ? `Official ZEX ID (${zexUserId}) is linked to your partner account. Your 5-device software license will activate immediately upon Admin bank verification.`
+                  : 'Authorize your mobile number or Google account on ZEX 4U to bind your 5-device Cyber Defense Software License before final approval.'}
+              </p>
+            </div>
+
+            {!isZexLinked ? (
+              <button
+                type="button"
+                onClick={handleProceedToZex}
+                disabled={isConnectingZex}
+                className="btn"
+                style={{
+                  background: 'linear-gradient(135deg, #06B6D4 0%, #0284C7 100%)',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '1rem',
+                  padding: '14px 28px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(6, 182, 212, 0.45)',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <span>{isConnectingZex ? 'Connecting to ZEX...' : 'Proceed to Link ZEX 4U'}</span>
+                <ExternalLink size={18} />
+              </button>
+            ) : (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#FFFFFF',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                border: '1.5px solid #BBF7D0',
+                color: '#15803D',
+                fontWeight: 800,
+                fontSize: '0.9rem'
+              }}>
+                <CheckCircle2 size={20} style={{ color: '#22C55E' }} />
+                <span>Identity Linked Successfully</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 2 Provisioned Accounts Status Grid */}
         <div className="pending-accounts-grid">
           {/* Account 1 Card */}
@@ -247,6 +372,12 @@ export default function PendingActivationView() {
               <div className="pending-spec-row">
                 <span className="spec-label">Portal Account:</span>
                 <span className="spec-val">{currentMember?.email || 'Registered User'}</span>
+              </div>
+              <div className="pending-spec-row">
+                <span className="spec-label">ZEX Identity Link:</span>
+                <span className={`spec-val font-bold ${isZexLinked ? 'text-success' : 'text-amber'}`}>
+                  {isZexLinked ? `✓ Linked (${zexUserId})` : '⏳ Action Required (Click button above)'}
+                </span>
               </div>
               <div className="pending-spec-row">
                 <span className="spec-label">License Key:</span>
