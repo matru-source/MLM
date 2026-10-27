@@ -389,16 +389,14 @@ export default async function handler(req, res) {
     try {
       // 2-0. Reset / Clean Test Data
       if (action === 'reset_test_data') {
-        await sql`DELETE FROM activations;`;
-        await sql`DELETE FROM transactions;`;
-        await sql`DELETE FROM payouts;`;
-        await sql`DELETE FROM orders;`;
-        try {
-          await sql`DELETE FROM zex_sales;`;
-          await sql`DELETE FROM zex_account_links;`;
-          await sql`DELETE FROM zex_connect_attempts;`;
-          await sql`DELETE FROM zex_webhook_inbox;`;
-        } catch (e) {}
+        try { await sql`DELETE FROM activations;`; } catch (e) {}
+        try { await sql`DELETE FROM transactions;`; } catch (e) {}
+        try { await sql`DELETE FROM payouts;`; } catch (e) {}
+        try { await sql`DELETE FROM orders;`; } catch (e) {}
+        try { await sql`DELETE FROM zex_sales;`; } catch (e) {}
+        try { await sql`DELETE FROM zex_account_links;`; } catch (e) {}
+        try { await sql`DELETE FROM zex_connect_attempts;`; } catch (e) {}
+        try { await sql`DELETE FROM zex_webhook_inbox;`; } catch (e) {}
         await sql`DELETE FROM members WHERE id != 'mem_matru';`;
         await sql`
           UPDATE members
