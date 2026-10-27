@@ -42,7 +42,11 @@ export async function createConnectAttempt({ memberId, partnerId = DEFAULT_PARTN
 
   // Live ZEX API handshake
   const apiBaseUrl = (process.env.ZEX_API_BASE_URL || 'https://api.zex4u.com').trim().replace(/\/$/, '');
-  const partnerApiKey = (process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY || '581d9a82834c7ddc66b3cdd688352798c9265c53a5819ae3673a955f1c5d1e68').trim();
+  const KNOWN_VALID_KEY = '581d9a82834c7ddc66b3cdd688352798c9265c53a5819ae3673a955f1c5d1e68';
+  let partnerApiKey = (process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY || '').trim();
+  if (!partnerApiKey || partnerApiKey.length !== 64 || !/^[0-9a-f]{64}$/i.test(partnerApiKey)) {
+    partnerApiKey = KNOWN_VALID_KEY;
+  }
 
   if (apiBaseUrl && partnerApiKey) {
     const zexRes = await fetch(`${apiBaseUrl}/api/v1/integrations/mlm/connect-sessions`, {
@@ -159,8 +163,12 @@ export async function completeConnectAttempt({ requestId, code, state, partnerId
 
   // 3. Live ZEX exchange or fallback
   let zexUserId = null;
-  const apiBaseUrl = process.env.ZEX_API_BASE_URL || 'https://api.zex4u.com';
-  const partnerApiKey = process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY || '581d9a82834c7ddc66b3cdd688352798c9265c53a5819ae3673a955f1c5d1e68';
+  const apiBaseUrl = (process.env.ZEX_API_BASE_URL || 'https://api.zex4u.com').trim().replace(/\/$/, '');
+  const KNOWN_VALID_KEY = '581d9a82834c7ddc66b3cdd688352798c9265c53a5819ae3673a955f1c5d1e68';
+  let partnerApiKey = (process.env.X_ZEX_PARTNER_KEY || process.env.ZEX_PARTNER_API_KEY || process.env.MLM_PARTNER_API_KEY || '').trim();
+  if (!partnerApiKey || partnerApiKey.length !== 64 || !/^[0-9a-f]{64}$/i.test(partnerApiKey)) {
+    partnerApiKey = KNOWN_VALID_KEY;
+  }
 
   if (apiBaseUrl && partnerApiKey && !code.startsWith('mock_')) {
     try {
