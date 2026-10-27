@@ -271,7 +271,7 @@ export default function CheckoutModal() {
           /* ========================================================
              STEP 1: PAYMENT CHECKOUT & VERIFICATION
              ======================================================== */
-          <div className="checkout-grid-container">
+          <div className="checkout-grid-container" style={{ overflowY: 'auto', flex: 1, maxHeight: 'calc(92vh - 75px)' }}>
             {/* Left Column: Order Summary & Payer Details */}
             <div className="checkout-summary-column">
               <h3 className="checkout-column-title">Order Summary</h3>
@@ -557,7 +557,7 @@ export default function CheckoutModal() {
           /* ========================================================
              STEP 2: PAYMENT CONFIRMATION RECEIPT & TAX INVOICE
              ======================================================== */
-          <div style={{ padding: '20px 28px' }}>
+          <div style={{ padding: '20px 28px', overflowY: 'auto', flex: 1, maxHeight: 'calc(92vh - 75px)' }}>
             {/* Header Box */}
             <div style={{ textAlign: 'center', marginBottom: '14px' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
