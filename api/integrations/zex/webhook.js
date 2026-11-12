@@ -1,5 +1,6 @@
 import { verifyZexWebhook } from '../../../src/lib/zexSecurity.js';
-import { processVerifiedWebhook } from '../../../src/services/zexIntegrationService.js';
+import { recordZexEvent, drainPending } from '../../../server/zexRecovery.js';
+import { waitUntil } from '@vercel/functions';
 
 export const config = {
   api: {
@@ -20,26 +21,15 @@ async function getRawBody(req, maxBytes = 64 * 1024) {
   return Buffer.concat(chunks, totalLength);
 }
 
-export default async function handler(req, res) {
+export function createWebhookHandler(recordEvent = recordZexEvent, schedule = waitUntil, runWorker = drainPending) {
+return async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Guessable Webhook Secret Fix:
-  const INSECURE_DEFAULT_SECRET = 'fixture-only-signing-secret-do-not-use-in-production';
-  const PRODUCTION_FALLBACK_SECRET = '59cb920a2d631209843d52632a49fb7c90f79e5e9deef7cea7d3eff91bafb228';
-  let webhookSecret = process.env.MLM_WEBHOOK_SECRET || process.env.ZEX_WEBHOOK_SECRET;
-
-  if (!webhookSecret || webhookSecret === INSECURE_DEFAULT_SECRET) {
-    webhookSecret = PRODUCTION_FALLBACK_SECRET;
-  }
-
-  if (webhookSecret.length < 32) {
-    console.error('[ZEX Webhook] Secret key too short (minimum 32 characters required).');
-    return res.status(503).json({
-      error: 'Security Error',
-      message: 'MLM_WEBHOOK_SECRET must be at least 32 characters long.'
-    });
+  const webhookSecret = process.env.MLM_WEBHOOK_SECRET || process.env.ZEX_WEBHOOK_SECRET;
+  if (!webhookSecret || webhookSecret.length < 32 || webhookSecret === 'fixture-only-signing-secret-do-not-use-in-production') {
+    return res.status(503).json({ error: 'Webhook verification is not configured' });
   }
 
   const partnerId = process.env.MLM_PARTNER_ID || process.env.ZEX_PARTNER_ID || 'cybernetworking';
@@ -60,11 +50,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Process event and distribute commissions
-    const outcome = await processVerifiedWebhook(event);
-    return res.status(200).json({ ok: true, event_id: event.event_id, outcome });
+    // Acknowledge only after the immutable event has been durably stored.
+    await recordEvent(event);
+    // Vercel keeps the function alive for this work after the response. The
+    // durable inbox and independent recovery scheduler remain the safety net.
+    const work = Promise.resolve().then(() => runWorker({ partner: partnerId, memberId: event.external_member_id, limit: 5, deadline: Date.now() + 40000 }))
+      .catch(() => console.error('[ZEX worker] Background processing could not complete'));
+    try { schedule(work); } catch { console.error('[ZEX worker] Background scheduling unavailable'); }
+    return res.status(200).json({ ok: true, event_id: event.event_id, accepted: true });
   } catch (err) {
     console.error('[ZEX Webhook] Processing error:', err);
-    return res.status(500).json({ error: 'Internal processing error' });
+    return res.status(503).json({ error: 'Internal processing error' });
   }
 }
+}
+export default createWebhookHandler();

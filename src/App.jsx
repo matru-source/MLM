@@ -63,7 +63,7 @@ function MainApp() {
 
   // If on Member Dashboard: Check if member is approved & active
   if (isDashboardView) {
-    const isMemberActive = currentMember?.seller_status === 'active';
+    const isMemberActive = ['active', 'subscription_expired'].includes(currentMember?.seller_status);
 
     // If pending admin approval or unpaid: Keep profile and referral locked, show PendingActivationView
     if (!isMemberActive) {
@@ -115,7 +115,7 @@ function MainApp() {
               <div className="footer-col-links">
                 <h4 className="footer-title">Platform</h4>
                 <button onClick={() => setCurrentPage('home')} className="footer-link-btn">Home</button>
-                <a href="#plans-section" className="footer-link-btn">Joining Plan (₹2,500)</a>
+                <a href="#plans-section" className="footer-link-btn">Joining Plan</a>
                 <a href="#compensation-section" className="footer-link-btn">Commission Plan</a>
                 <a href="#faq-section" className="footer-link-btn">FAQ</a>
               </div>

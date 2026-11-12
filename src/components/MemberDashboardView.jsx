@@ -68,6 +68,7 @@ export default function MemberDashboardView() {
     members = [],
     payoutRequests,
     pendingPayoutsTotal,
+    openCheckout,
     requestWithdrawal,
     submitKyc,
     updateMemberProfile,
@@ -355,7 +356,7 @@ export default function MemberDashboardView() {
     }
   }, [currentPage]);
 
-  const handleWithdraw = (e) => {
+  const handleWithdraw = async (e) => {
     e.preventDefault();
     const amount = Number(withdrawAmount);
 
@@ -374,7 +375,7 @@ export default function MemberDashboardView() {
       };
     }
 
-    if (requestWithdrawal(amount, overrideBank)) {
+    if (await requestWithdrawal(amount, overrideBank)) {
       setWithdrawModalOpen(false);
       setWithdrawAmount('');
     }
@@ -524,31 +525,13 @@ export default function MemberDashboardView() {
         {/* SUBVIEW 1: DASHBOARD OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="dash-overview-view">
-            {/* PENDING ADMIN APPROVAL BANNER IF USER JUST PURCHASED PLAN */}
-            {currentMember?.seller_status === 'pending_approval' && (
-              <div className="pending-activation-banner card-white mb-4">
-                <div className="pending-banner-left">
-                  <div className="pending-banner-icon">
-                    <Clock size={24} className="text-amber" />
-                  </div>
-                  <div>
-                    <h4 className="pending-banner-title">Joining Payment Verified • Dual Accounts Awaiting Admin Activation</h4>
-                    <p className="pending-banner-desc">
-                      Your ₹2,500 Joining Fee (Total ₹2,950 incl. 18% GST) has been successfully recorded. Account 1 (Partner MLM Account) and Account 2 (Enterprise Software License) have been provisioned via API and queued for Admin verification. Full features and referral links unlock immediately upon admin approval.
-                    </p>
-                    <div className="pending-banner-dual-info mt-2">
-                      <span className="code-font text-primary-blue mr-3">Partner ID: {currentMember.member_id}</span>
-                      <span className="code-font text-success">License Key: {currentMember.accounts?.account2_software?.license_key || 'CS-PRO-XXXX-XXXX'}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="badge badge-amber font-xs font-bold flex-center gap-1 shrink-0">
-                  <Clock size={14} />
-                  <span>Awaiting Bank Verification</span>
-                </div>
+            {currentMember?.seller_status === 'subscription_expired' && (
+              <div className="pending-activation-banner card-white mb-4" role="status">
+                Your ZEX subscription has expired or ended. Your earned wallet balance remains available.
+                Renew on ZEX to restore referral eligibility after ZEX confirms payment.
+                <button className="btn btn-secondary btn-sm" onClick={() => openCheckout('Joining')}>Open ZEX</button>
               </div>
             )}
-
             {/* 4 Top KPI Cards */}
             {(() => {
               const directActiveCount = (members || []).filter(m => 
@@ -770,7 +753,7 @@ export default function MemberDashboardView() {
                     <h4 className="ref-share-title m-0" style={{ color: '#B45309' }}>Referral Link Locked (Pending Plan Activation)</h4>
                   </div>
                   <p className="ref-share-sub" style={{ color: '#92400E' }}>
-                    Your distributor referral link will be unlocked once your ₹2,500 Joining Plan is completed and verified by Admin.
+                    Your distributor referral link will be unlocked once your ZEX purchase is completed and verified by Admin.
                   </p>
                   <div className="mt-3">
                     <button
@@ -779,7 +762,7 @@ export default function MemberDashboardView() {
                       className="btn btn-primary btn-sm flex-center gap-1"
                     >
                       <Zap size={14} />
-                      <span>Complete Plan Activation (₹2,500)</span>
+                      <span>Continue to ZEX</span>
                     </button>
                   </div>
                 </div>
@@ -954,12 +937,12 @@ export default function MemberDashboardView() {
                         {pendingOrUnpaidReferrals.length} Pending Referral(s) Excluded from Active Hierarchy
                       </div>
                       <p className="text-xs text-amber-800 mb-0">
-                        Under Direct Selling rules, referrals who have not completed their ₹2,500 plan payment or are pending Admin approval are strictly barred from your level genealogy, team count, and commission earnings.
+                        Referrals become active after ZEX confirms an eligible purchase.
                       </p>
                       <div className="pending-ref-chips-row mt-2">
                         {pendingOrUnpaidReferrals.map(p => (
                           <span key={p.member_id} className="pending-ref-chip">
-                            ⏳ {p.name} ({p.seller_status === 'pending_payment' ? 'Awaiting Payment' : 'Pending Admin Verification'})
+                            ⏳ {p.name} ({p.seller_status === 'pending_payment' ? 'Awaiting Payment' : 'Awaiting ZEX confirmation'})
                           </span>
                         ))}
                       </div>
@@ -998,7 +981,7 @@ export default function MemberDashboardView() {
                               No direct partners yet
                             </span>
                             <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
-                              Share your referral link to sponsor members and earn ₹1,000 Level 1 bonuses.
+                              Share your referral link to sponsor members.
                             </span>
                           </div>
                         ) : (
@@ -1175,7 +1158,7 @@ export default function MemberDashboardView() {
 
                     <div className="direct-modal-footer">
                       <div className="text-xs text-muted">
-                        Direct retail sales qualify for Level 1 payout (₹1,000 / 40%) under Direct Selling Rules, 2021.
+                        Eligible sales earn commission according to the approved policy.
                       </div>
                       <button 
                         type="button"
@@ -1317,7 +1300,7 @@ export default function MemberDashboardView() {
                                     amount: Math.abs(tx.amount),
                                     net_payable: Math.abs(tx.amount),
                                     admin_payment: {
-                                      utr_number: tx.utr_number || 'UTR-CS-881920',
+                                      utr_number: tx.utr_number || '',
                                       receipt_url: tx.receipt_url || '',
                                       paid_at: tx.date
                                     },
@@ -1358,7 +1341,7 @@ export default function MemberDashboardView() {
                         <th>Request ID</th>
                         <th>Request Date</th>
                         <th>Gross Amount</th>
-                        <th>5% TDS</th>
+                        <th>TDS</th>
                         <th>Net Payable</th>
                         <th>Bank Account</th>
                         <th>Status</th>
@@ -1523,7 +1506,7 @@ export default function MemberDashboardView() {
                             />
                           </div>
                           <div>
-                            <label className="text-xs text-muted block mb-0.5">PAN Card Number (Optional - 5% TDS)</label>
+                            <label className="text-xs text-muted block mb-0.5">PAN Card Number (Optional - TDS)</label>
                             <input
                               type="text"
                               value={quickPan}
@@ -1585,8 +1568,9 @@ export default function MemberDashboardView() {
                     {Number(withdrawAmount) >= 500 && (() => {
                       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
                       const hasPan = panRegex.test((currentMember?.kyc?.pan || '').trim().toUpperCase());
-                      const rate = hasPan ? 0.05 : 0.20;
-                      const calculatedTds = Math.round(Number(withdrawAmount) * rate);
+                      const rate = currentMember?.payout_tds_rate;
+                      if (rate == null) return <p>Payout estimates are temporarily unavailable.</p>;
+                      const calculatedTds = Math.round(Number(withdrawAmount) * rate * 100) / 100;
                       const netEstimated = Number(withdrawAmount) - calculatedTds;
                       return (
                         <div className="payout-tax-breakdown-card">
@@ -1596,15 +1580,10 @@ export default function MemberDashboardView() {
                           </div>
                           <div className="tax-row">
                             <span className="text-muted">
-                              {hasPan ? '5% Statutory TDS (Sec 194H)' : '20% Statutory TDS (Sec 206AA - No PAN)'}
+                              {`Configured deduction (${rate * 100}%)`}
                             </span>
                             <span className="text-rose font-semibold">-₹{calculatedTds.toLocaleString('en-IN')}</span>
                           </div>
-                          {!hasPan && (
-                            <div style={{ fontSize: '10.5px', color: '#b45309', background: '#fef3c7', padding: '5px 8px', borderRadius: '6px', margin: '2px 0' }}>
-                              ⚠️ Statutory Notice: Indian law mandates 20% TDS under Section 206AA when no valid PAN is linked. Update your PAN in KYC to reduce TDS to 5%.
-                            </div>
-                          )}
                           <div className="tax-divider" />
                           <div className="tax-row net-row">
                             <span className="font-bold text-primary font-xs">Net Bank Deposit (Estimated)</span>
@@ -1646,230 +1625,11 @@ export default function MemberDashboardView() {
           </div>
         )}
 
-        {/* SUBVIEW 4: MY SUBSCRIPTIONS & ORDERS */}
-        {activeTab === 'subscriptions' && (() => {
-          // Strictly isolate to current member's orders; NEVER leak orders[0] from other customers
-          const isUserActive = currentMember?.seller_status === 'active';
-          const myLatestOrder = orders.find(o => 
-            (o.buyer_member_id && o.buyer_member_id === currentMember?.member_id) || 
-            (o.buyer_email && o.buyer_email === currentMember?.email)
-          );
-          const orderNum = myLatestOrder?.order_id || (isUserActive ? (currentMember?.cs_customer_id ? `CS${currentMember.cs_customer_id}` : (currentMember?.member_id ? `ORD-${currentMember.member_id.slice(-6).toUpperCase()}` : 'CS-ROOT')) : 'PENDING');
-          const orderDate = myLatestOrder?.activation_date || (isUserActive ? new Date(currentMember?.joined_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pending Payment');
-          const renewalDate = myLatestOrder?.next_renewal || (isUserActive ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pending Activation');
-          const amountPaid = myLatestOrder?.total_amount || (isUserActive ? 2950 : 0);
-          const paymentStatus = myLatestOrder?.payment_status ? (myLatestOrder.payment_status.charAt(0).toUpperCase() + myLatestOrder.payment_status.slice(1)) : (isUserActive ? 'Paid' : 'Unpaid');
-          const subscriptionStatus = isUserActive ? 'Active (Enterprise Cloud Protected)' : (myLatestOrder?.payment_status === 'pending_verification' ? 'Awaiting Admin Verification' : 'Pending Plan Purchase');
-
-          return (
-            <div className="dash-sub-view">
-              {/* Active Subscription Card */}
-              <div className="active-sub-card card-white">
-                <div className="sub-card-header">
-                  <div>
-                    <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'} mb-2`}>
-                      {isUserActive ? 'Active' : (myLatestOrder ? 'Pending Admin Verification' : 'Pending Plan Purchase')}
-                    </span>
-                    <h3 className="sub-title-bold">CyberNetworking Partner Joining Membership</h3>
-                    <p className="text-muted text-sm">Official Authorized Member License • ₹2,500 Joining Plan</p>
-                  </div>
-                  <div className="sub-price-callout">
-                    <span className="text-muted text-xs">Amount Paid</span>
-                    <div className="text-primary-blue text-large font-bold">
-                      ₹{amountPaid.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="sub-dates-row">
-                  <div className="date-item">
-                    <span className="text-muted text-xs">Start Date</span>
-                    <span className="font-semibold">{orderDate}</span>
-                  </div>
-                  <div className="date-item">
-                    <span className="text-muted text-xs">Next Renewal</span>
-                    <span className="font-semibold">{renewalDate}</span>
-                  </div>
-                  <div className="date-item">
-                    <span className="text-muted text-xs">Official Activation</span>
-                    <span className={isUserActive ? 'text-success font-semibold' : 'text-amber font-semibold'}>
-                      {isUserActive ? 'CyberNetworking Defense Engine (Active)' : (myLatestOrder ? 'Pending Admin Bank Verification' : 'Pending Plan Purchase')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="sub-actions-row">
-                  {isUserActive ? (
-                    <button 
-                      onClick={() => {
-                        downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
-                        addToast('info', 'Invoice Downloaded', `Invoice #${orderNum} downloaded.`);
-                      }} 
-                      className="btn btn-secondary btn-sm"
-                    >
-                      <Download size={14} />
-                      <span>View / Download Invoice</span>
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => openCheckout('Joining')}
-                      className="btn btn-primary btn-sm flex-center gap-1"
-                    >
-                      <Zap size={14} />
-                      <span>Complete Plan Purchase (₹2,500)</span>
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => addToast('info', 'Subscription Status', isUserActive ? 'Your license is actively protecting endpoints.' : 'Pending plan activation.')} 
-                    className="btn btn-secondary btn-sm"
-                  >
-                    Manage
-                  </button>
-                  <button 
-                    onClick={() => addToast('warning', 'Cancellation policy', 'Cooling-off refund can be filed via support within 30 days.')} 
-                    className="btn btn-secondary btn-sm text-rose"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-
-              {/* Order Details & CyberShield Activation Status */}
-              <div className="order-details-card card-white">
-                <h3 className="chart-card-title mb-4">Latest Order & Activation Details</h3>
-                
-                <div className="order-specs-grid">
-                  <div className="spec-row">
-                    <span className="spec-label">Order Number:</span>
-                    <span className="spec-val font-semibold code-font">#{orderNum}</span>
-                  </div>
-                  <div className="spec-row">
-                    <span className="spec-label">Order Date:</span>
-                    <span className="spec-val">{orderDate}</span>
-                  </div>
-                  <div className="spec-row">
-                    <span className="spec-label">Payment Method:</span>
-                    <span className="spec-val">{myLatestOrder?.payment_method || (isUserActive ? 'UPI (Google Pay / PhonePe)' : 'Pending Selection')}</span>
-                  </div>
-                  <div className="spec-row">
-                    <span className="spec-label">Amount Paid:</span>
-                    <span className="spec-val font-bold">₹{amountPaid.toLocaleString('en-IN')} {isUserActive ? '(₹2,500 + 18% GST)' : (myLatestOrder ? '(Awaiting Admin Verification)' : '(Plan Not Purchased)')}</span>
-                  </div>
-                  <div className="spec-row">
-                    <span className="spec-label">Payment Status:</span>
-                    <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'}`}>
-                      {paymentStatus}
-                    </span>
-                  </div>
-                  <div className="spec-row">
-                    <span className="spec-label">Subscription Status:</span>
-                    <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'}`}>
-                      {subscriptionStatus}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  {isUserActive ? (
-                    <button 
-                      onClick={() => {
-                        downloadTaxInvoice({ order: myLatestOrder, member: currentMember });
-                        addToast('success', 'Invoice Downloaded', `CyberNetworking GST Tax Invoice #${orderNum} downloaded.`);
-                      }} 
-                      className="btn btn-primary btn-sm"
-                    >
-                      <Download size={14} />
-                      <span>Download Official Tax Invoice</span>
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => openCheckout('Joining')} 
-                      className="btn btn-primary btn-sm flex-center gap-1"
-                    >
-                      <Zap size={14} />
-                      <span>Proceed to Plan Payment (₹2,500)</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-            {/* DUAL ACCOUNTS PROVISIONED VIA API CARD */}
-            <div className="dual-accounts-showcase-card card-white mt-4 p-5">
-              <div className="card-head-between mb-4">
-                <div>
-                  <h3 className="chart-card-title mb-1">Dual Accounts Provisioned via API</h3>
-                  <p className="text-muted text-sm">
-                    Two independent enterprise accounts generated upon ₹2,500 joining fee completion.
-                  </p>
-                </div>
-                <span className={`badge ${isUserActive ? 'badge-green' : 'badge-amber'} font-xs`}>
-                  {isUserActive ? '2 Accounts Active ✓' : 'Awaiting Plan Activation'}
-                </span>
-              </div>
-
-              <div className="dual-accounts-container">
-                {/* Account 1 */}
-                <div className="dual-account-box mlm-account-box">
-                  <div className="account-box-badge">
-                    <span>Account 1: Partner MLM Account</span>
-                  </div>
-                  <div className="account-specs-compact">
-                    <div className="spec-item-compact">
-                      <span className="spec-k">Member / Partner ID:</span>
-                      <span className="spec-v code-font">{currentMember.member_id}</span>
-                    </div>
-                    <div className="spec-item-compact">
-                      <span className="spec-k">Distributor Referral Code:</span>
-                      <span className="spec-v code-font font-bold text-primary-blue">
-                        {isUserActive ? currentMember.referral_code : 'Locked (Pending Plan Activation)'}
-                      </span>
-                    </div>
-                    <div className="spec-item-compact">
-                      <span className="spec-k">Commission Wallet:</span>
-                      <span className="spec-v code-font">
-                        {isUserActive ? (currentMember.accounts?.account1_mlm?.commission_wallet_id || `WAL-${currentMember.referral_code || currentMember.member_id}`) : 'Pending Activation'}
-                      </span>
-                    </div>
-                    <div className="spec-item-compact">
-                      <span className="spec-k">Tier Hierarchy:</span>
-                      <span className="spec-v">{isUserActive ? '10-Tier Matrix Operational' : 'Inactive'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Account 2 */}
-                <div className="dual-account-box software-account-box">
-                  <div className="account-box-badge software-badge">
-                    <span>Account 2: Enterprise Cyber Defense License</span>
-                  </div>
-                  <div className="account-specs-compact">
-                    <div className="spec-item-compact">
-                      <span className="spec-k">Software License Key:</span>
-                      <span className={`spec-v code-font font-bold ${isUserActive ? 'text-success' : 'text-amber'}`}>
-                        {isUserActive 
-                          ? (currentMember.software_license?.license_key || currentMember.accounts?.account2_software?.license_key || `CS-PRO-${currentMember.referral_code || 'ACTIVE'}`)
-                          : 'Awaiting Admin Verification'}
-                      </span>
-                    </div>
-                    <div className="spec-item-compact">
-                      <span className="spec-k">Endpoint Device Seats:</span>
-                      <span className="spec-v font-bold">{isUserActive ? '5 Protected Devices' : '0 (Pending Activation)'}</span>
-                    </div>
-                    <div className="spec-item-compact">
-                      <span className="spec-k">Software Suite:</span>
-                      <span className="spec-v">CyberNetworking Pro Enterprise Suite</span>
-                    </div>
-                    <div className="spec-item-compact">
-                      <span className="spec-k">Client Portal Access:</span>
-                      <span className="spec-v">{currentMember.email}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+        {activeTab === 'subscriptions' && <div className="dash-sub-view"><div className="active-sub-card card-white">
+          <h3>ZEX purchases</h3><p>Purchase and subscription details are managed by ZEX. Your CyberNetworking account is activated when an eligible payment is confirmed.</p>
+          {orders.length ? <ul>{orders.map(order => <li key={order.order_id}>{order.product_code || 'ZEX plan'} — {order.payment_status || 'Unknown'} — ₹{Number(order.total_amount || 0).toLocaleString('en-IN')}</li>)}</ul> : <p>No verified purchase is available yet.</p>}
+          <button className="btn btn-primary" onClick={() => openCheckout('Joining')}>Open ZEX purchase</button>
+        </div></div>}
 
         {/* SUBVIEW 5: PROFILE & KYC (Matching Screen 8) */}
         {activeTab === 'kyc' && (
@@ -2380,7 +2140,7 @@ export default function MemberDashboardView() {
                       <span className="text-muted text-xs">Permanent Account Number (PAN)</span>
                       <div className="font-bold text-lg code-font mt-1">{currentMember?.kyc?.pan || 'Not Submitted'}</div>
                       <span className={`badge ${hasValidPan ? 'badge-green' : 'badge-amber'} font-xs mt-2`}>
-                        {hasValidPan ? 'Valid PAN Format (Sec 194H)' : 'Pending Submission (20% TDS)'}
+                        {hasValidPan ? 'Valid PAN Format (Sec 194H)' : 'Pending Submission'}
                       </span>
                     </div>
 
@@ -2902,7 +2662,7 @@ export default function MemberDashboardView() {
                 </div>
                 <div className="meta-box">
                   <span className="meta-lbl">Bank UTR Reference</span>
-                  <span className="meta-val code-font text-primary-blue">{selectedReceiptModal.admin_payment?.utr_number || 'UTR-CS-9918237'}</span>
+                  <span className="meta-val code-font text-primary-blue">{selectedReceiptModal.admin_payment?.utr_number || 'Not provided'}</span>
                 </div>
                 <div className="meta-box">
                   <span className="meta-lbl">Net Disbursed</span>
@@ -2953,7 +2713,7 @@ export default function MemberDashboardView() {
                       </div>
                       <div className="detail-line">
                         <span>UTR / Bank Ref:</span>
-                        <strong className="code-font text-primary">{selectedReceiptModal.admin_payment?.utr_number || 'UTR-CS-9918237'}</strong>
+                        <strong className="code-font text-primary">{selectedReceiptModal.admin_payment?.utr_number || 'Not provided'}</strong>
                       </div>
                     </div>
                   </div>
@@ -3140,13 +2900,13 @@ export default function MemberDashboardView() {
                   <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
                     <Check size={12} />
                   </div>
-                  <span><strong>10-Tier Commission Sync:</strong> Real-time webhook distribution for ₹1,000 / ₹300 / ₹150 matrix tiers.</span>
+                  <span><strong>10-Tier Commission Sync:</strong> Eligible verified sales are processed according to the configured policy.</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#334155' }}>
                   <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
                     <Check size={12} />
                   </div>
-                  <span><strong>License Key Provisioning:</strong> Enterprise software defense suite endpoint seats automatically bound to your identity.</span>
+                  <span><strong>License Key Provisioning:</strong> Software access and device limits are managed by ZEX.</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#334155' }}>
                   <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>

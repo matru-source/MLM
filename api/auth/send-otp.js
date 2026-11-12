@@ -1,146 +1,45 @@
-/**
- * Serverless API Route: /api/auth/send-otp
- * Securely dispatches Brevo transactional emails from backend.
- * Keeps Brevo API keys private and away from client bundles.
- */
+import { randomInt, randomUUID } from 'node:crypto';
+import { transaction } from '../../server/database.js';
+import { checkOrigin, readBody, fail, HttpError, secret } from '../../server/security.js';
+import { normalizeEmail, otpHash, ensureAuthTables, rateLimit } from '../../server/verification.js';
 
-export const config = {
-  runtime: 'nodejs'
-};
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  let body = req.body || {};
-  if (typeof body === 'string') {
-    try {
-      body = JSON.parse(body);
-    } catch (e) {
-      body = {};
-    }
-  }
-
-  const { email, fullName, otp } = body;
-
-  if (!email || !email.includes('@')) {
-    return res.status(400).json({ error: 'Valid email address is required' });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const cleanName = escapeHtml(fullName || 'Partner');
-  const otpCode = otp || Math.floor(100000 + Math.random() * 900000).toString();
-
-  const apiKey = process.env.BREVO_API_KEY || process.env.VITE_BREVO_API_KEY;
-  const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.VITE_BREVO_SENDER_EMAIL || 'matruprasadpanda497@gmail.com';
-  const senderName = process.env.BREVO_SENDER_NAME || process.env.VITE_BREVO_SENDER_NAME || 'CyberNetworking';
-
-  if (!apiKey) {
-    console.warn('[Brevo Serverless] BREVO_API_KEY not configured.');
-    return res.status(200).json({
-      ok: true,
-      success: true,
-      mode: 'preview',
-      message: 'Verification code dispatched to your email address.'
-    });
-  }
-
+export function createSendOtpHandler(runTransaction = transaction) {
+return async function handler(req, res) {
   try {
-    const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'api-key': apiKey
-      },
-      body: JSON.stringify({
-        sender: {
-          name: senderName,
-          email: senderEmail
-        },
-        to: [
-          {
-            email: cleanEmail,
-            name: cleanName
-          }
-        ],
-        subject: `[CyberNetworking] Your Registration Verification OTP: ${otpCode}`,
-        htmlContent: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #F8FAFC; margin: 0; padding: 24px; }
-              .container { max-width: 540px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; padding: 36px 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-              .logo { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 800; color: #1E40AF; margin-bottom: 20px; }
-              .title { font-size: 22px; font-weight: 800; color: #0F172A; margin: 0 0 10px 0; }
-              .subtitle { font-size: 14px; color: #64748B; line-height: 1.5; margin: 0 0 24px 0; }
-              .otp-box { background: #EFF6FF; border: 2px dashed #3B82F6; border-radius: 10px; padding: 18px; text-align: center; margin: 24px 0; }
-              .otp-number { font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #1D4ED8; font-family: monospace; }
-              .expiry-note { font-size: 12px; color: #64748B; margin-top: 6px; }
-              .footer { text-align: center; font-size: 11px; color: #94A3B8; margin-top: 28px; border-top: 1px solid #F1F5F9; padding-top: 16px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="logo">CyberNetworking</div>
-              <h1 class="title">Verify Your Email Address</h1>
-              <p class="subtitle">Hi ${cleanName}, thank you for registering with CyberNetworking. Use the verification code below to complete your partner enrollment:</p>
-              
-              <div class="otp-box">
-                <div class="otp-number">${otpCode}</div>
-                <div class="expiry-note">Valid for 10 minutes. Do not share this code with anyone.</div>
-              </div>
-
-              <div class="footer">
-                © 2026 CyberNetworking. All rights reserved.<br>
-                Direct Selling Rules, 2021 & Section 194H Compliant Architecture.
-              </div>
-            </div>
-          </body>
-          </html>
-        `
-      })
+    if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
+    checkOrigin(req);
+    res.setHeader('Cache-Control', 'no-store');
+    secret();
+    const email = normalizeEmail(readBody(req).email);
+    if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL) throw new HttpError(503, 'Email delivery is not configured');
+    const id = randomUUID();
+    const code = String(randomInt(100000, 1000000));
+    const allowed = await runTransaction(async sql => {
+      await ensureAuthTables(sql);
+      const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0];
+      const addressAllowed = await rateLimit(sql, 'otp:' + email, 1, 60);
+      const ipAllowed = await rateLimit(sql, 'otp-ip:' + ip, 20, 3600);
+      if (!addressAllowed || !ipAllowed) return false;
+      await sql`INSERT INTO auth_challenges (email, id, code_hash, expires_at) VALUES (${email}, ${id}, ${otpHash(id, code)}, NOW() + INTERVAL '10 minutes')
+        ON CONFLICT (email) DO UPDATE SET id = EXCLUDED.id, code_hash = EXCLUDED.code_hash, expires_at = EXCLUDED.expires_at, attempts = 0, verified = FALSE`;
+      return true;
     });
-
-    if (!brevoResponse.ok) {
-      const errBody = await brevoResponse.text();
-      console.error('[Brevo Serverless Error]:', brevoResponse.status, errBody);
-      // Fallback response with code so registration is not blocked if Brevo quota is reached
-      return res.status(200).json({
-        ok: true,
-        success: true,
-        mode: 'preview_fallback',
-        message: 'Verification code dispatched to your email.'
+    if (!allowed) throw new HttpError(429, 'Please wait before requesting another code');
+    try {
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'api-key': process.env.BREVO_API_KEY },
+        body: JSON.stringify({ sender: { email: process.env.BREVO_SENDER_EMAIL, name: 'CyberNetworking' },
+          to: [{ email }], subject: 'Your verification code', textContent: 'Your verification code is ' + code + '. It expires in 10 minutes.' }),
+        signal: AbortSignal.timeout(15000)
       });
+      if (!response.ok) throw new Error('Email provider rejected delivery');
+    } catch {
+      await runTransaction(sql => sql`DELETE FROM auth_challenges WHERE email = ${email} AND id = ${id}`);
+      throw new HttpError(502, 'Email could not be sent. Please try again.');
     }
-
-    const data = await brevoResponse.json();
-    return res.status(200).json({
-      ok: true,
-      success: true,
-      mode: 'live_brevo',
-      messageId: data.messageId
-    });
-  } catch (err) {
-    console.error('[Brevo Dispatch Exception]:', err);
-    return res.status(200).json({
-      ok: true,
-      success: true,
-      mode: 'preview_fallback',
-      message: 'Verification code dispatched to your email.'
-    });
-  }
+    return res.status(200).json({ ok: true, success: true, message: 'Verification email sent' });
+  } catch (error) { return fail(res, error); }
 }
+
+}
+export default createSendOtpHandler();

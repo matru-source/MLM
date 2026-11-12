@@ -53,7 +53,7 @@ export default function Navbar() {
             onClick={() => handleNavClick('home', 'plans-section')} 
             className="nav-link"
           >
-            Joining Plan (₹2,500)
+            ZEX Plan
           </button>
           <button 
             onClick={() => handleNavClick('home', 'compensation-section')} 
@@ -113,7 +113,7 @@ export default function Navbar() {
                 <button
                   onClick={() => setCurrentPage('dashboard')}
                   className="btn btn-outline-warning btn-sm flex-center gap-1"
-                  title="Awaiting Admin Approval"
+                  title="Awaiting ZEX payment confirmation"
                 >
                   <Clock size={14} className="text-amber" />
                   <span>Activation Pending</span>
@@ -198,7 +198,7 @@ export default function Navbar() {
                 onClick={() => handleNavClick('home', 'plans-section')}
                 className="mobile-nav-item"
               >
-                Joining Plan (₹2,500)
+                ZEX Plan
               </button>
               <button 
                 onClick={() => handleNavClick('home', 'compensation-section')}
@@ -255,7 +255,7 @@ export default function Navbar() {
                       <Clock size={20} className="text-amber" />
                       <div>
                         <div className="font-bold text-sm text-white">Activation In Progress</div>
-                        <div className="text-amber font-xs">Profile & Referral locked awaiting Admin approval</div>
+                        <div className="text-amber font-xs">Awaiting ZEX payment confirmation</div>
                       </div>
                     </div>
 
@@ -302,7 +302,7 @@ export default function Navbar() {
                     className="btn btn-primary full-width"
                   >
                     <UserPlus size={16} />
-                    <span>Join Now (₹2,500)</span>
+                    <span>Join Now</span>
                   </button>
                 </div>
               )}

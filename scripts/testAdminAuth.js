@@ -62,7 +62,7 @@ async function runTests() {
   const goodReq = {
     method: 'POST',
     headers: { 'x-forwarded-for': '192.168.1.200' },
-    body: { username: 'admin@cybershield.network', password: 'CyberShield#Admin2026!' }
+    body: { username: 'admin@cybershield.network', password: (process.env.ADMIN_PASSWORD || '') }
   };
   const goodRes = createMockRes();
   await handler(goodReq, goodRes);
@@ -106,7 +106,7 @@ async function runTests() {
   // Test 7: Verify no passwords in client code
   import('node:fs').then(fs => {
     const mlmContextContent = fs.readFileSync('src/context/MlmContext.jsx', 'utf-8');
-    if (mlmContextContent.includes('CyberShield#Admin2026!')) {
+    if (mlmContextContent.includes((process.env.ADMIN_PASSWORD || ''))) {
       throw new Error('FAIL: Master password still found in MlmContext.jsx!');
     }
     console.log('✓ 7. Master password completely eliminated from client source code');

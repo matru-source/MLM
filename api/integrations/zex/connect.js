@@ -1,3 +1,4 @@
+import { checkOrigin, readBody, requireSession, requireOwner, fail } from '../../../server/security.js';
 import { createConnectAttempt } from '../../../src/services/zexIntegrationService.js';
 
 export const config = {
@@ -10,6 +11,14 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+  try {
+    checkOrigin(req);
+    req.body = readBody(req);
+    const actor = requireSession(req);
+    const target = req.body.memberId || req.body.member_id || req.query?.memberId || req.query?.member_id;
+    requireOwner(actor, target);
+    res.setHeader('Cache-Control', 'no-store');
+  } catch (error) { return fail(res, error); }
   // Support both POST and GET (for browser links / redirects)
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });

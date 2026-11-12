@@ -1,4 +1,7 @@
-import { neon } from '@neondatabase/serverless';
+import { transaction } from '../../server/database.js';
+import { authorizeSync, memberSync } from '../../server/access.js';
+import { HttpError, fail, redact, hashPassword, signSession, setSessionCookie } from '../../server/security.js';
+import { normalizeEmail, consumeVerification, ensureAuthTables } from '../../server/verification.js';
 
 export const config = {
   runtime: 'nodejs',
@@ -9,20 +12,10 @@ export const config = {
   }
 };
 
-function getSql() {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl || dbUrl.trim() === '') return null;
-  try {
-    return neon(dbUrl);
-  } catch (err) {
-    console.warn('[DB Serverless] Failed to initialize Neon connection:', err.message);
-    return null;
-  }
-}
 
 let isAuditTableReady = false;
 async function ensureAuditTable(sql) {
-  if (isAuditTableReady || !sql) return;
+  if (!sql) return;
   try {
     await sql`
       CREATE TABLE IF NOT EXISTS audit_logs (
@@ -41,13 +34,13 @@ async function ensureAuditTable(sql) {
     `;
     isAuditTableReady = true;
   } catch (e) {
-    // Non-fatal if table already exists or permission issues
+    throw e;
   }
 }
 
 let isLearningTableReady = false;
 async function ensureLearningTable(sql) {
-  if (isLearningTableReady || !sql) return;
+  if (!sql) return;
   try {
     await sql`
       CREATE TABLE IF NOT EXISTS learning_resources (
@@ -71,19 +64,19 @@ async function ensureLearningTable(sql) {
     `;
     isLearningTableReady = true;
   } catch (e) {
-    // Non-fatal
+    throw e;
   }
 }
 
 let isTransactionColumnsReady = false;
 async function ensureTransactionColumns(sql) {
-  if (isTransactionColumnsReady || !sql) return;
+  if (!sql) return;
   try {
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ;`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;`;
     isTransactionColumnsReady = true;
   } catch (e) {
-    // Non-fatal
+    throw e;
   }
 }
 
@@ -113,7 +106,7 @@ async function autoSettleMaturedCommissions(sql) {
       }
     }
   } catch (e) {
-    // Non-fatal
+    throw e;
   }
 }
 
@@ -145,12 +138,11 @@ async function ensureZexLinksSync(sql) {
       ) AND zal.zex_user_id IS NOT NULL;
     `;
   } catch (e) {
-    // Non-fatal if table doesn't exist
+    throw e;
   }
 }
 
-export default async function handler(req, res) {
-  const sql = getSql();
+export async function executeSync(req, res, sql) {
 
   if (!sql) {
     return res.status(503).json({
@@ -177,7 +169,7 @@ export default async function handler(req, res) {
             id, action, admin_id, admin_name, member_id, member_name,
             reason, details, ip_address, user_agent, created_at
           FROM audit_logs ORDER BY created_at DESC LIMIT 200;
-        `.catch(() => []);
+        `;
         return res.status(200).json({ ok: true, data: rows });
       }
 
@@ -190,7 +182,7 @@ export default async function handler(req, res) {
             duration, page_count as "pageCount", author, thumbnail_url as thumbnail,
             is_featured as "isFeatured", chapters, notes, pages, created_at, updated_at
           FROM learning_resources ORDER BY created_at ASC;
-        `.catch(() => []);
+        `;
         return res.status(200).json({ ok: true, data: rows });
       }
 
@@ -198,7 +190,7 @@ export default async function handler(req, res) {
       if (type === 'members') {
         const rows = await sql`
           SELECT 
-            m.id as member_id, m.id, m.name, m.email, m.phone, m.avatar, m.password, m.rank,
+            m.id as member_id, m.id, m.name, m.email, m.phone, m.avatar, m.rank,
             m.cs_customer_id, m.sponsor_member_id, m.sponsor_code, m.sponsor_name,
             m.customer_status, m.seller_status, m.referral_code,
             COALESCE(m.wallet_balance, 0)::numeric as wallet_balance,
@@ -298,7 +290,7 @@ export default async function handler(req, res) {
       const [members, activations, payouts, orders, transactions, kycDocs, auditLogs, learningResources] = await Promise.all([
         sql`
           SELECT 
-            m.id as member_id, m.id, m.name, m.email, m.phone, m.avatar, m.password, m.rank,
+            m.id as member_id, m.id, m.name, m.email, m.phone, m.avatar, m.rank,
             m.cs_customer_id, m.sponsor_member_id, m.sponsor_code, m.sponsor_name,
             m.customer_status, m.seller_status, m.referral_code,
             COALESCE(m.wallet_balance, 0)::numeric as wallet_balance,
@@ -362,27 +354,27 @@ export default async function handler(req, res) {
           SELECT 
             id, member_id, doc_key, file_name, file_type, file_size, data_url, status, updated_at
           FROM kyc_documents ORDER BY updated_at DESC;
-        `.catch(() => []),
+        `,
         sql`
           SELECT 
             id, action, admin_id, admin_name, member_id, member_name,
             reason, details, ip_address, user_agent, created_at
           FROM audit_logs ORDER BY created_at DESC LIMIT 100;
-        `.catch(() => []),
+        `,
         sql`
           SELECT 
             id, type, title, category, description, url as "videoUrl", url,
             duration, page_count as "pageCount", author, thumbnail_url as thumbnail,
             is_featured as "isFeatured", chapters, notes, pages, created_at, updated_at
           FROM learning_resources ORDER BY created_at ASC;
-        `.catch(() => [])
+        `
       ]);
 
       const formattedMembers = members.map(r => ({
         ...r,
         id: r.member_id || r.id,
         member_id: r.member_id || r.id,
-        password: r.password || '',
+        payout_tds_rate: process.env.PAYOUT_TDS_RATE ? Number(process.env.PAYOUT_TDS_RATE) : null,
         wallet_balance: Number(r.wallet_balance || 0),
         total_earnings: Number(r.total_earnings || 0),
         avatar: r.avatar || '/matru-avatar.jpg',
@@ -435,8 +427,7 @@ export default async function handler(req, res) {
         }
       });
     } catch (err) {
-      console.error('[DB Sync GET Error]:', err);
-      return res.status(500).json({ ok: false, error: err.message });
+      throw err;
     }
   }
 
@@ -456,39 +447,16 @@ export default async function handler(req, res) {
     const { action, data } = body;
 
     try {
-      // 2-0. Reset / Clean Test Data
-      if (action === 'reset_test_data') {
-        try { await sql`DELETE FROM activations;`; } catch (e) {}
-        try { await sql`DELETE FROM transactions;`; } catch (e) {}
-        try { await sql`DELETE FROM payout_requests;`; } catch (e) {}
-        try { await sql`DELETE FROM payouts;`; } catch (e) {}
-        try { await sql`DELETE FROM orders;`; } catch (e) {}
-        try { await sql`DELETE FROM zex_sales;`; } catch (e) {}
-        try { await sql`DELETE FROM zex_account_links;`; } catch (e) {}
-        try { await sql`DELETE FROM zex_connect_attempts;`; } catch (e) {}
-        try { await sql`DELETE FROM zex_webhook_inbox;`; } catch (e) {}
-        try { await sql`DELETE FROM audit_logs;`; } catch (e) {}
-        await sql`DELETE FROM members WHERE id != 'mem_matru';`;
-        await sql`
-          UPDATE members
-          SET 
-            name = 'CyberNetworking Head Office',
-            email = 'admin@cybernetworking.in',
-            phone = '+91 9876543210',
-            rank = 'Executive Director',
-            customer_status = 'active_subscriber',
-            seller_status = 'active',
-            referral_code = 'CS123456',
-            wallet_balance = 0,
-            total_earnings = 0
-          WHERE id = 'mem_matru';
-        `;
-        return res.status(200).json({ ok: true, message: 'Test data cleared successfully' });
-      }
-
       // 2a. Register New Member
       if (action === 'register_member') {
-        const mem = data;
+        const email = normalizeEmail(data?.email);
+        await ensureAuthTables(sql);
+        await consumeVerification(sql, req, email);
+        if (!data?.member_id || !/^[A-Za-z0-9_-]{1,100}$/.test(data.member_id) || !data.name?.trim() || !/^\d{10}$/.test(data.phone || '')) throw new HttpError(400, 'Invalid registration details');
+        const sponsorRows = await sql`SELECT id, name, referral_code FROM members WHERE (UPPER(referral_code) = UPPER(${data.sponsor_code || 'CS123456'}) OR id = ${data.sponsor_member_id || ''}) AND seller_status = 'active' LIMIT 1`;
+        if (!sponsorRows.length) throw new HttpError(400, 'Sponsor is unavailable');
+        const sponsor = sponsorRows[0];
+        const mem = { ...data, email, password: hashPassword(data.password), seller_status: 'pending_payment', customer_status: 'registered', kyc: {}, sponsor_member_id: sponsor.id, sponsor_code: sponsor.referral_code, sponsor_name: sponsor.name };
         const rows = await sql`
           INSERT INTO members (
             id, name, email, phone, avatar, password, rank, 
@@ -515,282 +483,25 @@ export default async function handler(req, res) {
             ${JSON.stringify(mem.kyc || {})},
             NOW()
           )
-          ON CONFLICT (email) DO UPDATE SET
-            name = EXCLUDED.name,
-            phone = EXCLUDED.phone,
-            seller_status = EXCLUDED.seller_status
           RETURNING *;
         `;
         return res.status(200).json({ ok: true, data: rows[0] });
       }
 
-      // 2b. Create Order
-      if (action === 'create_order') {
-        const o = data;
-        await sql`
-          INSERT INTO orders (
-            order_id, cs_order_id, buyer_member_id,
-            product_code, product_name, amount, gst, total_amount, currency,
-            payment_method, payment_ref, payment_status, subscription_status,
-            activated_by, activation_date, next_renewal, account1_mlm, account2_software, created_at
-          ) VALUES (
-            ${o.order_id},
-            ${o.cs_order_id || 'ord_' + o.order_id},
-            ${o.buyer_member_id},
-            ${o.product_code || 'CS-PRO-SUITE'},
-            ${o.product_name || 'CyberNetworking Partner Joining Membership License'},
-            ${o.amount || 2500},
-            ${o.gst || 450},
-            ${o.total_amount || 2950},
-            ${o.currency || 'INR'},
-            ${o.payment_method || 'UPI'},
-            ${o.utr_number || o.payment_ref || ''},
-            ${o.payment_status || 'pending_verification'},
-            ${o.subscription_status || 'pending_approval'},
-            ${o.activated_by || 'Awaiting Admin Bank Credit Verification'},
-            ${o.activation_date || new Date().toISOString()},
-            ${o.next_renewal || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()},
-            ${JSON.stringify(o.account1_mlm || {})},
-            ${JSON.stringify(o.account2_software || {})},
-            NOW()
-          )
-          ON CONFLICT (order_id) DO UPDATE SET
-            payment_ref = EXCLUDED.payment_ref,
-            payment_status = EXCLUDED.payment_status;
-        `;
-        return res.status(200).json({ ok: true });
-      }
-
-      // 2c. Create Activation Request
-      if (action === 'create_activation') {
-        const act = data;
-
-        // Prevent duplicate UTR submission
-        if (act.utr_number && act.utr_number.trim()) {
-          const cleanUtr = act.utr_number.trim().toUpperCase();
-          const dupCheck = await sql`
-            SELECT id FROM (
-              SELECT id, utr_number FROM activations WHERE id != ${act.id}
-              UNION ALL
-              SELECT order_id as id, payment_ref as utr_number FROM orders WHERE order_id != ${act.payment_ref || ''}
-            ) combined
-            WHERE UPPER(utr_number) = ${cleanUtr}
-            LIMIT 1;
-          `;
-          if (dupCheck.length > 0) {
-            return res.status(400).json({ 
-              ok: false, 
-              error: `Duplicate UTR Error: Transaction reference "${cleanUtr}" has already been submitted.` 
-            });
-          }
-        }
-
-        await sql`
-          INSERT INTO activations (
-            id, member_id, member_name, member_email, member_phone, sponsor_code,
-            amount_paid, gst_paid, total_paid, payment_method, payment_ref, utr_number,
-            status, account1_mlm, account2_software, requested_at
-          ) VALUES (
-            ${act.id},
-            ${act.member_id},
-            ${act.member_name},
-            ${act.member_email},
-            ${act.member_phone || ''},
-            ${act.sponsor_code || 'CS123456'},
-            ${act.amount_paid || 2500},
-            ${act.gst_paid || 450},
-            ${act.total_paid || 2950},
-            ${act.payment_method || 'UPI'},
-            ${act.payment_ref || act.id},
-            ${act.utr_number},
-            'pending',
-            ${JSON.stringify(act.account1_mlm || {})},
-            ${JSON.stringify(act.account2_software || {})},
-            NOW()
-          )
-          ON CONFLICT (id) DO UPDATE SET
-            utr_number = EXCLUDED.utr_number,
-            status = 'pending';
-        `;
-
-        // Update member seller_status to pending_approval
-        await sql`
-          UPDATE members
-          SET 
-            seller_status = 'pending_approval',
-            rank = 'Partner (Pending Admin Approval)'
-          WHERE id = ${act.member_id};
-        `;
-
-        return res.status(200).json({ ok: true });
-      }
-
-      // 2d. Admin Approves Partner Activation & Software License
-      if (action === 'approve_activation') {
-        const { activationId } = body;
-        const actRows = await sql`
-          SELECT * FROM activations WHERE id = ${activationId} LIMIT 1;
-        `;
-        if (actRows.length === 0) {
-          return res.status(404).json({ ok: false, error: 'Activation not found' });
-        }
-        const act = actRows[0];
-
-        // 1. Mark activation approved
-        await sql`
-          UPDATE activations
-          SET status = 'approved', approved_at = NOW()
-          WHERE id = ${activationId};
-        `;
-
-        // 2. Unlock member accounts & licenses
-        await sql`
-          UPDATE members
-          SET 
-            seller_status = 'active',
-            rank = 'Active Partner',
-            customer_status = 'active_subscriber',
-            software_license = ${JSON.stringify(act.account2_software || {})},
-            mlm_account = ${JSON.stringify(act.account1_mlm || {})}
-          WHERE id = ${act.member_id};
-        `;
-
-        // 3. Mark orders subscription active
-        await sql`
-          UPDATE orders
-          SET 
-            subscription_status = 'active',
-            payment_status = 'verified',
-            activated_by = 'Admin Approved'
-          WHERE buyer_member_id = ${act.member_id} OR order_id = ${act.payment_ref};
-        `;
-
-        // 4. Credit multi-tier upline partners across all 10 levels (Total: ₹1,600 / 64% of ₹2,500)
-        const allDbMembers = await sql`SELECT id, referral_code, cs_customer_id, sponsor_member_id, sponsor_code FROM members;`;
-        const rates = [1000, 300, 150, 50, 25, 25, 25, 10, 10, 5];
-
-        let currentUplineId = act.member_id;
-        const visited = new Set([act.member_id]);
-        const paidLevels = [];
-        let totalPaidToNetwork = 0;
-
-        for (let level = 1; level <= 10; level++) {
-          const currentMem = allDbMembers.find(m => m.id === currentUplineId);
-          if (!currentMem && level > 1) break;
-
-          const sponsorRef = (
-            (currentMem ? (currentMem.sponsor_member_id || currentMem.sponsor_code) : null) ||
-            (level === 1 ? act.sponsor_code : null) ||
-            ''
-          ).trim().toUpperCase();
-
-          if (!sponsorRef) break;
-
-          const sponsor = allDbMembers.find(m =>
-            (m.id && m.id.toUpperCase() === sponsorRef) ||
-            (m.referral_code && m.referral_code.toUpperCase() === sponsorRef) ||
-            (m.cs_customer_id && m.cs_customer_id.toUpperCase() === sponsorRef)
-          );
-
-          if (!sponsor) break;
-          if (visited.has(sponsor.id)) break;
-          visited.add(sponsor.id);
-
-          const rate = rates[level - 1];
-          paidLevels.push(level);
-          totalPaidToNetwork += rate;
-
-          // 15–30 Day Statutory Cooling-Off Period (Default: 30 Days):
-          // Funds remain in 'Pending' escrow hold until 30-day refund window elapses.
-          // total_earnings increments immediately so partners see live commission performance.
-          // wallet_balance remains untouched until 30-day cooling-off window completes.
-          await sql`
-            UPDATE members
-            SET 
-              total_earnings = COALESCE(total_earnings, 0) + ${rate}
-            WHERE id = ${sponsor.id};
-          `;
-
-          const txId = `tx_act_${Date.now()}_${Math.floor(Math.random() * 10000)}_${level}`;
-          const availableAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-          await sql`
-            INSERT INTO transactions (
-              id, member_id, description, amount, type, status, available_at, created_at
-            ) VALUES (
-              ${txId},
-              ${sponsor.id},
-              ${`Retail Partner Commission (Level ${level}) - ₹2,500 Joining Activation from ${act.member_name}`},
-              ${rate},
-              'credit',
-              'Pending',
-              ${availableAt},
-              NOW()
-            );
-          `;
-
-          currentUplineId = sponsor.id;
-        }
-
-        // 5. Statutory Company Reserve Allocation for Unused / Unallocated Levels
-        // Total network allocation is ₹1,600. If fewer than 10 levels exist in ancestry,
-        // all remaining unused commissions are credited to the Company Reserve Fund (Head Office: mem_matru)
-        const unusedCommission = 1600 - totalPaidToNetwork;
-        if (unusedCommission > 0) {
-          const unusedLevels = [];
-          for (let lvl = 1; lvl <= 10; lvl++) {
-            if (!paidLevels.includes(lvl)) unusedLevels.push(lvl);
-          }
-
-          // Credit CyberNetworking Head Office Reserve Account
-          await sql`
-            UPDATE members
-            SET 
-              wallet_balance = COALESCE(wallet_balance, 0) + ${unusedCommission},
-              total_earnings = COALESCE(total_earnings, 0) + ${unusedCommission}
-            WHERE id = 'mem_matru' OR referral_code = 'CS123456';
-          `;
-
-          const txReserveId = `tx_reserve_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-          await sql`
-            INSERT INTO transactions (
-              id, member_id, description, amount, type, status, created_at
-            ) VALUES (
-              ${txReserveId},
-              'mem_matru',
-              ${`Company Reserve Fund (Unused Levels ${unusedLevels.join(', ')}) - ₹${unusedCommission} from ${act.member_name} Activation`},
-              ${unusedCommission},
-              'company_reserve',
-              'Available',
-              NOW()
-            );
-          `;
-        }
-
-        return res.status(200).json({ ok: true, unusedCommission });
-      }
-
-      // 2e. Admin Rejects Partner Activation
-      if (action === 'reject_activation') {
-        const { activationId, reason } = body;
-        await sql`
-          UPDATE activations
-          SET status = 'rejected', rejection_reason = ${reason || 'Payment verification failed'}
-          WHERE id = ${activationId};
-        `;
-        const actRows = await sql`SELECT member_id FROM activations WHERE id = ${activationId} LIMIT 1;`;
-        if (actRows.length > 0) {
-          await sql`
-            UPDATE members
-            SET seller_status = 'rejected'
-            WHERE id = ${actRows[0].member_id};
-          `;
-        }
-        return res.status(200).json({ ok: true });
-      }
-
       // 2f. Create Withdrawal / Payout Request
       if (action === 'create_payout') {
-        const p = data;
+        const amount = Number(data?.amount);
+        if (!Number.isFinite(amount) || amount < 500 || !Number.isSafeInteger(Math.round(amount * 100)) || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.00001) throw new HttpError(400, 'Enter a valid withdrawal amount of at least 500');
+        const owners = await sql`SELECT * FROM members WHERE id = ${data.member_id} FOR UPDATE`;
+        const owner = owners[0];
+        if (!owner || !['active', 'subscription_expired'].includes(owner.seller_status) || owner.kyc_data?.verification_status !== 'verified') throw new HttpError(400, 'Verified KYC and a member account are required');
+        if (Number(owner.wallet_balance) < amount) throw new HttpError(400, 'Insufficient available balance');
+        const tdsRate = Number(process.env.PAYOUT_TDS_RATE);
+        if (!process.env.PAYOUT_TDS_RATE || !Number.isFinite(tdsRate) || tdsRate < 0 || tdsRate > 1) throw new HttpError(503, 'Payout deduction rate is not configured');
+        const tds = Math.round(amount * tdsRate * 100) / 100;
+        const bank = owner.kyc_data;
+        if (!bank.bank_account_number || !bank.bank_ifsc) throw new HttpError(400, 'Verified bank details required');
+        const p = { ...data, amount, member_name: owner.name, member_email: owner.email, tds_amount: tds, net_payable: amount - tds, admin_payment: {}, bank_details: { bank_name: bank.bank_name, account_number: bank.bank_account_number, ifsc: bank.bank_ifsc, account_holder: bank.legal_name || owner.name } };
         await sql`
           INSERT INTO payout_requests (
             id, member_id, member_name, member_email, avatar,
@@ -804,7 +515,7 @@ export default async function handler(req, res) {
             ${p.avatar || '/matru-avatar.jpg'},
             ${p.amount},
             ${p.tds_amount || 0},
-            ${p.net_payable || p.amount},
+            ${p.net_payable ?? p.amount},
             ${p.bank_details?.bank_name || 'Bank'},
             ${p.bank_details?.account_number || ''},
             ${p.bank_details?.ifsc || ''},
@@ -845,7 +556,10 @@ export default async function handler(req, res) {
       // 2g. Admin Approves Payout
       if (action === 'approve_payout') {
         const { payoutId, details = {} } = body;
-        const utr = details.utrNumber || `UTR-CS-${Math.floor(100000000 + Math.random() * 900000000)}`;
+        const pending = await sql`SELECT id FROM payout_requests WHERE id = ${payoutId} AND status = 'pending'`;
+        if (!pending.length) throw new HttpError(409, 'Payout already processed');
+        const utr = String(details.utrNumber || '').trim();
+        if (!utr) throw new HttpError(400, 'Payment reference is required');
 
         await sql`
           UPDATE payout_requests
@@ -880,8 +594,9 @@ export default async function handler(req, res) {
       if (action === 'reject_payout') {
         const { payoutId, reason } = body;
         const pRows = await sql`
-          SELECT member_id, amount FROM payout_requests WHERE id = ${payoutId} LIMIT 1;
+          SELECT member_id, amount FROM payout_requests WHERE id = ${payoutId} AND status = 'pending' LIMIT 1;
         `;
+        if (!pRows.length) throw new HttpError(409, 'Payout already processed');
         if (pRows.length > 0) {
           const req = pRows[0];
 
@@ -1138,6 +853,7 @@ export default async function handler(req, res) {
         `;
         if (txRows.length > 0) {
           const tx = txRows[0];
+          if (!['Pending', 'Available'].includes(tx.status)) throw new HttpError(409, 'Commission already reversed');
           await sql`
             UPDATE transactions
             SET status = 'Clawed Back', description = description || ${` [Refund Clawback: ${reason || 'Buyer Cancelled'}]`}
@@ -1146,7 +862,7 @@ export default async function handler(req, res) {
           if (tx.status === 'Available') {
             await sql`
               UPDATE members
-              SET wallet_balance = GREATEST(0, COALESCE(wallet_balance, 0) - ${tx.amount}),
+              SET wallet_balance = COALESCE(wallet_balance, 0) - ${tx.amount},
                   total_earnings = GREATEST(0, COALESCE(total_earnings, 0) - ${tx.amount})
               WHERE id = ${tx.member_id};
             `;
@@ -1218,10 +934,51 @@ export default async function handler(req, res) {
 
       return res.status(400).json({ ok: false, error: `Unrecognized action: ${action}` });
     } catch (err) {
-      console.error('[DB Sync POST Error]:', err);
-      return res.status(500).json({ ok: false, error: err.message });
+      throw err;
     }
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export function createSyncHandler(runTransaction = transaction) {
+return async function handler(req, res) {
+  try {
+    const actor = authorizeSync(req);
+    res.setHeader('Cache-Control', 'no-store');
+    const result = await runTransaction(async sql => {
+      if (req.method === 'GET' && req.query?.type === 'referral') {
+        const code = String(req.query.code || '').trim().toUpperCase();
+        if (!code || code.length > 100) throw new HttpError(400, 'Enter a referral code');
+        const rows = await sql`SELECT id, id AS member_id, name, referral_code, seller_status FROM members WHERE UPPER(referral_code) = ${code} AND seller_status = 'active' LIMIT 1`;
+        return { ok: true, data: rows[0] || null };
+      }
+      if (req.method === 'GET' && actor.role !== 'admin') {
+        await ensureTransactionColumns(sql);
+        await autoSettleMaturedCommissions(sql);
+        await ensureLearningTable(sql);
+        return { ok: true, data: await memberSync(sql, actor, req.query?.type) };
+      }
+      if (req.method === 'POST' && req.body.action === 'update_kyc' && actor.role !== 'admin') {
+        const previous = await sql`SELECT kyc_data FROM members WHERE id = ${actor.sub}`;
+        const allowed = ['legal_name', 'pan', 'aadhaar', 'bank_name', 'bank_account_number', 'bank_ifsc', 'address', 'city', 'state', 'pincode', 'agreement_accepted', 'agreement_version'];
+        req.body.kyc = { ...(previous[0]?.kyc_data || {}), ...Object.fromEntries(Object.entries(req.body.kyc || {}).filter(([key]) => allowed.includes(key))), verification_status: 'under_review', verified_at: null };
+      }
+      let response;
+      const buffered = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) {
+        if (this.statusCode >= 400) throw new HttpError(this.statusCode, value.error || 'Request failed');
+        response = value; return value;
+      } };
+      await executeSync(req, buffered, sql);
+      if (!response) throw new Error('Missing database response');
+      return redact(response);
+    }, { serialize: true });
+    if (req.method === 'POST' && req.body.action === 'register_member') {
+      setSessionCookie(res, 'cs_member', signSession({ role: 'member', sub: result.data.id }));
+      setSessionCookie(res, 'cs_verified', '', 0);
+    }
+    return res.status(200).json(result);
+  } catch (error) { return fail(res, error); }
+}
+}
+export default createSyncHandler();

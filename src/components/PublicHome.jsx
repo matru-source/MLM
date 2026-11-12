@@ -58,7 +58,7 @@ export default function PublicHome() {
             </div>
             <div className="pill-item">
               <Zap size={15} className="text-primary-blue" />
-              <span>Single ₹2,500 Joining</span>
+              <span>Join through ZEX</span>
             </div>
             <div className="pill-item">
               <ShieldCheck size={15} className="text-primary-blue" />
@@ -72,7 +72,7 @@ export default function PublicHome() {
               onClick={handleJoinClick}
               className="btn btn-primary btn-lg"
             >
-              <span>Join Now (₹2,500)</span>
+              <span>Join Now</span>
               <ArrowRight size={18} />
             </button>
 
@@ -148,23 +148,23 @@ export default function PublicHome() {
         </div>
       </section>
 
-      {/* 2. OFFICIAL JOINING PLAN (Single Pricing: ₹2,500/- for Joining) */}
+      {/* ZEX joining plan */}
       <section id="plans-section" className="plans-section-coach">
         <div className="section-head-center">
           <div className="single-plan-pill">
             <Sparkles size={14} className="text-primary-blue" />
-            <span>Single Transparent Pricing • Direct Joining</span>
+            <span>Join through ZEX</span>
           </div>
           <h2 className="section-title-large">Official Joining & Partner Membership</h2>
           <p className="section-subtitle">
-            Only one standard pricing for joining. Get authorized access to the CyberNetworking enterprise cyber defense suite and start earning multi-tier direct selling commissions.
+            Link your ZEX account and review the current plan and price on ZEX before paying.
           </p>
         </div>
 
         {/* Single Centered Joining Plan Card */}
         <div className="single-plan-wrapper">
           <div className="plan-card card-white single-joining-card">
-            <div className="popular-ribbon">Only One Pricing • ₹2,500 For Joining</div>
+            <div className="popular-ribbon">Purchase through ZEX</div>
 
             <div className="single-plan-header">
               <div className="single-plan-header-flex">
@@ -181,12 +181,11 @@ export default function PublicHome() {
 
                 <div className="single-price-box">
                   <div className="single-price-display">
-                    <span className="single-currency">₹</span>
-                    <span className="single-amount">2,500</span>
-                    <span className="single-term">/- For Joining</span>
+                    <span className="single-amount">ZEX</span>
+                    <span className="single-term">plan</span>
                   </div>
                   <div className="single-price-subnote">
-                    +18% Statutory GST (₹450) • Total ₹2,950
+                    See the current price and taxes on ZEX before paying
                   </div>
                 </div>
               </div>
@@ -206,7 +205,7 @@ export default function PublicHome() {
                   </li>
                   <li>
                     <CheckCircle2 size={16} className="text-success flex-shrink-0" />
-                    <span>Verified Software License Key & Continuous Updates</span>
+                    <span>Software plan and access details are shown by ZEX</span>
                   </li>
                   <li>
                     <CheckCircle2 size={16} className="text-success flex-shrink-0" />
@@ -231,7 +230,7 @@ export default function PublicHome() {
                   </li>
                   <li>
                     <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
-                    <span><strong>10-Level Network Commissions:</strong> ₹1,000 Direct (Level 1) + override bonuses</span>
+                    <span><strong>10-Level Network Commissions:</strong> Rewards depend on the approved commission policy</span>
                   </li>
                   <li>
                     <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
@@ -239,7 +238,7 @@ export default function PublicHome() {
                   </li>
                   <li>
                     <CheckCircle2 size={16} className="text-primary-blue flex-shrink-0" />
-                    <span><strong>Manual Bank Disbursal:</strong> Admin-verified IMPS payouts with 5% TDS compliance</span>
+                    <span><strong>Manual Bank Disbursal:</strong> Verified bank payouts, with applicable deductions</span>
                   </li>
                 </ul>
               </div>
@@ -258,7 +257,7 @@ export default function PublicHome() {
                 </div>
                 <div className="guarantee-badge">
                   <CheckCircle2 size={15} className="text-purple" />
-                  <span>Zero Hidden Charges • One-Time ₹2,500 Joining Fee</span>
+                  <span>Pricing and payment are shown by ZEX</span>
                 </div>
               </div>
 
@@ -266,7 +265,7 @@ export default function PublicHome() {
                 onClick={handleJoinClick}
                 className="btn btn-primary btn-lg single-join-cta-btn"
               >
-                <span>Join Now for ₹2,500</span>
+                <span>Continue to ZEX</span>
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -284,37 +283,8 @@ export default function PublicHome() {
         </div>
 
         <div className="comp-layout-grid">
-          {/* Left: Clean Payout Table */}
-          <div className="comp-table-card card-white">
-            <table className="coach-table">
-              <thead>
-                <tr>
-                  <th>Level</th>
-                  <th>Relationship</th>
-                  <th className="text-right">Commission (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {commissionRules.slice(0, 10).map((r) => (
-                  <tr key={r.level} className={r.level === 1 ? 'row-highlight' : ''}>
-                    <td className="level-name font-semibold">Level {r.level}</td>
-                    <td className="relation-name">{r.name}</td>
-                    <td className="amount-cell text-right font-bold text-primary-blue">
-                      ₹{r.amount.toLocaleString('en-IN')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="tfoot-row">
-                  <td colSpan="2" className="font-bold">Total Network Payout</td>
-                  <td className="text-right font-bold text-primary-blue text-large">₹1,600</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <div className="comp-table-card card-white"><p>Commission amounts and eligibility follow the approved partner policy. Eligible ZEX sales are verified before rewards are recorded.</p></div>
 
-          {/* Right: 4 Compliance Callout Cards (Matching Screen 5) */}
           <div className="comp-callouts-list">
             <div className="callout-card callout-green">
               <div className="callout-icon-box">

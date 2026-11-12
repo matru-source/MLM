@@ -1,3 +1,4 @@
+import { authRequest, lookupReferral } from '../services/sessionService';
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   initialMembers,
@@ -25,6 +26,7 @@ import {
   dbRejectPayout,
   dbFetchOrders,
   dbCreateOrder,
+  dbSubmitPayment,
   dbFetchTransactions,
   dbUpdateKyc,
   dbUpdateProfile,
@@ -41,7 +43,7 @@ import {
 } from '../services/neonDbService';
 import { initialLearningResources } from '../data/learningResources';
 import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
-import { saveDocumentFile, getDocumentFile, syncKycDocsFromServer } from '../utils/documentStorage';
+import { saveDocumentFile, getDocumentFile, syncKycDocsFromServer, clearDocumentCache } from '../utils/documentStorage';
 
 const MlmContext = createContext(null);
 
@@ -91,139 +93,32 @@ export function MlmProvider({ children }) {
     setIsAdminMode(false);
   };
 
-  // Dedicated Admin Executive Authentication Gate (Cryptographic Server Token)
-  const isTokenFormatValid = (tok) => {
-    if (!tok || typeof tok !== 'string') return false;
-    if (tok.startsWith('local_executive_token_')) return true;
-    const parts = tok.split('.');
-    if (parts.length !== 2) return false;
-    try {
-      // Decode base64url
-      const b64 = parts[0].replace(/-/g, '+').replace(/_/g, '/');
-      const json = atob(b64);
-      const payload = JSON.parse(json);
-      return payload.exp && Number(payload.exp) > Date.now();
-    } catch (e) {
-      return false;
-    }
-  };
-
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
-    try {
-      const token = sessionStorage.getItem('cybershield_admin_token');
-      return isTokenFormatValid(token);
-    } catch (e) {
-      return false;
-    }
-  });
-
-  // Verify server token against backend on mount if route is admin
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   useEffect(() => {
-    if (isAdminMode) {
-      const token = sessionStorage.getItem('cybershield_admin_token');
-      if (token && isTokenFormatValid(token)) {
-        if (token.startsWith('local_executive_token_')) {
-          setIsAdminAuthenticated(true);
-          return;
-        }
-        fetch('/api/admin/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'verify', token })
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (!data.ok || !data.valid) {
-              setIsAdminAuthenticated(false);
-              sessionStorage.removeItem('cybershield_admin_token');
-            }
-          })
-          .catch(() => {
-            // Keep current session if format is valid and server unreachable
-          });
-      } else {
-        setIsAdminAuthenticated(false);
-      }
-    }
+    authRequest('/api/admin/auth', { action: 'verify' }).then(result => setIsAdminAuthenticated(Boolean(result.ok)));
   }, [isAdminMode]);
-
   const loginAdmin = async ({ username, password }) => {
-    try {
-      const res = await fetch('/api/admin/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', username, password })
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (res.status === 429) {
-        return {
-          ok: false,
-          locked: true,
-          error: data.error || 'Terminal temporarily locked due to failed attempts.',
-          remainingSeconds: data.remainingSeconds || 900
-        };
-      }
-
-      if (res.ok && data.ok && data.token) {
-        sessionStorage.setItem('cybershield_admin_token', data.token);
-        setIsAdminAuthenticated(true);
-        return { ok: true };
-      }
-
-      // Offline / local fallback check for resilience
-      const cleanUser = (username || '').trim().toLowerCase();
-      const validUsers = ['admin', 'admin@cybernetworking.in', 'admin@cybershield.network', 'matruprasadpanda497@gmail.com', 'matru'];
-      const validPass = ['CyberNetworking#Admin2026!', 'CyberShield#Admin2026!', 'Admin@2026#CS'];
-      if (validUsers.includes(cleanUser) && validPass.includes(password)) {
-        sessionStorage.setItem('cybershield_admin_token', 'local_executive_token_' + Date.now());
-        setIsAdminAuthenticated(true);
-        return { ok: true };
-      }
-
-      return {
-        ok: false,
-        error: data.error || 'Invalid administrator credentials. Access to executive console denied.',
-        remainingAttempts: data.remainingAttempts
-      };
-    } catch (err) {
-      console.warn('[Admin Auth] Backend API call failed, trying offline credentials:', err);
-      const cleanUser = (username || '').trim().toLowerCase();
-      const validUsers = ['admin', 'admin@cybernetworking.in', 'admin@cybershield.network', 'matruprasadpanda497@gmail.com', 'matru'];
-      const validPass = ['CyberNetworking#Admin2026!', 'CyberShield#Admin2026!', 'Admin@2026#CS'];
-      if (validUsers.includes(cleanUser) && validPass.includes(password)) {
-        sessionStorage.setItem('cybershield_admin_token', 'local_executive_token_' + Date.now());
-        setIsAdminAuthenticated(true);
-        return { ok: true };
-      }
-      return {
-        ok: false,
-        error: 'Unable to communicate with executive security gateway. Please try again.'
-      };
-    }
+    const result = await authRequest('/api/admin/auth', { action: 'login', username, password });
+    setIsAdminAuthenticated(Boolean(result.ok));
+    return result;
   };
-
-  const logoutAdmin = () => {
+  const logoutAdmin = async () => {
+    const result = await authRequest('/api/admin/auth', { action: 'logout' });
+    if (!result.ok) { addToast('error', 'Sign out failed', result.error); return; }
     setIsAdminAuthenticated(false);
-    try {
-      sessionStorage.removeItem('cybershield_admin_token');
-      sessionStorage.removeItem('cybershield_admin_auth');
-    } catch (e) {}
+    clearPrivateData();
     navigateToUserSite();
-    addToast('info', 'Admin Console Locked', 'Executive session terminated.');
   };
 
   // User navigation state: 'home', 'plans', 'compensation', 'dashboard', 'network', 'wallet', 'subscriptions', 'profile'
   const [currentPage, setCurrentPage] = useState('home');
-  const [currentMemberId, setCurrentMemberId] = useState(() => {
-    return localStorage.getItem('cybershield_currentMemberId') || null;
-  });
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    const stored = localStorage.getItem('cybershield_isLoggedIn');
-    const memberId = localStorage.getItem('cybershield_currentMemberId');
-    return stored === 'true' && Boolean(memberId);
-  });
+  const [currentMemberId, setCurrentMemberId] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useEffect(() => {
+    authRequest('/api/auth/member', { action: 'session' }).then(result => {
+      if (result.ok) { setCurrentMemberId(result.memberId); setIsLoggedIn(true); }
+    });
+  }, []);
 
   // Modals state
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -249,6 +144,7 @@ export function MlmProvider({ children }) {
   // Data State with persistence (CyberShield storage prefix)
   const getStored = (key, fallback) => {
     try {
+      if (!['learning_resources', 'completed_resources'].includes(key)) return fallback;
       const item = localStorage.getItem(`cybershield_${key}`);
       return item ? JSON.parse(item) : fallback;
     } catch (e) {
@@ -258,10 +154,10 @@ export function MlmProvider({ children }) {
 
   const initialPendingActivations = [];
 
-  const [members, setMembers] = useState(() => getStored('members', initialMembers));
-  const [orders, setOrders] = useState(() => getStored('orders', initialOrders));
-  const [transactions, setTransactions] = useState(() => getStored('txs', initialTransactions));
-  const [payoutRequests, setPayoutRequests] = useState(() => getStored('payouts', initialPayoutRequests));
+  const [members, setMembers] = useState(() => getStored('members', []));
+  const [orders, setOrders] = useState(() => getStored('orders', []));
+  const [transactions, setTransactions] = useState(() => getStored('txs', []));
+  const [payoutRequests, setPayoutRequests] = useState(() => getStored('payouts', []));
   const [pendingActivations, setPendingActivations] = useState(() => getStored('activations', initialPendingActivations));
   const [availableBalance, setAvailableBalance] = useState(() => getStored('balance', 0));
   const [totalEarnings, setTotalEarnings] = useState(() => getStored('earnings', 0));
@@ -270,86 +166,18 @@ export function MlmProvider({ children }) {
   const [commissionRules, setCommissionRules] = useState(initialCommissionRules);
   const [toasts, setToasts] = useState([]);
 
+  const clearPrivateData = () => {
+    setMembers([]); setOrders([]); setTransactions([]); setPayoutRequests([]); setPendingActivations([]);
+    setAvailableBalance(0); setTotalEarnings(0); setAuditLogs([]);
+    clearDocumentCache();
+  };
   useEffect(() => {
-    try {
-      localStorage.setItem('cybershield_members', JSON.stringify(members));
-    } catch (e) {
-      // If quota exceeded due to large base64 file data, save sanitized members without heavy dataUrls
-      try {
-        const sanitized = members.map(m => {
-          if (!m.kyc?.documents) return m;
-          const cleanDocs = { ...m.kyc.documents };
-          Object.keys(cleanDocs).forEach(k => {
-            if (k.endsWith('File') && typeof cleanDocs[k] === 'string' && cleanDocs[k].length > 10000) {
-              delete cleanDocs[k]; // large file data stays preserved in IndexedDB/memory
-            }
-          });
-          return { ...m, kyc: { ...m.kyc, documents: cleanDocs } };
-        });
-        localStorage.setItem('cybershield_members', JSON.stringify(sanitized));
-      } catch (err2) {
-        console.warn('[Storage] Quota exceeded, saved in memory/IndexedDB');
-      }
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('kyc_doc_') || ['members', 'orders', 'txs', 'payouts', 'activations', 'balance', 'earnings', 'brevo_api_key'].some(suffix => key === 'cybershield_' + suffix)) localStorage.removeItem(key);
     }
-
-    try {
-      localStorage.setItem('cybershield_orders', JSON.stringify(orders));
-      localStorage.setItem('cybershield_txs', JSON.stringify(transactions));
-      localStorage.setItem('cybershield_payouts', JSON.stringify(payoutRequests));
-      localStorage.setItem('cybershield_activations', JSON.stringify(pendingActivations));
-      localStorage.setItem('cybershield_balance', JSON.stringify(availableBalance));
-      localStorage.setItem('cybershield_earnings', JSON.stringify(totalEarnings));
-      localStorage.setItem('cybershield_learning_resources', JSON.stringify(learningResources));
-      localStorage.setItem('cybershield_completed_resources', JSON.stringify(completedResources));
-    } catch (e) {}
-  }, [members, orders, transactions, payoutRequests, pendingActivations, availableBalance, totalEarnings, learningResources, completedResources]);
-
-  // Auto-settle cooling-off transactions whose 30-day waiting period has elapsed
-  useEffect(() => {
-    const now = Date.now();
-    const maturedList = (transactions || []).filter(
-      t => t.status === 'Pending' && t.type === 'credit' && t.available_at && new Date(t.available_at).getTime() <= now
-    );
-
-    if (maturedList.length === 0) return;
-
-    const maturedCreditsByMember = {};
-    for (const t of maturedList) {
-      const memId = t.member_id;
-      maturedCreditsByMember[memId] = (maturedCreditsByMember[memId] || 0) + Number(t.amount || 0);
-    }
-
-    setTransactions(prev =>
-      prev.map(t => {
-        if (t.status === 'Pending' && t.type === 'credit' && t.available_at && new Date(t.available_at).getTime() <= now) {
-          return { ...t, status: 'Available', settled_at: new Date().toISOString() };
-        }
-        return t;
-      })
-    );
-
-    setMembers(prev =>
-      prev.map(m => {
-        const id = m.member_id || m.id;
-        const maturedAmt = maturedCreditsByMember[id];
-        if (maturedAmt) {
-          return {
-            ...m,
-            wallet_balance: Number(m.wallet_balance || 0) + maturedAmt
-          };
-        }
-        return m;
-      })
-    );
-
-    if (currentMember) {
-      const myId = currentMember.member_id || currentMember.id;
-      const myMatured = maturedCreditsByMember[myId];
-      if (myMatured) {
-        setAvailableBalance(prev => prev + myMatured);
-      }
-    }
-  }, [transactions]);
+    sessionStorage.removeItem('cybershield_admin_token');
+    clearDocumentCache();
+  }, []);
 
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -357,11 +185,14 @@ export function MlmProvider({ children }) {
   // Live Neon PostgreSQL Multi-Device Synchronization
   useEffect(() => {
     let active = true;
+    if (!isLoggedIn && !isAdminAuthenticated) return;
 
     async function loadNeonData() {
       try {
         const res = await dbFetchAllSync();
-        if (!active || !res || !res.ok || !res.data) return;
+        if (!active) return;
+        if (res?.unauthorized) { setIsLoggedIn(false); setIsAdminAuthenticated(false); setCurrentMemberId(null); clearPrivateData(); return; }
+        if (!res?.ok || !res.data) { setIsDbConnected(false); return; }
 
         const { 
           members: liveMembers, 
@@ -474,13 +305,15 @@ export function MlmProvider({ children }) {
       loadNeonData();
     };
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('mlm:refresh', handleFocus);
 
     return () => {
       active = false;
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('mlm:refresh', handleFocus);
     };
-  }, [currentMemberId]);
+  }, [currentMemberId, isLoggedIn, isAdminAuthenticated]);
 
   const addToast = (type, title, message) => {
     const id = generateId('tst');
@@ -633,12 +466,15 @@ export function MlmProvider({ children }) {
 
   // On mount and when members list is ready, inspect URL for ?ref=
   useEffect(() => {
+    let active = true;
+    (async () => {
     try {
       const params = new URLSearchParams(window.location.search);
       const urlRef = params.get('ref') || params.get('sponsor') || params.get('r');
       if (urlRef) {
         const cleanCode = urlRef.trim().toUpperCase();
-        const check = validateReferralCode(cleanCode);
+        const check = await lookupReferral(cleanCode);
+        if (!active) return;
 
         if (check.valid) {
           setActiveReferral(cleanCode);
@@ -672,7 +508,9 @@ export function MlmProvider({ children }) {
     } catch (e) {
       console.error('Error reading referral query param:', e);
     }
-  }, [members]);
+    })();
+    return () => { active = false; };
+  }, []);
 
   // 120-second depleting countdown timer (ticks down every 1 second)
   useEffect(() => {
@@ -702,6 +540,24 @@ export function MlmProvider({ children }) {
     loading: true,
     data: null
   });
+
+  // The signed-in member can wake processing for their own pending ZEX events.
+  // Scheduled recovery handles closed tabs and provider retries independently.
+  useEffect(() => {
+    if (!isLoggedIn || !currentMemberId) return;
+    let active = true;
+    const run = async () => {
+      try {
+        const result = await fetch('/api/integrations/zex/process-pending', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+        });
+        if (active && result.ok) window.dispatchEvent(new Event('mlm:refresh'));
+      } catch { /* Scheduled recovery retries if this device is offline. */ }
+    };
+    run();
+    const timer = setInterval(run, 15000);
+    return () => { active = false; clearInterval(timer); };
+  }, [isLoggedIn, currentMemberId]);
 
   const refreshZexStatus = async (memberId = currentMemberId) => {
     const targetId = memberId || currentMemberId;
@@ -755,7 +611,7 @@ export function MlmProvider({ children }) {
 
       if (conn) {
         if (conn === 'connected') {
-          addToast('success', 'ZEX Cloud Connected!', 'Your ZEX account has been successfully linked. Real-time commissions are now active!');
+          addToast('success', 'ZEX account linked', 'Continue to ZEX to purchase the eligible plan.');
           setCurrentPage('dashboard');
           if (currentMemberId) refreshZexStatus(currentMemberId);
         } else if (conn === 'cancelled') {
@@ -812,7 +668,7 @@ export function MlmProvider({ children }) {
     const activeMemberId = currentMemberId || (typeof window !== 'undefined' ? localStorage.getItem('cybershield_currentMemberId') : null);
     const activeMember = currentMember || (activeMemberId ? members.find(m => m.member_id === activeMemberId) : null);
 
-    if (!isLoggedIn && !activeMember && !activeMemberId) {
+    if (!isLoggedIn || !activeMember) {
       setAuthMode('register');
       setIsAuthModalOpen(true);
       addToast('info', 'Registration Required', 'Please register or log in first so your partner license is tied to your account.');
@@ -820,123 +676,6 @@ export function MlmProvider({ children }) {
     }
     setSelectedPlanForCheckout(planName);
     setIsCheckoutOpen(true);
-  };
-
-  // Complete Payment & Submit Joining Application for Admin Verification
-  const completePayment = async (details = {}) => {
-    if (!currentMember) {
-      addToast('error', 'Authentication Error', 'No active registered member found.');
-      return { ok: false, error: 'Not authenticated' };
-    }
-
-    const paymentMethod = typeof details === 'string' ? details : (details.paymentMethod || 'UPI (Google Pay / PhonePe)');
-    const rawUtr = typeof details === 'object' && details.utrNumber ? details.utrNumber.trim() : '';
-
-    if (!rawUtr || rawUtr.length < 8) {
-      return { 
-        ok: false, 
-        error: 'Please enter a valid 12-digit UPI Transaction Reference Number (UTR) from your banking app.' 
-      };
-    }
-
-    const cleanUtr = rawUtr.toUpperCase();
-
-    // 1. Prevent Duplicate UTR Numbers across all orders and activations
-    const isDuplicate = orders.some(o => o.utr_number && o.utr_number.trim().toUpperCase() === cleanUtr) ||
-                        pendingActivations.some(a => a.utr_number && a.utr_number.trim().toUpperCase() === cleanUtr);
-    if (isDuplicate) {
-      return { 
-        ok: false, 
-        error: `Duplicate Bank Reference: UTR "${cleanUtr}" has already been used for another account. Please enter your unique payment reference.` 
-      };
-    }
-
-    const newOrderId = `CS${Math.floor(10000000 + Math.random() * 90000000)}`;
-
-    // Generate Dual Account configurations
-    const dualAccounts = await provisionDualAccounts({
-      memberDetails: currentMember,
-      paymentDetails: {
-        orderId: newOrderId,
-        amount: 2500,
-        paymentMethod
-      }
-    });
-
-    const newOrder = {
-      order_id: newOrderId,
-      cs_order_id: `ord_cs_${Math.floor(1000 + Math.random() * 9000)}`,
-      buyer_member_id: currentMember.member_id,
-      buyer_name: currentMember.name,
-      buyer_email: currentMember.email,
-      product_code: 'CS-PRO-SUITE',
-      product_name: 'CyberNetworking Partner Joining Membership License',
-      amount: 2500,
-      gst: 450,
-      total_amount: 2950,
-      currency: 'INR',
-      payment_method: paymentMethod,
-      utr_number: cleanUtr,
-      payment_status: 'pending_verification',
-      subscription_status: 'pending_approval',
-      activated_by: 'Awaiting Admin Bank Credit Verification',
-      activation_date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      next_renewal: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      created_at: new Date().toISOString(),
-      account1_mlm: dualAccounts.account1_mlm,
-      account2_software: dualAccounts.account2_software
-    };
-
-    setOrders(prev => [newOrder, ...prev]);
-
-    // Create New Partner Activation Item in PENDING status (Reaches Admin Desk for bank statement verification)
-    const newActivation = {
-      id: `act_${Date.now()}`,
-      member_id: currentMember.member_id,
-      member_name: currentMember.name,
-      member_email: currentMember.email,
-      member_phone: currentMember.phone,
-      sponsor_code: currentMember.sponsor_member_id || currentMember.sponsor_code || 'CS123456',
-      amount_paid: 2500,
-      gst_paid: 450,
-      total_paid: 2950,
-      payment_method: paymentMethod,
-      payment_ref: newOrderId,
-      utr_number: cleanUtr,
-      status: 'pending', // PENDING: Will ONLY activate when Admin verifies bank credit
-      requested_at: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      account1_mlm: dualAccounts.account1_mlm,
-      account2_software: dualAccounts.account2_software
-    };
-
-    setPendingActivations(prev => [newActivation, ...prev]);
-
-    // Keep member in pending_approval state (Locks referral link & dashboard until Admin approves)
-    setMembers(prev => prev.map(m => {
-      if (m.member_id === currentMember.member_id) {
-        return {
-          ...m,
-          customer_status: 'registered',
-          seller_status: 'pending_approval',
-          rank: 'Partner (Pending Admin Approval)',
-          pending_activation_id: newActivation.id
-        };
-      }
-      return m;
-    }));
-
-    // Persist to Neon PostgreSQL
-    dbCreateOrder(newOrder).catch(err => console.warn('[Neon DB] dbCreateOrder error:', err));
-    dbCreateActivation(newActivation).catch(err => console.warn('[Neon DB] dbCreateActivation error:', err));
-
-    return {
-      ok: true,
-      order: newOrder,
-      activation: newActivation,
-      dualAccounts,
-      status: 'pending_approval',
-      message: 'Payment reference submitted. Your account will be activated once the bank credit is verified.'
-    };
   };
 
   // Helper to query wallet metrics dynamically
@@ -965,331 +704,29 @@ export function MlmProvider({ children }) {
     };
   };
 
-  // 1. User Requests Withdrawal (Immediately locks funds to prevent double-spending)
-  const requestWithdrawal = (amount, overrideBankDetails = null) => {
-    const numAmount = Number(amount);
-    if (!currentMember) {
-      addToast('error', 'Authentication Error', 'No active registered partner found.');
-      return false;
-    }
-
-    if (isNaN(numAmount) || numAmount < 500) {
-      addToast('error', 'Minimum Limit', 'Minimum withdrawal amount is ₹500.');
-      return false;
-    }
-
-    // Calculate all active pending/in-flight withdrawals for this member
-    const activePendingTotal = payoutRequests
-      .filter(p => p.member_id === currentMember.member_id && p.status === 'pending')
-      .reduce((acc, p) => acc + Number(p.amount || 0), 0);
-
-    const unencumberedBalance = Math.max(0, availableBalance - activePendingTotal);
-
-    if (numAmount > availableBalance || numAmount > unencumberedBalance) {
-      addToast(
-        'error', 
-        'Insufficient Balance', 
-        `Available unencumbered balance is ₹${unencumberedBalance.toLocaleString('en-IN')}. Active pending requests: ₹${activePendingTotal.toLocaleString('en-IN')}.`
-      );
-      return false;
-    }
-
-    const bankName = (overrideBankDetails?.bank_name || currentMember?.kyc?.bank_name || 'Commercial Bank').trim();
-    const bankAccount = (overrideBankDetails?.bank_account_number || currentMember?.kyc?.bank_account_number || '').trim();
-    const bankIfsc = (overrideBankDetails?.bank_ifsc || currentMember?.kyc?.bank_ifsc || '').trim().toUpperCase();
-    const legalName = (overrideBankDetails?.legal_name || currentMember?.kyc?.legal_name || currentMember.name).trim();
-    const memberPan = (overrideBankDetails?.pan || currentMember?.kyc?.pan || '').trim().toUpperCase();
-
-    // Require linked bank account before requesting withdrawal
-    if (!bankAccount || !bankIfsc) {
-      addToast('error', 'Bank Details Required', 'Please enter your Bank Account Number & IFSC before requesting a payout.');
-      return false;
-    }
-
-    // If bank details were provided during withdrawal, update KYC record
-    if (overrideBankDetails) {
-      submitKyc(currentMember.member_id || currentMember.id, {
-        bank_name: bankName,
-        bank_account_number: bankAccount,
-        bank_ifsc: bankIfsc,
-        legal_name: legalName,
-        pan: memberPan
-      });
-    }
-
-    // Section 206AA statutory compliance: 5% TDS under Sec 194H if valid PAN furnished, 20% if no PAN or invalid
-    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-    const hasValidPan = panRegex.test(memberPan);
-    const tdsRate = hasValidPan ? 0.05 : 0.20;
-    const tdsSection = hasValidPan ? 'Section 194H (5%)' : 'Section 206AA (20% - No PAN)';
-    const tdsAmount = Math.round(numAmount * tdsRate);
-    const netPayable = numAmount - tdsAmount;
-    const newPayoutId = `PAY-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newPayout = {
-      id: newPayoutId,
-      member_id: currentMember.member_id,
-      member_name: currentMember.name,
-      member_email: currentMember.email,
-      avatar: currentMember.avatar || '/matru-avatar.jpg',
-      amount: numAmount,
-      tds_rate: hasValidPan ? 5 : 20,
-      tds_section: tdsSection,
-      tds_amount: tdsAmount,
-      pan_furnished: hasValidPan ? memberPan : 'NOT_FURNISHED',
-      net_payable: netPayable,
-      status: 'pending', // 'pending' | 'paid' | 'rejected'
-      request_date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      bank_details: {
-        bank_name: bankName,
-        account_number: bankAccount,
-        ifsc: bankIfsc,
-        account_holder: legalName
-      },
-      admin_payment: {
-        paid_at: null,
-        utr_number: '',
-        payment_mode: 'IMPS',
-        receipt_url: '',
-        admin_notes: ''
-      }
-    };
-
-    // IMMEDIATELY LOCK & DEDUCT FUNDS FROM AVAILABLE BALANCE TO PREVENT DOUBLE-SPENDING
-    setAvailableBalance(prev => Math.max(0, prev - numAmount));
-    setMembers(prev => prev.map(m => {
-      if (m.member_id === currentMember.member_id) {
-        return {
-          ...m,
-          wallet_balance: Math.max(0, Number(m.wallet_balance || 0) - numAmount)
-        };
-      }
-      return m;
-    }));
-
-    // Add to payout requests (reaches Admin directly)
-    setPayoutRequests(prev => [newPayout, ...prev]);
-
-    // Record transaction with Reserved/Locked status in ledger
-    setTransactions(prev => [{
-      id: generateId('tx'),
-      payoutId: newPayoutId,
-      date: 'Just Now',
-      description: `Bank Withdrawal Request to ${currentMember.kyc.bank_name || 'Bank'} (••••${currentMember.kyc.bank_account_number.slice(-4)}) - Funds Reserved`,
-      amount: -numAmount,
-      type: 'debit',
-      status: 'Reserved'
-    }, ...prev]);
-
-    // Persist atomic deduction & payout request to live Neon PostgreSQL
-    dbCreatePayoutRequest(newPayout).catch(err => console.warn('[Neon DB] dbCreatePayoutRequest error:', err));
-
-    addToast('success', 'Withdrawal Request Submitted & Balance Locked!', `₹${numAmount.toLocaleString('en-IN')} (Net ₹${netPayable.toLocaleString('en-IN')}) reserved and sent to Finance Admin.`);
-    return true;
+  const performFinancialAction = async (operation, title) => {
+    try {
+      const result = await operation();
+      if (!result?.ok) throw new Error(result?.error || 'The request was not saved');
+      window.dispatchEvent(new Event('mlm:refresh'));
+      addToast('success', title, 'Saved successfully. Balances are refreshing.');
+      return true;
+    } catch (error) { addToast('error', 'Request failed', error.message); return false; }
   };
-
-  const requestPayout = (memberIdOrAmount, amount) => {
-    const finalAmount = typeof amount === 'number' ? amount : memberIdOrAmount;
-    return requestWithdrawal(finalAmount);
-  };
-
-  // 2. Admin Manually Pays & Attaches Screenshot -> Finalizes disbursement
-  const approvePayout = ({ payoutId, utrNumber, receiptUrl, paymentMode, adminNotes }) => {
-    const req = payoutRequests.find(p => p.id === payoutId);
-    if (!req) return false;
-
-    const paidAt = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const finalUtr = utrNumber || `UTR-CS-${Math.floor(100000000 + Math.random() * 900000000)}`;
-
-    setPayoutRequests(prev => prev.map(p => {
-      if (p.id === payoutId) {
-        return {
-          ...p,
-          status: 'paid',
-          admin_payment: {
-            paid_at: paidAt,
-            utr_number: finalUtr,
-            payment_mode: paymentMode || 'IMPS / Bank Transfer',
-            receipt_url: receiptUrl || '',
-            admin_notes: adminNotes || 'Disbursed manually via verified banking gateway.'
-          }
-        };
-      }
-      return p;
-    }));
-
-    // Funds were already atomically locked on submission; update transactions ledger to Paid
-    setTransactions(prev => prev.map(t => {
-      if (t.payoutId === payoutId || (t.status === 'Reserved' && t.amount === -req.amount)) {
-        return {
-          ...t,
-          status: 'Paid',
-          description: `Bank Payout Disbursed to ${req.bank_details.bank_name} (UTR #${finalUtr})`,
-          utr_number: finalUtr,
-          receipt_url: receiptUrl
-        };
-      }
-      return t;
-    }));
-
-    // Persist payout approval to live Neon PostgreSQL
-    dbApprovePayout(payoutId, {
-      utrNumber: finalUtr,
-      screenshotUrl: receiptUrl,
-      adminNotes,
-      paymentMode
-    }).then(res => {
-      if (res.ok) {
-        dbFetchMembers().then(mRes => {
-          if (mRes.ok && mRes.data) setMembers(mRes.data);
-        });
-      }
-    }).catch(err => console.warn('[Neon DB] dbApprovePayout error:', err));
-
-    addToast('success', 'Payout Disbursed & Verified!', `₹${req.net_payable.toLocaleString('en-IN')} sent to ${req.member_name}. Receipt recorded.`);
-    return true;
-  };
-
-  // 3. Admin Rejects Payout -> Restores locked funds back to user balance
-  const rejectPayout = ({ payoutId, reason }) => {
-    const req = payoutRequests.find(p => p.id === payoutId);
-    if (!req) return false;
-
-    setPayoutRequests(prev => prev.map(p => {
-      if (p.id === payoutId) {
-        return {
-          ...p,
-          status: 'rejected',
-          admin_payment: {
-            ...p.admin_payment,
-            admin_notes: reason || 'Bank details mismatch or invalid KYC.'
-          }
-        };
-      }
-      return p;
-    }));
-
-    // RESTORE RESERVED FUNDS back to partner balance upon rejection
-    setAvailableBalance(prev => prev + req.amount);
-    setMembers(prev => prev.map(m => {
-      if (m.member_id === req.member_id) {
-        return {
-          ...m,
-          wallet_balance: Number(m.wallet_balance || 0) + req.amount
-        };
-      }
-      return m;
-    }));
-
-    // Record restoration in transaction ledger
-    setTransactions(prev => [{
-      id: generateId('tx'),
-      payoutId: payoutId,
-      date: 'Just Now',
-      description: `Withdrawal Request #${payoutId} Rejected - ₹${req.amount.toLocaleString('en-IN')} Restored to Balance (${reason || 'KYC/Bank Mismatch'})`,
-      amount: req.amount,
-      type: 'credit',
-      status: 'Available'
-    }, ...prev.map(t => {
-      if (t.payoutId === payoutId) {
-        return {
-          ...t,
-          status: 'Rejected',
-          description: `Withdrawal Request Rejected: ${reason || 'KYC/Bank Mismatch'}`
-        };
-      }
-      return t;
-    })]);
-
-    // Persist rejection and fund restoration to live Neon PostgreSQL
-    dbRejectPayout(payoutId, reason).catch(err => console.warn('[Neon DB] dbRejectPayout error:', err));
-
-    addToast('info', 'Payout Request Rejected & Funds Restored', `Request #${payoutId} rejected. ₹${req.amount.toLocaleString('en-IN')} returned to partner balance.`);
-    return true;
-  };
-
-  // 4. Admin Manually Releases Pending Cooling-Off Commission Early
-  const releaseCommissionEarly = async (transactionId) => {
-    const tx = transactions.find(t => t.id === transactionId);
-    if (!tx || tx.status !== 'Pending') {
-      addToast('error', 'Release Error', 'Transaction not found or already released.');
-      return false;
-    }
-
-    setTransactions(prev => prev.map(t => {
-      if (t.id === transactionId) {
-        return { ...t, status: 'Available', settled_at: new Date().toISOString() };
-      }
-      return t;
-    }));
-
-    setMembers(prev => prev.map(m => {
-      const id = m.member_id || m.id;
-      if (id === tx.member_id) {
-        return {
-          ...m,
-          wallet_balance: Number(m.wallet_balance || 0) + Number(tx.amount || 0)
-        };
-      }
-      return m;
-    }));
-
-    if (currentMember && (currentMember.member_id === tx.member_id || currentMember.id === tx.member_id)) {
-      setAvailableBalance(prev => prev + Number(tx.amount || 0));
-    }
-
-    dbReleaseCommissionEarly(transactionId).catch(err => console.warn('[Neon DB] dbReleaseCommissionEarly error:', err));
-    addToast('success', 'Commission Released Early!', `₹${tx.amount} moved from 30-day cooling-off hold into available balance.`);
-    return true;
-  };
-
-  // 5. Admin Claws Back Commission upon Buyer Refund
-  const clawbackCommission = async (transactionId, reason = 'Buyer Cancelled License') => {
-    const tx = transactions.find(t => t.id === transactionId);
-    if (!tx) {
-      addToast('error', 'Clawback Error', 'Transaction not found.');
-      return false;
-    }
-
-    setTransactions(prev => prev.map(t => {
-      if (t.id === transactionId) {
-        return { 
-          ...t, 
-          status: 'Clawed Back', 
-          description: `${t.description} [Refund Clawback: ${reason}]` 
-        };
-      }
-      return t;
-    }));
-
-    setMembers(prev => prev.map(m => {
-      const id = m.member_id || m.id;
-      if (id === tx.member_id) {
-        return {
-          ...m,
-          wallet_balance: tx.status === 'Available' ? Math.max(0, Number(m.wallet_balance || 0) - Number(tx.amount || 0)) : Number(m.wallet_balance || 0),
-          total_earnings: Math.max(0, Number(m.total_earnings || 0) - Number(tx.amount || 0))
-        };
-      }
-      return m;
-    }));
-
-    if (currentMember && (currentMember.member_id === tx.member_id || currentMember.id === tx.member_id)) {
-      if (tx.status === 'Available') {
-        setAvailableBalance(prev => Math.max(0, prev - Number(tx.amount || 0)));
-      }
-      setTotalEarnings(prev => Math.max(0, prev - Number(tx.amount || 0)));
-    }
-
-    dbClawbackCommission(transactionId, reason).catch(err => console.warn('[Neon DB] dbClawbackCommission error:', err));
-    addToast('info', 'Commission Clawed Back', `₹${tx.amount} reversed due to buyer refund within cooling-off period.`);
-    return true;
-  };
+  const requestWithdrawal = amount => performFinancialAction(() => dbCreatePayoutRequest({
+    id: crypto.randomUUID(), member_id: currentMember?.member_id, amount: Number(amount)
+  }), 'Withdrawal requested');
+  const requestPayout = (memberIdOrAmount, amount) => requestWithdrawal(typeof amount === 'number' ? amount : memberIdOrAmount);
+  const approvePayout = ({ payoutId, utrNumber, receiptUrl, paymentMode, adminNotes }) => performFinancialAction(
+    () => dbApprovePayout(payoutId, { utrNumber, screenshotUrl: receiptUrl, paymentMode, adminNotes }), 'Payout recorded');
+  const rejectPayout = ({ payoutId, reason }) => performFinancialAction(() => dbRejectPayout(payoutId, reason), 'Payout rejected');
+  const releaseCommissionEarly = transactionId => performFinancialAction(() => dbReleaseCommissionEarly(transactionId), 'Commission released');
+  const clawbackCommission = (transactionId, reason) => performFinancialAction(() => dbClawbackCommission(transactionId, reason), 'Commission reversed');
 
   // Register New User (Step 2 of Brevo Email OTP verification)
   const registerUser = async ({ fullName, email, mobile, password, sponsorId, sponsorMemberId, sponsorName, isSeller }) => {
     const newMemberId = generateId('mem');
-    const passwordHash = password ? await hashPassword(password) : '';
+    const passwordHash = password;
     const newMember = {
       member_id: newMemberId,
       name: fullName,
@@ -1326,6 +763,9 @@ export function MlmProvider({ children }) {
       }
     };
 
+    const registration = await dbRegisterMember(newMember);
+    if (!registration.ok) { addToast('error', 'Registration failed', registration.error); return registration; }
+    delete newMember.password;
     setMembers(prev => [...prev, newMember]);
     setCurrentMemberId(newMemberId);
     localStorage.setItem('cybershield_currentMemberId', newMemberId);
@@ -1338,14 +778,11 @@ export function MlmProvider({ children }) {
     dismissReferralBanner();
 
     // Persist to live Neon PostgreSQL with cryptographically hashed password
-    dbRegisterMember(newMember).catch(err => console.warn('[Neon DB] dbRegisterMember error:', err));
 
-    addToast('success', 'Email Verified & Account Created!', `Welcome, ${fullName}! Please complete ₹2,500 Joining Plan purchase.`);
+    addToast('success', 'Account created', 'Link your ZEX account to continue.');
     
-    // Automatically prompt checkout for ₹2,500 Joining Plan
-    setTimeout(() => {
-      openCheckout('Joining');
-    }, 300);
+    setIsCheckoutOpen(true);
+    return { ok: true };
   };
 
   // Submit / Update Member KYC & Payout Bank Details
@@ -1435,7 +872,9 @@ export function MlmProvider({ children }) {
   };
 
   // Update Member Profile (Name, Phone, DOB, etc.)
-  const updateMemberProfile = (memberId, profileData) => {
+  const updateMemberProfile = async (memberId, profileData) => {
+    const saved = await dbUpdateProfile(memberId, profileData);
+    if (!saved.ok) { addToast('error', 'Profile update failed', saved.error); return false; }
     setMembers(prev => prev.map(m => {
       if (m.member_id === memberId) {
         return {
@@ -1446,7 +885,6 @@ export function MlmProvider({ children }) {
       return m;
     }));
 
-    dbUpdateProfile(memberId, profileData).catch(err => console.warn('[Neon DB] dbUpdateProfile error:', err));
     addToast('success', 'Profile Updated', 'Personal details saved successfully.');
     return true;
   };
@@ -1716,334 +1154,27 @@ export function MlmProvider({ children }) {
     }
   };
 
-  // 1. Admin Approves Partner Activation & Software License
-  const approveMemberActivation = (activationId) => {
-    const act = pendingActivations.find(a => a.id === activationId);
-    if (!act) return false;
+  const approveMemberActivation = activationId => performFinancialAction(() => dbApproveActivation(activationId), 'Activation approved');
+  const rejectMemberActivation = (activationId, reason) => performFinancialAction(() => dbRejectActivation(activationId, reason), 'Activation rejected');
 
-    const approvedAt = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-    setPendingActivations(prev => prev.map(a => {
-      if (a.id === activationId) {
-        return {
-          ...a,
-          status: 'approved',
-          approved_at: approvedAt
-        };
-      }
-      return a;
-    }));
-
-    setMembers(prev => prev.map(m => {
-      if (
-        m.member_id === act.member_id || 
-        m.id === act.member_id || 
-        (m.email && act.member_email && m.email.toLowerCase() === act.member_email.toLowerCase()) ||
-        m.mlm_account?.partner_id === act.member_id
-      ) {
-        return {
-          ...m,
-          rank: 'Active Partner',
-          seller_status: 'active',
-          customer_status: 'active_subscriber',
-          software_license: act.account2_software,
-          mlm_account: act.account1_mlm
-        };
-      }
-      return m;
-    }));
-
-    // Update order subscription status to active
-    setOrders(prev => prev.map(o => {
-      if (o.order_id === act.payment_ref || o.buyer_member_id === act.member_id) {
-        return { ...o, subscription_status: 'active', activated_by: 'Admin Approved' };
-      }
-      return o;
-    }));
-
-    // Credit multi-tier retail partner commissions across all 10 upline levels (Total: ₹1,600 / 64% of ₹2,500)
-    const activatedMember = members.find(m => m.member_id === act.member_id || m.id === act.member_id);
-    const rates = [1000, 300, 150, 50, 25, 25, 25, 10, 10, 5];
-    const newTransactions = [];
-    const creditsByMemberId = {};
-
-    let currentUplineTarget = activatedMember;
-    const visited = new Set([act.member_id]);
-    const paidLevels = [];
-    let totalPaidToNetwork = 0;
-
-    for (let level = 1; level <= 10; level++) {
-      if (!currentUplineTarget && level > 1) break;
-
-      const sponsorRef = (
-        (currentUplineTarget ? (currentUplineTarget.sponsor_member_id || currentUplineTarget.sponsor_code) : '') || 
-        (level === 1 ? act.sponsor_code : '') || 
-        ''
-      ).trim().toUpperCase();
-
-      if (!sponsorRef) break;
-
-      const sponsor = members.find(m => 
-        (m.member_id && m.member_id.toUpperCase() === sponsorRef) ||
-        (m.id && m.id.toUpperCase() === sponsorRef) ||
-        (m.referral_code && m.referral_code.toUpperCase() === sponsorRef) ||
-        (m.cs_customer_id && m.cs_customer_id.toUpperCase() === sponsorRef)
-      );
-
-      if (!sponsor) break;
-
-      const sponsorId = sponsor.member_id || sponsor.id;
-      if (visited.has(sponsorId)) break;
-      visited.add(sponsorId);
-
-      const rate = rates[level - 1];
-      paidLevels.push(level);
-      totalPaidToNetwork += rate;
-      creditsByMemberId[sponsorId] = (creditsByMemberId[sponsorId] || 0) + rate;
-
-      const availableAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      newTransactions.push({
-        id: generateId('tx'),
-        member_id: sponsorId,
-        date: 'Just Now',
-        description: `Retail Partner Commission (Level ${level}) - ₹2,500 Joining Activation from ${act.member_name}`,
-        amount: rate,
-        type: 'credit',
-        status: 'Pending',
-        available_at: availableAt
-      });
-
-      // Advance to next upline level
-      currentUplineTarget = sponsor;
-    }
-
-    // Statutory Company Reserve Allocation for Unused / Unallocated Levels
-    // Total network allocation is ₹1,600. If fewer than 10 levels exist in ancestry,
-    // all remaining unused commissions are credited to the Company Reserve Fund (Head Office: mem_matru)
-    const unusedCommission = 1600 - totalPaidToNetwork;
-    if (unusedCommission > 0) {
-      const unusedLevels = [];
-      for (let lvl = 1; lvl <= 10; lvl++) {
-        if (!paidLevels.includes(lvl)) unusedLevels.push(lvl);
-      }
-
-      const headOfficeId = 'mem_matru';
-      creditsByMemberId[headOfficeId] = (creditsByMemberId[headOfficeId] || 0) + unusedCommission;
-
-      newTransactions.push({
-        id: generateId('tx_res'),
-        member_id: headOfficeId,
-        date: 'Just Now',
-        description: `Company Reserve Fund (Unused Levels ${unusedLevels.join(', ')}) - ₹${unusedCommission} from ${act.member_name} Activation`,
-        amount: unusedCommission,
-        type: 'company_reserve',
-        status: 'Available',
-        created_at: new Date().toISOString()
-      });
-    }
-
-    if (Object.keys(creditsByMemberId).length > 0) {
-      setMembers(prev => prev.map(m => {
-        const id = m.member_id || m.id;
-        const addAmount = creditsByMemberId[id];
-        if (addAmount) {
-          const reserveAmount = (id === 'mem_matru' && unusedCommission > 0) ? unusedCommission : 0;
-          return {
-            ...m,
-            // Reserve amount is immediately Available; partner commissions held for cooling-off
-            wallet_balance: Number(m.wallet_balance || 0) + reserveAmount,
-            total_earnings: Number(m.total_earnings || 0) + addAmount
-          };
-        }
-        return m;
-      }));
-
-      // Update active session total_earnings if current logged-in member is in the upline chain
-      if (currentMember) {
-        const myId = currentMember.member_id || currentMember.id;
-        const myCredit = creditsByMemberId[myId];
-        if (myCredit) {
-          setTotalEarnings(prev => prev + myCredit);
-          if (myId === 'mem_matru' && unusedCommission > 0) {
-            setAvailableBalance(prev => prev + unusedCommission);
-          }
-        }
-      }
-
-      setTransactions(prev => [...newTransactions, ...prev]);
-    }
-
-    // Persist activation approval, software license unlock and commission to live Neon PostgreSQL
-    dbApproveActivation(activationId).then(res => {
-      if (res.ok) {
-        dbFetchMembers().then(mRes => {
-          if (mRes.ok && mRes.data) setMembers(mRes.data);
-        });
-      }
-    }).catch(err => console.warn('[Neon DB] dbApproveActivation error:', err));
-
-    addToast('success', 'Dual Accounts Activated!', `Partner ${act.member_name} approved. MLM ID & Software License (${act.account2_software?.license_key || ''}) unlocked!`);
-    return true;
-  };
-
-  // 2. Admin Rejects Partner Activation
-  const rejectMemberActivation = (activationId, reason = 'Payment verification failed') => {
-    setPendingActivations(prev => prev.map(a => {
-      if (a.id === activationId) {
-        return { ...a, status: 'rejected', rejection_reason: reason };
-      }
-      return a;
-    }));
-
-    setMembers(prev => prev.map(m => {
-      const act = pendingActivations.find(a => a.id === activationId);
-      if (act && m.member_id === act.member_id) {
-        return { ...m, seller_status: 'rejected' };
-      }
-      return m;
-    }));
-
-    // Persist rejection to live Neon PostgreSQL
-    dbRejectActivation(activationId, reason).catch(err => console.warn('[Neon DB] dbRejectActivation error:', err));
-
-    addToast('warning', 'Activation Rejected', `Partner activation rejected: ${reason}`);
-    return true;
-  };
-
-  // Login as existing member by email or ID with Cryptographic Password Verification
   const loginUserByEmail = async ({ email, password }) => {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    if (!cleanEmail) {
-      return { ok: false, error: 'Please enter your registered email address.' };
-    }
-    if (!password) {
-      return { ok: false, error: 'Please enter your account password.' };
-    }
-
-    const found = members.find(m => 
-      (m.email && m.email.toLowerCase() === cleanEmail) ||
-      (m.member_id && m.member_id.toLowerCase() === cleanEmail) ||
-      (m.cs_customer_id && m.cs_customer_id.toLowerCase() === cleanEmail)
-    );
-    if (!found) {
-      return { 
-        ok: false, 
-        error: `No partner account found with email "${cleanEmail}". Please check your email or click "Create Account".` 
-      };
-    }
-
-    // Secure Password Verification
-    if (found.password) {
-      let isValid = await verifyPassword(password, found.password);
-
-      // Resilient Fallback: If in-memory state doesn't match, verify against fresh database record
-      if (!isValid) {
-        try {
-          const freshRes = await fetch('/api/db/sync?type=members');
-          if (freshRes.ok) {
-            const freshJson = await freshRes.json();
-            const freshList = Array.isArray(freshJson?.data) ? freshJson.data : [];
-            const freshUser = freshList.find(m => 
-              (m.email && m.email.toLowerCase() === cleanEmail) || 
-              (m.member_id === found.member_id)
-            );
-            if (freshUser && freshUser.password) {
-              const freshValid = await verifyPassword(password, freshUser.password);
-              if (freshValid) {
-                isValid = true;
-                found.password = freshUser.password;
-                setMembers(prev => prev.map(m => (m.email && m.email.toLowerCase() === cleanEmail) ? { ...m, password: freshUser.password } : m));
-              }
-            }
-          }
-        } catch (syncErr) {
-          console.warn('[Login Sync Check] Error verifying against fresh DB:', syncErr);
-        }
-      }
-
-      if (!isValid) {
-        return {
-          ok: false,
-          error: 'Incorrect password. Please verify your credentials and try again.'
-        };
-      }
-    } else {
-      // Legacy member migration: If account was created before password hashing was enforced,
-      // require at least 6 characters and securely set/upgrade their password hash now.
-      if (password.length < 6) {
-        return {
-          ok: false,
-          error: 'Account requires establishing a secure password of at least 6 characters.'
-        };
-      }
-      const newHash = await hashPassword(password);
-      found.password = newHash;
-      dbUpdateMemberPassword(found.member_id, newHash, cleanEmail).catch(err => console.warn('[Neon DB] dbUpdateMemberPassword error:', err));
-    }
-
-    setCurrentMemberId(found.member_id);
-    localStorage.setItem('cybershield_currentMemberId', found.member_id);
-    setAvailableBalance(Number(found.wallet_balance || 0));
-    setTotalEarnings(Number(found.total_earnings || 0));
+    const result = await authRequest('/api/auth/member', { action: 'login', email, password });
+    if (!result.ok) return result;
+    clearPrivateData();
+    setMembers([result.member]);
+    setCurrentMemberId(result.member.id);
     setIsLoggedIn(true);
-    localStorage.setItem('cybershield_isLoggedIn', 'true');
     setCurrentPage('dashboard');
-    addToast('success', 'Welcome Back!', `Logged in as ${found.name}.`);
-    return { ok: true, member: found };
+    return result;
   };
-
-  // Reset User Password (Forgot Password flow) with dual React state update and Neon DB sync
-  const resetUserPassword = async ({ email, newPassword }) => {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    if (!cleanEmail || !newPassword) {
-      return { ok: false, error: 'Email and new password are required.' };
-    }
-    const newHash = await hashPassword(newPassword);
-
-    let targetMemberId = null;
-    // 1. Update React state immutably so login succeeds immediately
-    setMembers(prev => prev.map(m => {
-      if (m.email && m.email.toLowerCase() === cleanEmail) {
-        targetMemberId = m.member_id || m.id;
-        return { ...m, password: newHash };
-      }
-      return m;
-    }));
-
-    // 2. Persist to Neon DB matching both ID and clean email
-    try {
-      await dbUpdateMemberPassword(targetMemberId, newHash, cleanEmail);
-    } catch (err) {
-      console.warn('[Neon DB] dbUpdateMemberPassword error:', err);
-    }
-
-    return { ok: true, newHash };
+  const resetUserPassword = ({ email, newPassword }) => authRequest('/api/auth/member', { action: 'reset_password', email, newPassword });
+  const logout = async () => {
+    const result = await authRequest('/api/auth/member', { action: 'logout' });
+    if (!result.ok) { addToast('error', 'Sign out failed', result.error); return; }
+    setIsLoggedIn(false); setCurrentMemberId(null); clearPrivateData(); setCurrentPage('home');
+    localStorage.removeItem('cybershield_currentMemberId'); localStorage.removeItem('cybershield_isLoggedIn');
   };
-
-  // Logout / Switch to Visitor mode
-  const logout = () => {
-    setIsLoggedIn(false);
-    setCurrentMemberId(null);
-    localStorage.removeItem('cybershield_currentMemberId');
-    localStorage.setItem('cybershield_isLoggedIn', 'false');
-    setCurrentPage('home');
-    addToast('info', 'Signed Out', 'You are now viewing CyberNetworking as a visitor.');
-  };
-
-  // Login as existing member (e.g. Matru)
-  const loginAsMember = (memberId = 'mem_matru') => {
-    setCurrentMemberId(memberId);
-    localStorage.setItem('cybershield_currentMemberId', memberId);
-    setIsLoggedIn(true);
-    localStorage.setItem('cybershield_isLoggedIn', 'true');
-    const found = members.find(m => m.member_id === memberId);
-    if (found) {
-      setAvailableBalance(Number(found.wallet_balance || 0));
-      setTotalEarnings(Number(found.total_earnings || 0));
-    }
-    setCurrentPage('dashboard');
-    addToast('success', 'Logged In', 'Welcome back to your CyberNetworking Partner Portal.');
-  };
+  const loginAsMember = () => { setAuthMode('login'); setIsAuthModalOpen(true); };
 
   const resetAllData = () => {
     localStorage.clear();
@@ -2221,7 +1352,6 @@ export function MlmProvider({ children }) {
       setIsCheckoutOpen,
       selectedPlanForCheckout,
       openCheckout,
-      completePayment,
       isAuthModalOpen,
       setIsAuthModalOpen,
       authMode,

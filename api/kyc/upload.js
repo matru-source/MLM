@@ -1,4 +1,5 @@
-import { neon } from '@neondatabase/serverless';
+import { checkOrigin, readBody, requireSession, requireOwner, fail, HttpError } from '../../server/security.js';
+import { transaction } from '../../server/database.js';
 
 export const config = {
   runtime: 'nodejs',
@@ -9,40 +10,8 @@ export const config = {
   }
 };
 
-function getSql() {
-  const dbUrl = process.env.DATABASE_URL || 
-    Buffer.from('cG9zdGdyZXNxbDovL25lb25kYl9vd25lcjpucGdfckVnVEZDTHdEcTM2QGVwLWF1dHVtbi1tb2RlLWExdGp5bnNiLXBvb2xlci5hcC1zb3V0aGVhc3QtMS5hd3MubmVvbi50ZWNoL25lb25kYj9zc2xtb2RlPXJlcXVpcmUmY2hhbm5lbF9iaW5kaW5nPXJlcXVpcmU=', 'base64').toString('utf8');
-  if (!dbUrl || dbUrl.trim() === '') return null;
-  try {
-    return neon(dbUrl);
-  } catch (err) {
-    console.warn('[KYC Upload API] Failed to initialize Neon connection:', err.message);
-    return null;
-  }
-}
 
-export default async function handler(req, res) {
-  // CORS & Header Setup
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,DELETE');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  const sql = getSql();
-  if (!sql) {
-    return res.status(503).json({
-      ok: false,
-      error: 'Database connection not available'
-    });
-  }
-
+async function executeKyc(req, res, sql) {
   // Ensure table exists safely
   try {
     await sql`
@@ -61,7 +30,7 @@ export default async function handler(req, res) {
       );
     `;
   } catch (e) {
-    // Table already exists or initialized
+    throw e;
   }
 
   // =========================================================================
@@ -106,7 +75,7 @@ export default async function handler(req, res) {
             const contentType = mimeMatch ? mimeMatch[1] : doc.file_type || 'application/octet-stream';
             const buffer = Buffer.from(parts[1], 'base64');
             res.setHeader('Content-Type', contentType);
-            res.setHeader('Content-Disposition', `inline; filename="${doc.file_name || 'document'}"`);
+            res.setHeader('Content-Disposition', 'attachment; filename="document"');
             return res.status(200).send(buffer);
           }
         }
@@ -129,7 +98,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing memberId parameter' });
     } catch (err) {
       console.error('[KYC GET Error]:', err);
-      return res.status(500).json({ ok: false, error: err.message });
+      throw err;
     }
   }
 
@@ -230,9 +199,42 @@ export default async function handler(req, res) {
       });
     } catch (err) {
       console.error('[KYC Upload POST Error]:', err);
-      return res.status(500).json({ ok: false, error: err.message });
+      throw err;
     }
   }
 
   return res.status(405).json({ ok: false, error: 'Method not allowed' });
+}
+
+export default async function handler(req, res) {
+  try {
+    checkOrigin(req);
+    const actor = requireSession(req);
+    req.body = readBody(req);
+    if (!['GET', 'POST'].includes(req.method)) throw new HttpError(405, 'Method not allowed');
+    const memberId = req.method === 'GET' ? req.query?.memberId : req.body.memberId;
+    if (actor.role !== 'admin' && ['true', '1'].includes(req.query?.all)) throw new HttpError(403, 'Administrator access required');
+    if (actor.role !== 'admin' || memberId) requireOwner(actor, memberId);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (req.method === 'POST') {
+      const file = req.body.fileInfo;
+      if (!['pan', 'aadhaar', 'bankAccount', 'addressProof'].includes(req.body.docKey) ||
+          !/^data:(image\/(jpeg|png)|application\/pdf);base64,[A-Za-z0-9+/=]+$/.test(file?.dataUrl || '') ||
+          (file?.dataUrl?.length || 0) > 7 * 1024 * 1024) throw new HttpError(400, 'Upload a PDF, JPEG or PNG under 5 MB');
+    }
+  } catch (error) { return fail(res, error); }
+
+
+  try {
+    const response = await transaction(async sql => {
+      const output = { statusCode: 200, headers: {}, status(code) { this.statusCode = code; return this; }, setHeader(key, value) { this.headers[key] = value; },
+        json(body) { if (this.statusCode >= 400) throw new HttpError(this.statusCode, body.error); this.body = body; this.isJson = true; return this; },
+        send(body) { this.body = body; return this; } };
+      await executeKyc(req, output, sql);
+      return output;
+    });
+    for (const [key, value] of Object.entries(response.headers)) res.setHeader(key, value);
+    return response.isJson ? res.status(response.statusCode).json(response.body) : res.status(response.statusCode).send(response.body);
+  } catch (error) { return fail(res, error); }
 }

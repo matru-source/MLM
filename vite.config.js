@@ -1,85 +1,50 @@
-import react from '@vitejs/plugin-react'
-import { defineConfig, loadEnv } from 'vite'
+import react from '@vitejs/plugin-react';
+import { defineConfig, loadEnv } from 'vite';
 
+const routes = {
+  '/api/db/sync': './api/db/sync.js',
+  '/api/admin/auth': './api/admin/auth.js',
+  '/api/auth/member': './api/auth/member.js',
+  '/api/auth/send-otp': './api/auth/send-otp.js',
+  '/api/auth/verify-otp': './api/auth/verify-otp.js',
+  '/api/kyc/upload': './api/kyc/upload.js',
+  '/api/integrations/zex/connect': './api/integrations/zex/connect.js',
+  '/api/integrations/zex/purchase': './api/integrations/zex/purchase.js',
+  '/api/integrations/zex/process-pending': './api/integrations/zex/process-pending.js',
+  '/api/integrations/zex/recover': './api/integrations/zex/recover.js',
+  '/api/integrations/zex/health': './api/integrations/zex/health.js',
+  '/api/integrations/zex/callback': './api/integrations/zex/callback.js',
+  '/api/integrations/zex/status': './api/integrations/zex/status.js',
+  '/api/integrations/zex/webhook': './api/integrations/zex/webhook.js'
+};
 function serverlessApiPlugin() {
-  return {
-    name: 'serverless-api-plugin',
-    configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
-        const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-        const pathname = url.pathname;
-
-        const executeHandler = async (handler) => {
-          req.query = Object.fromEntries(url.searchParams.entries());
-
-          res.status = function(code) {
-            res.statusCode = code;
-            return res;
-          };
-          res.json = function(data) {
-            if (!res.headersSent) {
-              res.setHeader('Content-Type', 'application/json');
-            }
-            res.end(JSON.stringify(data));
-            return res;
-          };
-
-          if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-            let bodyStr = '';
-            req.on('data', chunk => { bodyStr += chunk; });
-            req.on('end', async () => {
-              try {
-                req.body = bodyStr ? JSON.parse(bodyStr) : {};
-              } catch (e) {
-                req.body = {};
-              }
-              await handler(req, res);
-            });
-          } else {
-            req.body = {};
-            await handler(req, res);
+  return { name: 'serverless-api-plugin', configureServer(server) {
+    server.middlewares.use(async (req, res, next) => {
+      const url = new URL(req.url, 'http://' + req.headers.host);
+      if (!routes[url.pathname]) return next();
+      res.status = code => { res.statusCode = code; return res; };
+      res.json = body => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)); return res; };
+      res.send = body => { res.end(body); return res; };
+      res.redirect = (code, location) => { res.statusCode = code; res.setHeader('Location', location); res.end(); };
+      try {
+        req.query = Object.fromEntries(url.searchParams);
+        if (req.method === 'POST' && !url.pathname.endsWith('/webhook')) {
+          let text = '';
+          for await (const chunk of req) {
+            text += chunk;
+            if (Buffer.byteLength(text) > 10 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'Request too large' });
           }
-        };
-
-        if (pathname.startsWith('/api/db/sync')) {
-          try {
-            const syncModule = await import('./api/db/sync.js');
-            return await executeHandler(syncModule.default);
-          } catch (err) {
-            console.error('[Vite API] Error in /api/db/sync:', err);
-            res.statusCode = 500;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ ok: false, error: err.message }));
-            return;
-          }
+          req.body = text ? JSON.parse(text) : {};
         }
-
-        if (pathname.startsWith('/api/admin/auth')) {
-          try {
-            const authModule = await import('./api/admin/auth.js');
-            return await executeHandler(authModule.default);
-          } catch (err) {
-            console.error('[Vite API] Error in /api/admin/auth:', err);
-            res.statusCode = 500;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ ok: false, error: err.message }));
-            return;
-          }
-        }
-
-        next();
-      });
-    }
-  };
+        const { default: handler } = await import(routes[url.pathname]);
+        await handler(req, res);
+      } catch {
+        if (!res.writableEnded) res.status(500).json({ ok: false, error: 'Request failed' });
+      }
+    });
+  } };
 }
-
-// https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  Object.assign(process.env, env);
-
-  return {
-    plugins: [react(), serverlessApiPlugin()],
-    envPrefix: ['VITE_', 'DATABASE_']
-  };
+  Object.assign(process.env, loadEnv(mode, process.cwd(), ''));
+  return { plugins: [react(), serverlessApiPlugin()], envPrefix: 'VITE_' };
 });

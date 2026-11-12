@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 
 const databaseUrl = process.env.DATABASE_URL || 
-  Buffer.from('cG9zdGdyZXNxbDovL25lb25kYl9vd25lcjpucGdfckVnVEZDTHdEcTM2QGVwLWF1dHVtbi1tb2RlLWExdGp5bnNiLXBvb2xlci5hcC1zb3V0aGVhc3QtMS5hd3MubmVvbi50ZWNoL25lb25kYj9zc2xtb2RlPXJlcXVpcmUmY2hhbm5lbF9iaW5kaW5nPXJlcXVpcmU=', 'base64').toString('utf8');
+  (process.env.DATABASE_URL || '');
 
 const sql = neon(databaseUrl);
 

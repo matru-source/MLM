@@ -19,7 +19,8 @@ export const sql = null;
 export async function dbFetchAllSync() {
   try {
     const res = await fetch('/api/db/sync');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (res.status === 401) return { ok: false, unauthorized: true };
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbFetchAllSync failed:', err.message);
@@ -33,7 +34,7 @@ export async function dbFetchAllSync() {
 export async function dbFetchMembers() {
   try {
     const res = await fetch('/api/db/sync?type=members');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbFetchMembers error:', err.message);
@@ -72,7 +73,7 @@ export async function dbUpdateMemberPassword(memberId, passwordHash, email) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update_password', memberId, passwordHash, email })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbUpdateMemberPassword error:', err.message);
@@ -86,7 +87,7 @@ export async function dbUpdateMemberPassword(memberId, passwordHash, email) {
 export async function dbFetchActivations() {
   try {
     const res = await fetch('/api/db/sync?type=activations');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbFetchActivations error:', err.message);
@@ -125,7 +126,7 @@ export async function dbApproveActivation(activationId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'approve_activation', activationId })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.error('[Neon DB Bridge] dbApproveActivation error:', err.message);
@@ -143,7 +144,7 @@ export async function dbRejectActivation(activationId, reason = 'Payment verific
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'reject_activation', activationId, reason })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbRejectActivation error:', err.message);
@@ -157,7 +158,7 @@ export async function dbRejectActivation(activationId, reason = 'Payment verific
 export async function dbFetchPayoutRequests() {
   try {
     const res = await fetch('/api/db/sync?type=payouts');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbFetchPayoutRequests error:', err.message);
@@ -175,7 +176,7 @@ export async function dbCreatePayoutRequest(payout) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'create_payout', data: payout })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.error('[Neon DB Bridge] dbCreatePayoutRequest error:', err.message);
@@ -193,7 +194,7 @@ export async function dbApprovePayout(payoutId, details = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'approve_payout', payoutId, details })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.error('[Neon DB Bridge] dbApprovePayout error:', err.message);
@@ -211,7 +212,7 @@ export async function dbRejectPayout(payoutId, reason = 'KYC/Bank Mismatch') {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'reject_payout', payoutId, reason })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbRejectPayout error:', err.message);
@@ -241,7 +242,7 @@ export async function dbCheckUtrExists(utr) {
 export async function dbFetchOrders() {
   try {
     const res = await fetch('/api/db/sync?type=orders');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbFetchOrders error:', err.message);
@@ -259,7 +260,7 @@ export async function dbCreateOrder(order) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'create_order', data: order })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.error('[Neon DB Bridge] dbCreateOrder error:', err.message);
@@ -276,7 +277,7 @@ export async function dbFetchTransactions(memberId = null) {
       ? `/api/db/sync?type=transactions&memberId=${encodeURIComponent(memberId)}` 
       : '/api/db/sync?type=transactions';
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbFetchTransactions error:', err.message);
@@ -316,13 +317,13 @@ export async function dbUpdateKyc(memberId, kycData) {
 export async function dbFetchZexLinkStatus(memberId) {
   try {
     const res = await fetch(`/api/integrations/zex/status?member_id=${encodeURIComponent(memberId)}`);
-    if (!res.ok) return { ok: true, linked: false, data: null };
+    if (!res.ok) return { ok: false, error: 'Unable to check account link' };
     const data = await res.json();
     const isLinked = Boolean(data.linked || data.status?.linked);
     const linkData = data.data || data.status?.data || null;
     return { ok: true, linked: isLinked, data: linkData, status: data.status };
   } catch (err) {
-    return { ok: true, linked: false, data: null };
+    return { ok: false, error: 'Unable to check account link' };
   }
 }
 
@@ -336,7 +337,7 @@ export async function dbUpdateProfile(memberId, profile) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update_profile', memberId, profile })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbUpdateProfile error:', err.message);
@@ -374,7 +375,7 @@ export async function dbFetchKycDocuments(memberId = null) {
       ? `/api/kyc/upload?memberId=${encodeURIComponent(memberId)}` 
       : '/api/kyc/upload?all=true';
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbFetchKycDocuments error:', err.message);
@@ -451,7 +452,7 @@ export async function dbRejectKyc(memberId, adminInfo = {}) {
 export async function dbFetchAuditLogs() {
   try {
     const res = await fetch('/api/db/sync?type=audit_logs');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     const data = await res.json();
     return data.ok && Array.isArray(data.data) ? data.data : [];
   } catch (err) {
@@ -470,7 +471,7 @@ export async function dbReleaseCommissionEarly(transactionId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'release_commission_early', transactionId })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.error('[Neon DB Bridge] dbReleaseCommissionEarly error:', err.message);
@@ -488,7 +489,7 @@ export async function dbClawbackCommission(transactionId, reason = 'Buyer Refund
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'clawback_commission', transactionId, reason })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.error('[Neon DB Bridge] dbClawbackCommission error:', err.message);
@@ -502,7 +503,7 @@ export async function dbClawbackCommission(transactionId, reason = 'Buyer Refund
 export async function dbFetchLearningResources() {
   try {
     const res = await fetch('/api/db/sync?type=learning_resources');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.warn('[Neon DB Bridge] dbFetchLearningResources error:', err.message);
@@ -520,7 +521,7 @@ export async function dbSaveLearningResource(resource) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save_learning_resource', data: resource })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.error('[Neon DB Bridge] dbSaveLearningResource error:', err.message);
@@ -538,7 +539,7 @@ export async function dbDeleteLearningResource(id) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete_learning_resource', data: { id } })
     });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) { const failure = await res.json().catch(() => ({})); throw new Error(failure.error || 'Request failed'); }
     return await res.json();
   } catch (err) {
     console.error('[Neon DB Bridge] dbDeleteLearningResource error:', err.message);
@@ -548,3 +549,11 @@ export async function dbDeleteLearningResource(id) {
 
 
 
+
+export async function dbSubmitPayment(order, activation) {
+  try {
+    const response = await fetch('/api/db/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'submit_payment', order, activation }) });
+    const result = await response.json();
+    return { ...result, ok: response.ok && result.ok };
+  } catch { return { ok: false, error: 'Unable to submit payment. Please retry.' }; }
+}
