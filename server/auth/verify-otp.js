@@ -1,4 +1,4 @@
-import { transaction } from '../../server/database.js';
+import { transaction } from '../database.js';
 import { checkOrigin, readBody, fail, signSession, setSessionCookie, HttpError } from '../../server/security.js';
 import { normalizeEmail, otpHash, ensureAuthTables } from '../../server/verification.js';
 

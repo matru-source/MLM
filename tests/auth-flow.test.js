@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PGlite } from '@electric-sql/pglite';
-import { createSendOtpHandler } from '../api/auth/send-otp.js';
-import { createVerifyOtpHandler } from '../api/auth/verify-otp.js';
-import { createMemberHandler } from '../api/auth/member.js';
+import { createSendOtpHandler } from '../server/auth/send-otp.js';
+import { createVerifyOtpHandler } from '../server/auth/verify-otp.js';
+import { createMemberHandler } from '../server/auth/member.js';
 import { createAdminHandler } from '../api/admin/auth.js';
 import { hashPassword } from '../server/security.js';
 

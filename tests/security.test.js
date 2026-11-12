@@ -9,7 +9,7 @@ import kyc from '../api/kyc/upload.js';
 import connect from '../api/integrations/zex/connect.js';
 import status from '../api/integrations/zex/status.js';
 import admin from '../api/admin/auth.js';
-import sendOtp from '../api/auth/send-otp.js';
+import sendOtp from '../server/auth/send-otp.js';
 import webhook from '../api/integrations/zex/webhook.js';
 import { createWebhookHandler } from '../api/integrations/zex/webhook.js';
 import { createPurchaseHandler } from '../api/integrations/zex/purchase.js';

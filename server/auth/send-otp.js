@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { transaction } from '../../server/database.js';
+import { transaction } from '../database.js';
 import { checkOrigin, readBody, fail, HttpError, secret } from '../../server/security.js';
 import { normalizeEmail, otpHash, ensureAuthTables, rateLimit } from '../../server/verification.js';
 
