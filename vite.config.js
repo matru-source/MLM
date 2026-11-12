@@ -4,9 +4,9 @@ import { defineConfig, loadEnv } from 'vite';
 const routes = {
   '/api/db/sync': './api/db/sync.js',
   '/api/admin/auth': './api/admin/auth.js',
-  '/api/auth/member': './api/auth/[action].js',
-  '/api/auth/send-otp': './api/auth/[action].js',
-  '/api/auth/verify-otp': './api/auth/[action].js',
+  '/api/auth/member': './api/auth/dispatch.js',
+  '/api/auth/send-otp': './api/auth/dispatch.js',
+  '/api/auth/verify-otp': './api/auth/dispatch.js',
   '/api/kyc/upload': './api/kyc/upload.js',
   '/api/integrations/zex/connect': './api/integrations/zex/connect.js',
   '/api/integrations/zex/purchase': './api/integrations/zex/purchase.js',

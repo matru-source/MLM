@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import handler from '../api/auth/[action].js';
+import handler from '../api/auth/dispatch.js';
 
 test('shared authentication function preserves routes and rejects query overrides', async () => {
   for (const path of ['member', 'send-otp', 'verify-otp', 'unknown']) {
