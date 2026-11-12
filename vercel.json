@@ -1,14 +1,9 @@
 {
   "crons": [{ "path": "/api/integrations/zex/recover", "schedule": "0 2 * * *" }],
   "functions": { "api/integrations/zex/recover.js": { "maxDuration": 60 }, "api/integrations/zex/webhook.js": { "maxDuration": 60 } },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/api/.*", "status": 404 },
+    { "src": "/.*", "dest": "/index.html" }
   ]
 }
