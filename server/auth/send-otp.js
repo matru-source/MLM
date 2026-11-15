@@ -33,8 +33,10 @@ return async function handler(req, res) {
         signal: AbortSignal.timeout(15000)
       });
       if (!response.ok) throw new Error('Email provider rejected delivery');
-    } catch {
+    } catch (error) {
       await runTransaction(sql => sql`DELETE FROM auth_challenges WHERE email = ${email} AND id = ${id}`);
+      // Log only provider status/class, never the API key, OTP, or recipient address.
+      console.error('[OTP email delivery failed]', error?.statusCode || error?.status || error?.name || 'provider_error');
       throw new HttpError(502, 'Email could not be sent. Please try again.');
     }
     return res.status(200).json({ ok: true, success: true, message: 'Verification email sent' });
