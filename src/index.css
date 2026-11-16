@@ -249,6 +249,136 @@ body {
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* Focused, accessible ZEX handoff dialog */
+.zex-checkout-overlay {
+  z-index: 1100;
+  padding: 24px;
+}
+
+.zex-checkout-dialog {
+  position: relative;
+  width: min(100%, 520px);
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+  padding: 34px;
+  border: 1px solid #E3EAF5;
+  border-radius: 24px;
+  background: #FFFFFF;
+  box-shadow: 0 28px 90px rgba(15, 35, 75, 0.28);
+  color: #14213D;
+  animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.zex-checkout-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #E4EAF2;
+  border-radius: 50%;
+  background: #F7F9FC;
+  color: #5B6880;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.zex-checkout-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  margin-bottom: 18px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #EAF2FF, #DCE8FF);
+  color: #245CE5;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.zex-checkout-eyebrow {
+  color: #285FE6;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.zex-checkout-dialog h2 {
+  margin: 8px 46px 8px 0;
+  color: #14213D;
+  font-size: clamp(1.45rem, 4vw, 1.8rem);
+  line-height: 1.2;
+}
+
+.zex-checkout-lead {
+  margin: 0 0 22px;
+  color: #5B6880;
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.zex-checkout-steps {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #E8EDF5;
+  border-radius: 16px;
+  background: #F8FAFD;
+}
+
+.zex-checkout-steps > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.zex-checkout-steps > div > span {
+  display: grid;
+  flex: 0 0 27px;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 50%;
+  background: #E7EEFF;
+  color: #285FE6;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.zex-checkout-steps p { margin: 0; line-height: 1.35; }
+.zex-checkout-steps strong { display: block; color: #1A2945; font-size: 0.9rem; }
+.zex-checkout-steps small { display: block; margin-top: 3px; color: #68758B; font-size: 0.82rem; line-height: 1.45; }
+
+.zex-checkout-note {
+  margin-top: 15px;
+  padding: 12px 14px;
+  border-left: 3px solid #F0B84B;
+  border-radius: 8px;
+  background: #FFFAEB;
+  color: #6C5930;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.zex-checkout-actions { display: grid; gap: 10px; margin-top: 22px; }
+.zex-checkout-actions .btn { width: 100%; min-height: 48px; justify-content: center; }
+.zex-checkout-cancel { min-height: 42px; border: 0; background: transparent; color: #52617A; font: inherit; font-weight: 650; cursor: pointer; }
+.zex-checkout-security { margin-top: 10px; color: #77839A; font-size: 0.76rem; text-align: center; }
+
+@media (max-width: 600px) {
+  .zex-checkout-overlay { align-items: center; padding: 14px; }
+  .zex-checkout-dialog { padding: 26px 20px 20px; border-radius: 20px; max-height: 90vh; }
+  .zex-checkout-steps { padding: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zex-checkout-dialog { animation: none; }
+}
+
 /* Universal Modal Close Button - Perfectly Positioned Top-Right */
 .modal-close-btn,
 .auth-modal-close-btn,
