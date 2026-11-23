@@ -1,46 +1,113 @@
 import React, { useState } from 'react';
 import { useMlm } from '../context/MlmContext';
+import { ShieldCheck, ExternalLink, X, RefreshCw } from 'lucide-react';
 
 export default function CheckoutModal() {
-  const { isCheckoutOpen, setIsCheckoutOpen, currentMember, zexLinkStatus, initiateZexConnect, addToast } = useMlm();
-  const [busy, setBusy] = useState(false);
+  const { 
+    isCheckoutOpen, 
+    setIsCheckoutOpen, 
+    currentMember, 
+    initiateZexConnect, 
+    zexLinkStatus, 
+    refreshZexStatus,
+    addToast 
+  } = useMlm();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
   if (!isCheckoutOpen) return null;
-  const start = async () => {
-    if (busy) return;
-    setBusy(true);
+
+  const handleProceed = async () => {
+    setIsRedirecting(true);
     try {
-      if (!zexLinkStatus?.linked) {
-        const result = await initiateZexConnect(currentMember?.member_id || currentMember?.id);
-        if (!result.ok) throw new Error(result.error || 'Unable to link ZEX');
-      } else {
-        const response = await fetch('/api/integrations/zex/purchase', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.error || 'ZEX checkout is unavailable');
-        window.location.assign(result.purchase_url);
+      const memberId = currentMember?.member_id || currentMember?.id;
+      if (!memberId) {
+        addToast('error', 'Authentication Error', 'No active partner session found. Please register or sign in first.');
+        setIsRedirecting(false);
+        return;
       }
-    } catch (error) { addToast('error', 'Unable to continue', error.message); }
-    finally { setBusy(false); }
+      const res = await initiateZexConnect(memberId);
+      if (!res?.ok) {
+        addToast('error', 'Connection Error', res?.error || 'Unable to redirect to ZEX platform.');
+        setIsRedirecting(false);
+      }
+    } catch (err) {
+      console.error('[CheckoutModal] Redirect error:', err);
+      addToast('error', 'Redirect Error', err.message);
+      setIsRedirecting(false);
+    }
   };
-  return <div className="modal-overlay zex-checkout-overlay" onMouseDown={event => { if (event.target === event.currentTarget) setIsCheckoutOpen(false); }}>
-    <section className="zex-checkout-dialog" role="dialog" aria-modal="true" aria-labelledby="zex-checkout-title" aria-describedby="zex-checkout-description">
-      <button className="zex-checkout-close" type="button" aria-label="Close" onClick={() => setIsCheckoutOpen(false)}>×</button>
-      <div className="zex-checkout-mark" aria-hidden="true">Z</div>
-      <div className="zex-checkout-eyebrow">Secure checkout with ZEX</div>
-      <h2 id="zex-checkout-title">{zexLinkStatus?.linked ? 'Continue to your ZEX plan' : 'Connect your ZEX account'}</h2>
-      <p className="zex-checkout-lead" id="zex-checkout-description">
-        {zexLinkStatus?.linked ? 'Your accounts are connected. Continue to ZEX to review the plan and complete payment.' : 'Sign in to your ZEX account, or create one there, to connect it with CyberNetworking.'}
-      </p>
-      <div className="zex-checkout-steps" aria-label="What happens next">
-        <div><span>1</span><p><strong>{zexLinkStatus?.linked ? 'Review your plan' : 'Connect your account'}</strong><small>{zexLinkStatus?.linked ? 'ZEX securely opens your plan.' : 'Sign in or create an account on ZEX.'}</small></p></div>
-        <div><span>2</span><p><strong>Pay on ZEX</strong><small>Your payment is handled by ZEX.</small></p></div>
-        <div><span>3</span><p><strong>Get activated automatically</strong><small>We activate your account after ZEX confirms payment.</small></p></div>
+
+  return (
+    <div className="admin-modal-overlay">
+      <div className="admin-modal-card" style={{ maxWidth: '480px', width: '92%', borderRadius: '16px' }}>
+        <div className="admin-modal-header flex-between items-center p-4" style={{ borderBottom: '1px solid #E2E8F0' }}>
+          <div className="flex items-center gap-2">
+            <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={22} className="text-primary-blue" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-main" style={{ margin: 0 }}>License Activation via ZEX</h3>
+              <p className="text-xs text-muted" style={{ margin: 0 }}>Official ZEX 4U Security Gateway</p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setIsCheckoutOpen(false)}
+            className="btn-icon-close"
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-4 flex-col gap-3">
+          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#334155', lineHeight: 1.5 }}>
+              CyberNetworking partners activate their direct selling license and enterprise cyber defense software suite directly via <strong>ZEX 4U</strong>.
+            </p>
+            <div style={{ marginTop: '10px', fontSize: '0.8rem', color: '#64748B' }}>
+              <div>• <strong>Joining Plan:</strong> ₹2,500 (+ 18% GST = ₹2,950)</div>
+              <div>• <strong>Includes:</strong> 5-Device Software License + 10-Tier Commission Wallet</div>
+              <div>• <strong>ZEX Account Status:</strong> {zexLinkStatus?.linked ? '✓ Linked' : '⏳ Pending Connection'}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <button
+              type="button"
+              onClick={handleProceed}
+              disabled={isRedirecting}
+              className="btn btn-primary"
+              style={{
+                flex: 1,
+                padding: '12px 18px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                background: 'linear-gradient(135deg, #06B6D4 0%, #2563EB 100%)'
+              }}
+            >
+              <ExternalLink size={16} />
+              <span>{isRedirecting ? 'Connecting to ZEX...' : 'Proceed to ZEX Platform ➔'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { refreshZexStatus(); window.dispatchEvent(new Event('mlm:refresh')); }}
+              className="btn btn-secondary"
+              title="Refresh ZEX connection status"
+              style={{ padding: '12px' }}
+            >
+              <RefreshCw size={16} />
+            </button>
+          </div>
+          
+          <p style={{ fontSize: '0.72rem', color: '#94A3B8', textAlign: 'center', marginTop: '8px', marginBottom: 0 }}>
+            🔒 All transactions are secured with 256-bit encryption. Zero internal UPI forms.
+          </p>
+        </div>
       </div>
-      <div className="zex-checkout-note">Returning to CyberNetworking alone does not confirm payment. Activation follows ZEX’s verified payment notice.</div>
-      <div className="zex-checkout-actions">
-        <button className="btn btn-primary" onClick={start} disabled={busy || zexLinkStatus?.loading}>{busy ? 'Connecting…' : zexLinkStatus?.linked ? 'Continue to ZEX' : 'Connect with ZEX'}</button>
-        <button className="zex-checkout-cancel" type="button" onClick={() => setIsCheckoutOpen(false)}>Maybe later</button>
-      </div>
-      <div className="zex-checkout-security"><span aria-hidden="true">🔒</span> Payment details are entered on ZEX</div>
-    </section>
-  </div>;
+    </div>
+  );
 }

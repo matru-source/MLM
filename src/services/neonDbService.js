@@ -557,3 +557,58 @@ export async function dbSubmitPayment(order, activation) {
     return { ...result, ok: response.ok && result.ok };
   } catch { return { ok: false, error: 'Unable to submit payment. Please retry.' }; }
 }
+
+/**
+ * 27. Admin Direct Activate Member (Payment Bypass)
+ */
+export async function dbAdminDirectActivate({ memberId, reason, referenceNote, actorId, actorName }) {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'admin_direct_activate',
+        data: {
+          member_id: memberId,
+          reason,
+          reference_note: referenceNote,
+          actor_id: actorId,
+          actor_name: actorName
+        }
+      })
+    });
+    if (!res.ok) {
+      const failure = await res.json().catch(() => ({}));
+      throw new Error(failure.error || 'Direct activation request failed');
+    }
+    return await res.json();
+  } catch (err) {
+    console.error('[Neon DB Bridge] dbAdminDirectActivate error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * 28. Admin Direct Partner Onboarding (Supports Root Partner #1)
+ */
+export async function dbAdminCreatePartner(partnerData) {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'admin_create_partner',
+        data: partnerData
+      })
+    });
+    if (!res.ok) {
+      const failure = await res.json().catch(() => ({}));
+      throw new Error(failure.error || 'Partner creation request failed');
+    }
+    return await res.json();
+  } catch (err) {
+    console.error('[Neon DB Bridge] dbAdminCreatePartner error:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+

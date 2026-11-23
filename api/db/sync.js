@@ -453,8 +453,9 @@ export async function executeSync(req, res, sql) {
         await ensureAuthTables(sql);
         await consumeVerification(sql, req, email);
         if (!data?.member_id || !/^[A-Za-z0-9_-]{1,100}$/.test(data.member_id) || !data.name?.trim() || !/^\d{10}$/.test(data.phone || '')) throw new HttpError(400, 'Invalid registration details');
-        const sponsorRows = await sql`SELECT id, name, referral_code FROM members WHERE (UPPER(referral_code) = UPPER(${data.sponsor_code || 'CS123456'}) OR id = ${data.sponsor_member_id || ''}) AND seller_status = 'active' LIMIT 1`;
-        if (!sponsorRows.length) throw new HttpError(400, 'Sponsor is unavailable');
+        if (!data?.sponsor_code?.trim()) throw new HttpError(400, 'Sponsor referral code is strictly mandatory');
+        const sponsorRows = await sql`SELECT id, name, referral_code FROM members WHERE (UPPER(referral_code) = UPPER(${data.sponsor_code.trim()}) OR id = ${data.sponsor_member_id || ''}) AND seller_status = 'active' LIMIT 1`;
+        if (!sponsorRows.length) throw new HttpError(400, 'Invalid or inactive sponsor referral code');
         const sponsor = sponsorRows[0];
         const mem = { ...data, email, password: hashPassword(data.password), seller_status: 'pending_payment', customer_status: 'registered', kyc: {}, sponsor_member_id: sponsor.id, sponsor_code: sponsor.referral_code, sponsor_name: sponsor.name };
         const rows = await sql`
@@ -486,6 +487,190 @@ export async function executeSync(req, res, sql) {
           RETURNING *;
         `;
         return res.status(200).json({ ok: true, data: rows[0] });
+      }
+
+      // 2a-1. Admin Direct Activate Member (Payment Bypass)
+      if (action === 'admin_direct_activate') {
+        const memberId = data?.member_id;
+        if (!memberId) throw new HttpError(400, 'Member ID is required for direct activation');
+        const membersList = await sql`SELECT * FROM members WHERE id = ${memberId} LIMIT 1`;
+        if (!membersList.length) throw new HttpError(404, 'Member not found');
+        const buyer = membersList[0];
+
+        const updatedRows = await sql`
+          UPDATE members
+          SET seller_status = 'active',
+              customer_status = 'active_subscriber',
+              rank = CASE WHEN rank LIKE '%Pending%' THEN 'Active Partner' ELSE rank END
+          WHERE id = ${memberId}
+          RETURNING *;
+        `;
+
+        const orderId = 'CS-BYPASS-' + Math.floor(100000 + Math.random() * 900000);
+        const orderRows = await sql`
+          INSERT INTO orders (
+            order_id, cs_order_id, buyer_member_id, product_code, product_name,
+            amount, gst, total_amount, currency, payment_method, payment_ref,
+            payment_status, subscription_status, activated_by, activation_date, created_at
+          ) VALUES (
+            ${orderId},
+            ${orderId},
+            ${memberId},
+            'CYBER-PRO-JOIN',
+            'CyberNetworking Pro Enterprise (Joining Plan)',
+            2500,
+            450,
+            2950,
+            'INR',
+            'Admin Manual Clearance (Bypass)',
+            ${data?.reference_note || 'ADMIN-BYPASS'},
+            'verified',
+            'active',
+            ${data?.actor_name || 'Super Admin'},
+            NOW(),
+            NOW()
+          )
+          RETURNING *;
+        `;
+
+        await sql`
+          INSERT INTO audit_logs (
+            action, admin_id, admin_name, member_id, member_name, reason, details, created_at
+          ) VALUES (
+            'ADMIN_PAYMENT_BYPASS_ACTIVATION',
+            ${data?.actor_id || 'admin'},
+            ${data?.actor_name || 'Super Admin'},
+            ${memberId},
+            ${buyer.name},
+            ${data?.reason || 'Direct Authorization'},
+            ${'Direct partner activation authorized via admin desk. Ref: ' + (data?.reference_note || 'None')},
+            NOW()
+          );
+        `;
+
+        return res.status(200).json({ ok: true, member: updatedRows[0], order: orderRows[0] });
+      }
+
+      // 2a-2. Admin Direct Partner Onboarding (Supports Root Partner #1)
+      if (action === 'admin_create_partner') {
+        const email = normalizeEmail(data?.email);
+        await ensureAuthTables(sql);
+        if (!data?.name?.trim() || !email || !data?.phone) {
+          throw new HttpError(400, 'Name, email, and mobile phone number are required');
+        }
+
+        const cleanMobile = String(data.phone).replace(/\D/g, '');
+        if (cleanMobile.length !== 10) {
+          throw new HttpError(400, 'Mobile phone must be a valid 10-digit number');
+        }
+
+        const existing = await sql`SELECT id FROM members WHERE LOWER(email) = ${email} LIMIT 1`;
+        if (existing.length) {
+          throw new HttpError(400, `An account with email ${email} is already registered`);
+        }
+
+        let sponsorMemberId = 'ROOT';
+        let sponsorCode = 'ROOT';
+        let sponsorName = 'CyberNetworking Head Office';
+
+        if (!data?.isRoot) {
+          if (!data?.sponsorCode?.trim()) {
+            throw new HttpError(400, 'Sponsor referral code is required when not registering Root Partner');
+          }
+          const sponsorRows = await sql`
+            SELECT id, name, referral_code FROM members 
+            WHERE (UPPER(referral_code) = UPPER(${data.sponsorCode.trim()}) OR id = ${data.sponsorCode.trim()})
+            LIMIT 1
+          `;
+          if (!sponsorRows.length) {
+            throw new HttpError(400, `Sponsor referral code "${data.sponsorCode}" was not found in active partner directory`);
+          }
+          sponsorMemberId = sponsorRows[0].id;
+          sponsorCode = sponsorRows[0].referral_code;
+          sponsorName = sponsorRows[0].name;
+        }
+
+        const newMemberId = 'mem_' + Math.random().toString(36).substr(2, 9);
+        const referralCode = 'CS' + Math.floor(100000 + Math.random() * 900000);
+        const autoActivate = Boolean(data?.autoActivate);
+        const passwordHash = hashPassword(data?.password || 'Partner@2026');
+
+        const newMemRows = await sql`
+          INSERT INTO members (
+            id, name, email, phone, avatar, password, rank,
+            cs_customer_id, sponsor_member_id, sponsor_code, sponsor_name,
+            customer_status, seller_status, referral_code,
+            wallet_balance, total_earnings, kyc_data, created_at
+          ) VALUES (
+            ${newMemberId},
+            ${data.name.trim()},
+            ${email},
+            ${cleanMobile},
+            '/matru-avatar.jpg',
+            ${passwordHash},
+            ${autoActivate ? 'Active Partner' : 'Partner (Pending Plan Purchase)'},
+            ${'CS' + Math.floor(10000000 + Math.random() * 90000000)},
+            ${sponsorMemberId},
+            ${sponsorCode},
+            ${sponsorName},
+            ${autoActivate ? 'active_subscriber' : 'registered'},
+            ${autoActivate ? 'active' : 'pending_payment'},
+            ${referralCode},
+            0,
+            0,
+            ${JSON.stringify({ legal_name: data.name.trim(), verification_status: autoActivate ? 'verified' : 'unverified' })},
+            NOW()
+          )
+          RETURNING *;
+        `;
+
+        let orderRow = null;
+        if (autoActivate) {
+          const orderId = 'CS-BYPASS-' + Math.floor(100000 + Math.random() * 900000);
+          const oRows = await sql`
+            INSERT INTO orders (
+              order_id, cs_order_id, buyer_member_id, product_code, product_name,
+              amount, gst, total_amount, currency, payment_method, payment_ref,
+              payment_status, subscription_status, activated_by, activation_date, created_at
+            ) VALUES (
+              ${orderId},
+              ${orderId},
+              ${newMemberId},
+              'CYBER-PRO-JOIN',
+              'CyberNetworking Pro Enterprise (Joining Plan)',
+              2500,
+              450,
+              2950,
+              'INR',
+              'Admin Manual Clearance (Direct Onboard)',
+              ${data?.bypassRef || 'ADMIN-ONBOARD'},
+              'verified',
+              'active',
+              ${data?.actor_name || 'Super Admin'},
+              NOW(),
+              NOW()
+            )
+            RETURNING *;
+          `;
+          orderRow = oRows[0];
+        }
+
+        await sql`
+          INSERT INTO audit_logs (
+            action, admin_id, admin_name, member_id, member_name, reason, details, created_at
+          ) VALUES (
+            'ADMIN_DIRECT_PARTNER_CREATION',
+            ${data?.actor_id || 'admin'},
+            ${data?.actor_name || 'Super Admin'},
+            ${newMemberId},
+            ${data.name.trim()},
+            ${data?.isRoot ? 'Root Partner Creation' : 'Direct Desk Onboard'},
+            ${'Direct partner onboarded. Referral Code: ' + referralCode + '. Auto-active: ' + autoActivate},
+            NOW()
+          );
+        `;
+
+        return res.status(200).json({ ok: true, member: newMemRows[0], order: orderRow });
       }
 
       // 2f. Create Withdrawal / Payout Request

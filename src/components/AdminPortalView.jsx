@@ -39,6 +39,7 @@ import AdminLearningManager from './AdminLearningManager';
 import ZexHealthPanel from './AdminPortal/ZexHealthPanel';
 import { getDocumentFile, generateDocPlaceholder, saveDocumentFile } from '../utils/documentStorage';
 import { getEffectiveKycStatus, validateAadhaar, maskAadhaar } from '../utils/kycValidation';
+import { downloadTaxInvoice } from '../utils/downloadHelpers';
 
 export default function AdminPortalView() {
   const { 
@@ -53,6 +54,9 @@ export default function AdminPortalView() {
     pendingActivations = [],
     approveMemberActivation,
     rejectMemberActivation,
+    adminDirectActivateMember,
+    adminCreateDirectPartner,
+    refreshZexStatus,
     approvePayout,
     rejectPayout,
     approveKyc,
@@ -98,6 +102,33 @@ export default function AdminPortalView() {
     act: null,
     zexId: null
   });
+
+  // Direct Activation (Payment Bypass) Modal State
+  const [directActivateModal, setDirectActivateModal] = useState({
+    open: false,
+    member: null,
+    reason: 'Offline Bank Transfer / Cheque Verified',
+    referenceNote: '',
+    isSubmitting: false
+  });
+
+  // Direct Partner Onboarding (Root Partner / Manual Seat) Modal State
+  const [onboardPartnerModal, setOnboardPartnerModal] = useState({
+    open: false,
+    name: '',
+    email: '',
+    phone: '',
+    password: 'Password@2026',
+    isRoot: false,
+    sponsorCode: '',
+    autoActivate: true,
+    bypassReason: 'Founding Direct Distributor Seat',
+    bypassRef: 'DESK-ROOT-001',
+    isSubmitting: false
+  });
+
+  const [activationSearchQuery, setActivationSearchQuery] = useState('');
+  const [activationFilterStatus, setActivationFilterStatus] = useState('pending');
 
   const getDocFileInfo = (member, docKey) => {
     const docs = member?.kyc?.documents || {};
@@ -282,6 +313,7 @@ export default function AdminPortalView() {
 
   const pendingRequests = payoutRequests.filter(p => p.status === 'pending');
   const pendingTotalAmount = pendingRequests.reduce((sum, p) => sum + p.amount, 0);
+  const pendingPartnersCount = members.filter(m => m.seller_status !== 'active').length;
   const pendingActivationList = (pendingActivations || []).filter(a => a.status === 'pending');
   const coolingOffTransactions = (transactions || []).filter(t => t.status === 'Pending' && t.type === 'credit');
   const coolingOffTotalAmount = coolingOffTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -289,6 +321,24 @@ export default function AdminPortalView() {
     t.type === 'company_reserve' || (t.description && t.description.includes('Company Reserve'))
   );
   const reserveTransactionsTotal = reserveTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const filteredActivationMembers = members.filter(m => {
+    if (activationFilterStatus === 'pending') {
+      if (m.seller_status === 'active') return false;
+    } else if (activationFilterStatus === 'active') {
+      if (m.seller_status !== 'active') return false;
+    }
+    if (!activationSearchQuery.trim()) return true;
+    const q = activationSearchQuery.toLowerCase();
+    return (
+      (m.name && m.name.toLowerCase().includes(q)) ||
+      (m.email && m.email.toLowerCase().includes(q)) ||
+      (m.phone && m.phone.includes(q)) ||
+      (m.member_id && m.member_id.toLowerCase().includes(q)) ||
+      (m.sponsor_code && m.sponsor_code.toLowerCase().includes(q)) ||
+      (m.referral_code && m.referral_code.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <div className="admin-app-layout">
@@ -328,10 +378,10 @@ export default function AdminPortalView() {
               <Users size={17} />
               <span>Partner Activations</span>
             </div>
-            {pendingActivationList.length > 0 ? (
-              <span className="admin-nav-badge badge-pending">{pendingActivationList.length} Pending</span>
+            {pendingPartnersCount > 0 ? (
+              <span className="admin-nav-badge badge-pending">{pendingPartnersCount} Pending</span>
             ) : (
-              <span className="admin-nav-badge">{pendingActivations.length}</span>
+              <span className="admin-nav-badge">{members.length}</span>
             )}
           </button>
 
@@ -547,7 +597,188 @@ export default function AdminPortalView() {
             </div>
           </div>
 
-        {adminTab === 'activations' && <div className="admin-panel-card card-white"><h3>Automatic ZEX activation</h3><p>Accounts activate when ZEX confirms an eligible product payment. Historical manual requests require separate reconciliation.</p></div>}
+        {adminTab === 'activations' && (
+          <div className="admin-panel-card card-white">
+            <div className="admin-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h3 className="admin-panel-title">Partner Activations & ZEX Gateway Desk</h3>
+                <p className="admin-panel-subtitle">
+                  Review partner registrations, verify live ZEX Platform link status, or authorize instant partner activations via Admin Payment Bypass.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setOnboardPartnerModal({
+                    open: true,
+                    name: '',
+                    email: '',
+                    phone: '',
+                    password: 'Password@2026',
+                    isRoot: members.length === 0,
+                    sponsorCode: '',
+                    autoActivate: true,
+                    bypassReason: 'Founding Direct Distributor Seat',
+                    bypassRef: 'DESK-DIRECT-001',
+                    isSubmitting: false
+                  })}
+                  className="btn btn-primary btn-sm"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#2563EB' }}
+                >
+                  <Users size={15} />
+                  <span>+ Onboard Direct Partner</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', margin: '16px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F1F5F9', padding: '6px 12px', borderRadius: '8px', flex: 1, minWidth: '240px' }}>
+                <Search size={16} className="text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, phone, or sponsor code..."
+                  value={activationSearchQuery}
+                  onChange={(e) => setActivationSearchQuery(e.target.value)}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActivationFilterStatus('pending')}
+                  className={`btn btn-sm ${activationFilterStatus === 'pending' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '0.78rem' }}
+                >
+                  Pending Activations ({members.filter(m => m.seller_status !== 'active').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivationFilterStatus('all')}
+                  className={`btn btn-sm ${activationFilterStatus === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '0.78rem' }}
+                >
+                  All Partners ({members.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivationFilterStatus('active')}
+                  className={`btn btn-sm ${activationFilterStatus === 'active' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '0.78rem' }}
+                >
+                  Active ({members.filter(m => m.seller_status === 'active').length})
+                </button>
+              </div>
+            </div>
+
+            {/* Table of Partners */}
+            <div className="table-responsive">
+              <table className="coach-table">
+                <thead>
+                  <tr>
+                    <th>Partner / Applicant</th>
+                    <th>Contact Info</th>
+                    <th>Sponsor Upline</th>
+                    <th>ZEX Connection</th>
+                    <th>Account Status</th>
+                    <th>Joined Date</th>
+                    <th className="text-right">Admin Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredActivationMembers.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="text-center py-8 text-muted">
+                        No partners match the current filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredActivationMembers.map(m => {
+                      const isLinked = Boolean(m.zex_user_id || m.mlm_account?.zex_user_id || m.software_license?.zex_user_id);
+                      const isPending = m.seller_status !== 'active';
+                      return (
+                        <tr key={m.member_id || m.id}>
+                          <td>
+                            <div className="font-semibold text-main">{m.name}</div>
+                            <div className="code-font text-xs text-muted">{m.member_id || m.id}</div>
+                            {m.referral_code && (
+                              <span className="badge badge-blue font-2xs" style={{ marginTop: '2px' }}>
+                                Ref: {m.referral_code}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="text-sm">{m.email}</div>
+                            <div className="text-xs text-muted">{m.phone || 'No phone'}</div>
+                          </td>
+                          <td>
+                            <div className="font-semibold text-sm">{m.sponsor_name || 'CyberNetworking Root'}</div>
+                            <div className="code-font text-xs text-primary-blue">{m.sponsor_code || m.sponsor_member_id || 'ROOT'}</div>
+                          </td>
+                          <td>
+                            {isLinked ? (
+                              <span className="badge badge-green font-xs flex items-center gap-1" style={{ width: 'fit-content' }}>
+                                <Check size={12} />
+                                <span>Linked ({m.zex_user_id || m.mlm_account?.zex_user_id || 'ZEX-OK'})</span>
+                              </span>
+                            ) : (
+                              <span className="badge badge-amber font-xs flex items-center gap-1" style={{ width: 'fit-content' }}>
+                                <Clock size={12} />
+                                <span>⏳ Unlinked</span>
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`badge ${isPending ? 'badge-amber' : 'badge-green'} font-xs`}>
+                              {isPending ? '⏳ Pending Plan Activation' : '✓ Active Seller'}
+                            </span>
+                          </td>
+                          <td className="text-xs text-muted">
+                            {m.joined_at || m.created_at ? new Date(m.joined_at || m.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent'}
+                          </td>
+                          <td className="text-right">
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                              {isPending && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDirectActivateModal({
+                                    open: true,
+                                    member: m,
+                                    reason: 'Offline Bank Transfer / Cheque Verified',
+                                    referenceNote: '',
+                                    isSubmitting: false
+                                  })}
+                                  className="btn btn-primary btn-sm flex items-center gap-1"
+                                  style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', borderColor: '#059669', fontSize: '0.75rem', padding: '6px 10px' }}
+                                  title="Activate partner without online payment"
+                                >
+                                  <ShieldCheck size={13} />
+                                  <span>⚡ Direct Activate (Bypass)</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  refreshZexStatus(m.member_id || m.id);
+                                  addToast('info', 'ZEX Query Dispatched', `Checking real-time ZEX gateway status for ${m.name}...`);
+                                }}
+                                className="btn btn-secondary btn-sm"
+                                style={{ fontSize: '0.75rem', padding: '6px 8px' }}
+                                title="Sync with ZEX Gateway"
+                              >
+                                <RotateCcw size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* TAB 1: BANK PAYOUT DISBURSEMENTS */}
         {adminTab === 'payouts' && (
@@ -683,10 +914,20 @@ export default function AdminPortalView() {
                         <td><span className="badge badge-green">Paid (CyberNetworking)</span></td>
                         <td>
                           <button 
-                            onClick={() => addToast('info', 'Invoice Exported', `Exported invoice for #${o.order_id}`)}
-                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              const buyerMember = members.find(m => m.member_id === o.buyer_member_id || m.id === o.buyer_member_id) || {
+                                name: o.buyer_name,
+                                email: o.buyer_email,
+                                member_id: o.buyer_member_id
+                              };
+                              downloadTaxInvoice({ order: o, member: buyerMember });
+                              addToast('success', 'Tax Invoice Downloaded', `Generated official GST Tax Invoice for #${o.order_id}`);
+                            }}
+                            className="btn btn-secondary btn-sm flex items-center gap-1"
+                            title="Download Vector PDF Tax Invoice"
                           >
-                            Invoice
+                            <Download size={13} />
+                            <span>Invoice</span>
                           </button>
                         </td>
                       </tr>
@@ -2767,6 +3008,289 @@ export default function AdminPortalView() {
                 <span>Confirm & Approve Partner</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN DIRECT ACTIVATION (PAYMENT BYPASS) MODAL */}
+      {directActivateModal.open && directActivateModal.member && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-card" style={{ maxWidth: '520px', width: '92%' }}>
+            <div className="admin-modal-header flex-between items-center p-4" style={{ borderBottom: '1px solid #E2E8F0' }}>
+              <div className="flex items-center gap-2">
+                <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShieldCheck size={22} className="text-emerald" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-main" style={{ margin: 0 }}>Authorize Direct Partner Activation</h3>
+                  <p className="text-xs text-muted" style={{ margin: 0 }}>Admin Payment Bypass & License Provisioning</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false })}
+                className="btn-icon-close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (directActivateModal.isSubmitting) return;
+              setDirectActivateModal(prev => ({ ...prev, isSubmitting: true }));
+              
+              await adminDirectActivateMember({
+                memberId: directActivateModal.member.member_id || directActivateModal.member.id,
+                reason: directActivateModal.reason,
+                referenceNote: directActivateModal.referenceNote
+              });
+
+              setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false });
+            }}>
+              <div className="p-4 flex-col gap-3">
+                <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '0.82rem' }}>
+                  <div className="flex-between mb-1">
+                    <span className="text-muted">Target Partner:</span>
+                    <strong className="text-main">{directActivateModal.member.name}</strong>
+                  </div>
+                  <div className="flex-between mb-1">
+                    <span className="text-muted">Email:</span>
+                    <span className="text-main">{directActivateModal.member.email}</span>
+                  </div>
+                  <div className="flex-between mb-1">
+                    <span className="text-muted">Member ID:</span>
+                    <span className="code-font text-primary-blue">{directActivateModal.member.member_id || directActivateModal.member.id}</span>
+                  </div>
+                  <div className="flex-between">
+                    <span className="text-muted">Assigned Sponsor:</span>
+                    <span className="code-font text-emerald">{directActivateModal.member.sponsor_code || 'ROOT'}</span>
+                  </div>
+                </div>
+
+                <div className="form-group-clean">
+                  <label className="form-label-clean">Clearance & Bypass Reason *</label>
+                  <select
+                    className="form-input-clean"
+                    value={directActivateModal.reason}
+                    onChange={(e) => setDirectActivateModal(prev => ({ ...prev, reason: e.target.value }))}
+                    required
+                  >
+                    <option value="Offline Bank Transfer / Cheque Verified">Offline Bank Transfer / Cheque Verified</option>
+                    <option value="Founding Distributor / Key Executive">Founding Distributor / Key Executive</option>
+                    <option value="Corporate Complimentary Seat">Corporate Complimentary Seat</option>
+                    <option value="Direct Selling Management Discretionary Approval">Direct Selling Management Discretionary Approval</option>
+                  </select>
+                </div>
+
+                <div className="form-group-clean">
+                  <label className="form-label-clean">Payment / Authorization Reference Note</label>
+                  <input
+                    type="text"
+                    className="form-input-clean code-font"
+                    placeholder="e.g. CHQ-SBI-98231 or OFFLINE-NEFT-5501"
+                    value={directActivateModal.referenceNote}
+                    onChange={(e) => setDirectActivateModal(prev => ({ ...prev, referenceNote: e.target.value }))}
+                  />
+                  <span className="text-2xs text-muted" style={{ display: 'block', marginTop: '4px' }}>
+                    Recorded permanently in the compliance audit trail and GST tax invoice.
+                  </span>
+                </div>
+
+                <div style={{ background: '#FFFBEB', padding: '12px', borderRadius: '8px', border: '1px solid #FDE68A', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <AlertCircle size={16} className="text-amber shrink-0 mt-0.5" />
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400E', lineHeight: 1.4 }}>
+                    <strong>Statutory Note:</strong> Direct activation bypasses external online checkout, unlocks the partner's 10-tier commission matrix, creates a paid retail order record (#CS-BYPASS-XXXX), and provisions 5 device protection software licenses.
+                  </p>
+                </div>
+              </div>
+
+              <div className="admin-modal-footer flex-between items-center p-3" style={{ borderTop: '1px solid #E2E8F0' }}>
+                <button
+                  type="button"
+                  onClick={() => setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false })}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={directActivateModal.isSubmitting}
+                  className="btn btn-primary btn-sm flex items-center gap-1.5"
+                  style={{ background: '#059669', borderColor: '#059669' }}
+                >
+                  <CheckCircle2 size={15} />
+                  <span>{directActivateModal.isSubmitting ? 'Activating...' : 'Confirm & Direct Activate'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN DIRECT PARTNER ONBOARDING MODAL (Supports Partner #1 Root) */}
+      {onboardPartnerModal.open && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-card" style={{ maxWidth: '560px', width: '92%' }}>
+            <div className="admin-modal-header flex-between items-center p-4" style={{ borderBottom: '1px solid #E2E8F0' }}>
+              <div className="flex items-center gap-2">
+                <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Users size={22} className="text-primary-blue" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-main" style={{ margin: 0 }}>Onboard Direct Partner</h3>
+                  <p className="text-xs text-muted" style={{ margin: 0 }}>Executive Direct Registration Desk (Root / Downline)</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setOnboardPartnerModal(prev => ({ ...prev, open: false }))}
+                className="btn-icon-close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (onboardPartnerModal.isSubmitting) return;
+
+              if (!onboardPartnerModal.isRoot && !onboardPartnerModal.sponsorCode.trim()) {
+                addToast('error', 'Sponsor Required', 'Please provide a sponsor referral code or check the Root Partner toggle.');
+                return;
+              }
+
+              setOnboardPartnerModal(prev => ({ ...prev, isSubmitting: true }));
+
+              const res = await adminCreateDirectPartner({
+                name: onboardPartnerModal.name,
+                email: onboardPartnerModal.email,
+                phone: onboardPartnerModal.phone,
+                password: onboardPartnerModal.password,
+                isRoot: onboardPartnerModal.isRoot,
+                sponsorCode: onboardPartnerModal.sponsorCode,
+                autoActivate: onboardPartnerModal.autoActivate,
+                bypassReason: onboardPartnerModal.bypassReason,
+                bypassRef: onboardPartnerModal.bypassRef
+              });
+
+              setOnboardPartnerModal(prev => ({ ...prev, isSubmitting: false, open: !res?.ok }));
+            }}>
+              <div className="p-4 flex-col gap-3">
+                <div className="form-group-clean">
+                  <label className="form-label-clean">Partner Legal Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input-clean"
+                    placeholder="e.g. Alex Kumar"
+                    value={onboardPartnerModal.name}
+                    onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group-clean">
+                    <label className="form-label-clean">Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      className="form-input-clean"
+                      placeholder="alex@example.com"
+                      value={onboardPartnerModal.email}
+                      onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group-clean">
+                    <label className="form-label-clean">10-Digit Mobile Phone *</label>
+                    <input
+                      type="tel"
+                      required
+                      className="form-input-clean"
+                      placeholder="9876543210"
+                      value={onboardPartnerModal.phone}
+                      onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group-clean">
+                  <label className="form-label-clean">Initial Login Password *</label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input-clean"
+                    value={onboardPartnerModal.password}
+                    onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, password: e.target.value }))}
+                  />
+                </div>
+
+                {/* Root Partner Toggle */}
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#0F172A' }}>
+                    <input
+                      type="checkbox"
+                      checked={onboardPartnerModal.isRoot}
+                      onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, isRoot: e.target.checked }))}
+                      style={{ width: 16, height: 16 }}
+                    />
+                    <span>Root Partner (Top of Network Tree — No Upline Sponsor Required)</span>
+                  </label>
+                  <p style={{ margin: '4px 0 0 26px', fontSize: '0.74rem', color: '#64748B' }}>
+                    Enable this when onboarding the 1st partner in the company. All future partners can join using this partner's referral code.
+                  </p>
+
+                  {!onboardPartnerModal.isRoot && (
+                    <div style={{ marginTop: '12px', paddingLeft: '26px' }}>
+                      <label className="form-label-clean">Sponsor Referral Code *</label>
+                      <input
+                        type="text"
+                        required={!onboardPartnerModal.isRoot}
+                        className="form-input-clean code-font font-bold"
+                        placeholder="e.g. CS123456"
+                        value={onboardPartnerModal.sponsorCode}
+                        onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, sponsorCode: e.target.value.toUpperCase().trim() }))}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Auto Activate Toggle */}
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '12px 14px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#065F46' }}>
+                    <input
+                      type="checkbox"
+                      checked={onboardPartnerModal.autoActivate}
+                      onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, autoActivate: e.target.checked }))}
+                      style={{ width: 16, height: 16 }}
+                    />
+                    <span>Direct Activate Immediately (Payment Bypass / Complimentary Onboarding)</span>
+                  </label>
+                  <p style={{ margin: '4px 0 0 26px', fontSize: '0.74rem', color: '#047857' }}>
+                    Automatically unlocks software license, sets status to Active, and allocates matrix placement without requiring ZEX gateway payment.
+                  </p>
+                </div>
+              </div>
+
+              <div className="admin-modal-footer flex-between items-center p-3" style={{ borderTop: '1px solid #E2E8F0' }}>
+                <button
+                  type="button"
+                  onClick={() => setOnboardPartnerModal(prev => ({ ...prev, open: false }))}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={onboardPartnerModal.isSubmitting}
+                  className="btn btn-primary btn-sm flex items-center gap-1.5"
+                  style={{ background: '#2563EB', borderColor: '#2563EB' }}
+                >
+                  <Users size={15} />
+                  <span>{onboardPartnerModal.isSubmitting ? 'Onboarding...' : 'Onboard Partner Now'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

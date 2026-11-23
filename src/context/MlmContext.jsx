@@ -39,7 +39,9 @@ import {
   dbReleaseCommissionEarly,
   dbClawbackCommission,
   dbSaveLearningResource,
-  dbDeleteLearningResource
+  dbDeleteLearningResource,
+  dbAdminDirectActivate,
+  dbAdminCreatePartner
 } from '../services/neonDbService';
 import { initialLearningResources } from '../data/learningResources';
 import { hashPassword, verifyPassword } from '../utils/cryptoAuth';
@@ -362,8 +364,17 @@ export function MlmProvider({ children }) {
   const validateReferralCode = (code, userEmail = null, userPhone = null) => {
     const clean = (code || '').trim().toUpperCase();
 
-    // If empty, ROOT, HEAD, or CS123456: Enrolls directly under Head Office
-    if (!clean || clean === 'CS123456' || clean === 'ROOT' || clean === 'HEAD') {
+    // If empty: Sponsor is strictly mandatory
+    if (!clean) {
+      return {
+        valid: false,
+        reason: 'required',
+        message: 'Sponsor referral code is strictly mandatory to join CyberNetworking.'
+      };
+    }
+
+    // Explicit Root Head Office referral codes
+    if (clean === 'CS123456' || clean === 'ROOT' || clean === 'HEAD') {
       const rootPartner = members.find(m => m.referral_code === 'CS123456' || m.member_id === 'mem_matru') || {
         member_id: 'mem_matru',
         name: 'CyberNetworking Head Office',
@@ -779,10 +790,9 @@ export function MlmProvider({ children }) {
 
     // Persist to live Neon PostgreSQL with cryptographically hashed password
 
-    addToast('success', 'Account created', 'Link your ZEX account to continue.');
+    addToast('success', 'Account created', 'Connecting to ZEX platform for license activation.');
     
-    setIsCheckoutOpen(true);
-    return { ok: true };
+    return { ok: true, member_id: newMemberId };
   };
 
   // Submit / Update Member KYC & Payout Bank Details
@@ -1157,6 +1167,77 @@ export function MlmProvider({ children }) {
   const approveMemberActivation = activationId => performFinancialAction(() => dbApproveActivation(activationId), 'Activation approved');
   const rejectMemberActivation = (activationId, reason) => performFinancialAction(() => dbRejectActivation(activationId, reason), 'Activation rejected');
 
+  // Admin Direct Activation (Payment Bypass)
+  const adminDirectActivateMember = async ({ memberId, reason, referenceNote }) => {
+    try {
+      const res = await dbAdminDirectActivate({
+        memberId,
+        reason,
+        referenceNote,
+        actorId: currentMemberId || 'admin_direct',
+        actorName: currentMember?.name || 'Super Admin'
+      });
+
+      if (!res || !res.ok) {
+        throw new Error(res?.error || 'Direct activation could not be completed.');
+      }
+
+      // Optimistically update partner list
+      setMembers(prev => prev.map(m => {
+        if (m.member_id === memberId || m.id === memberId) {
+          return {
+            ...m,
+            seller_status: 'active',
+            customer_status: 'active_subscriber',
+            rank: 'Active Partner'
+          };
+        }
+        return m;
+      }));
+
+      // Add order
+      if (res.order) {
+        setOrders(prev => [res.order, ...prev]);
+      }
+
+      addToast('success', 'Partner Direct-Activated', 'Account activated via Admin Payment Bypass. Software license & matrix unlocked.');
+      return { ok: true, data: res };
+    } catch (err) {
+      console.error('[adminDirectActivateMember] Error:', err);
+      addToast('error', 'Direct Activation Failed', err.message);
+      return { ok: false, error: err.message };
+    }
+  };
+
+  // Admin Direct Partner Onboarding (Supports Root Partner #1)
+  const adminCreateDirectPartner = async (partnerData) => {
+    try {
+      const res = await dbAdminCreatePartner({
+        ...partnerData,
+        actorId: currentMemberId || 'admin_direct',
+        actorName: currentMember?.name || 'Super Admin'
+      });
+
+      if (!res || !res.ok) {
+        throw new Error(res?.error || 'Partner creation could not be saved.');
+      }
+
+      if (res.member) {
+        setMembers(prev => [res.member, ...prev]);
+      }
+      if (res.order) {
+        setOrders(prev => [res.order, ...prev]);
+      }
+
+      addToast('success', 'Partner Created Successfully', `Partner ${partnerData.name} onboarded with code ${res.member?.referral_code || 'assigned'}.`);
+      return { ok: true, member: res.member, order: res.order };
+    } catch (err) {
+      console.error('[adminCreateDirectPartner] Error:', err);
+      addToast('error', 'Direct Onboard Failed', err.message);
+      return { ok: false, error: err.message };
+    }
+  };
+
   const loginUserByEmail = async ({ email, password }) => {
     const result = await authRequest('/api/auth/member', { action: 'login', email, password });
     if (!result.ok) return result;
@@ -1362,6 +1443,8 @@ export function MlmProvider({ children }) {
       rejectPayout,
       approveMemberActivation,
       rejectMemberActivation,
+      adminDirectActivateMember,
+      adminCreateDirectPartner,
       releaseCommissionEarly,
       clawbackCommission,
       toasts,

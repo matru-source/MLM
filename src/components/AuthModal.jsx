@@ -1,4 +1,3 @@
-import { lookupReferral } from '../services/sessionService';
 import React, { useState, useEffect } from 'react';
 import { useMlm } from '../context/MlmContext';
 import { 
@@ -33,6 +32,7 @@ export default function AuthModal() {
     registerUser, 
     setIsLoggedIn,
     openCheckout,
+    initiateZexConnect,
     activeReferral,
     getMemberByReferralCode,
     validateReferralCode,
@@ -164,14 +164,19 @@ export default function AuthModal() {
     }
 
     // 4. Password Strength Validation
-    if (!password || password.length < 8) {
-      addToast('error', 'Password Too Short', 'Password must be at least 8 characters long.');
+    if (!password || password.length < 6) {
+      addToast('error', 'Password Too Short', 'Password must be at least 6 characters long.');
       return;
     }
 
-    // 5. Sponsor Referral Code (Defaults to Head Office Root CS123456 if left empty)
-    const cleanSponsor = (sponsorId || '').trim().toUpperCase() || 'CS123456';
-    const sponsorCheck = await lookupReferral(cleanSponsor);
+    // 5. Sponsor Referral Code (Strictly Mandatory)
+    const cleanSponsor = (sponsorId || '').trim().toUpperCase();
+    if (!cleanSponsor) {
+      setSponsorError('Sponsor referral code is strictly mandatory to join CyberNetworking.');
+      addToast('error', 'Sponsor Code Required', 'Please enter a valid sponsor referral code to continue.');
+      return;
+    }
+    const sponsorCheck = validateReferralCode(cleanSponsor, email, mobile);
     if (!sponsorCheck.valid) {
       setSponsorError(sponsorCheck.message);
       addToast('error', 'Sponsor Verification Failed', sponsorCheck.message);
@@ -194,7 +199,7 @@ export default function AuthModal() {
       }
     } catch (err) {
       setIsSendingOtp(false);
-      setOtpErrorMessage(err.message || 'Failed to send verification code. Please try again.');
+      setOtpErrorMessage('Failed to send verification code. Please try again.');
     }
   };
 
@@ -204,13 +209,14 @@ export default function AuthModal() {
     setIsSendingOtp(true);
     setOtpErrorMessage('');
 
-    try {
-      await sendEmailOtp({ email, fullName });
-      setOtpCountdown(60); setCanResend(false);
-      addToast('success', 'OTP Resent', 'Check your inbox for the new code.');
-    } catch (error) { setOtpErrorMessage(error.message); }
-    finally { setIsSendingOtp(false); }
+    const result = await sendEmailOtp({ email, fullName });
+    setIsSendingOtp(false);
+    setOtpCountdown(60);
+    setCanResend(false);
 
+    if (result.success) {
+      addToast('success', 'OTP Resent!', `New verification code delivered to ${email}. Check your inbox.`);
+    }
   };
 
   // Handle Step 2: Verify OTP and Register
@@ -227,12 +233,19 @@ export default function AuthModal() {
       return;
     }
 
-    const cleanSponsor = (sponsorId || '').trim().toUpperCase() || 'CS123456';
-    const sponsorCheck = await lookupReferral(cleanSponsor);
-    const verifiedSponsor = sponsorCheck.valid ? sponsorCheck.member : null;
+    const cleanSponsor = (sponsorId || '').trim().toUpperCase();
+    if (!cleanSponsor) {
+      setOtpErrorMessage('Sponsor referral code is strictly mandatory.');
+      return;
+    }
+    const sponsorCheck = validateReferralCode(cleanSponsor, email, mobile);
+    if (!sponsorCheck.valid) {
+      setOtpErrorMessage(sponsorCheck.message);
+      return;
+    }
+    const verifiedSponsor = sponsorCheck.member;
 
-    if (!sponsorCheck.valid) { setOtpErrorMessage(sponsorCheck.message); return; }
-    // OTP Verified! Register user and advance to plan purchase
+    // OTP Verified! Register user and advance directly to ZEX connect
     const registration = await registerUser({
       fullName: fullName.trim(),
       email: email.trim(),
@@ -240,13 +253,26 @@ export default function AuthModal() {
       password,
       sponsorId: cleanSponsor,
       sponsorMemberId: verifiedSponsor?.member_id || cleanSponsor,
-      sponsorName: verifiedSponsor?.name || 'CyberShield Head Office',
+      sponsorName: verifiedSponsor?.name || 'CyberNetworking Partner',
       isSeller
     });
-    if (!registration?.ok) { setOtpErrorMessage(registration?.error || 'Registration could not be saved'); return; }
+
+    if (registration && !registration.ok) {
+      setOtpErrorMessage(registration.error || 'Registration failed to save');
+      return;
+    }
 
     setIsAuthModalOpen(false);
-    addToast('success', 'Email Verified!', 'Account created successfully. Link your ZEX account to continue.');
+    addToast('success', 'Email Verified!', 'Account created successfully. Redirecting to ZEX for license activation...');
+
+    const targetMemberId = registration?.member_id || registration?.data?.id;
+    if (targetMemberId && initiateZexConnect) {
+      try {
+        await initiateZexConnect(targetMemberId);
+      } catch (e) {
+        console.warn('[Post-OTP ZEX Handshake] Warning:', e);
+      }
+    }
   };
 
   // Handle Login submission with Cryptographic Password Verification
@@ -298,10 +324,15 @@ export default function AuthModal() {
       return;
     }
 
+    const foundMember = (members || []).find(m => m.email && m.email.toLowerCase() === cleanEmail);
+    if (!foundMember) {
+      setForgotError(`No registered partner account found with email "${cleanEmail}".`);
+      return;
+    }
 
     setIsSendingResetOtp(true);
     try {
-      const res = await sendEmailOtp({ email: cleanEmail, fullName: 'Partner' });
+      const res = await sendEmailOtp({ email: cleanEmail, fullName: foundMember.name });
       if (!res.success) {
         setForgotError(res.message || 'Failed to dispatch password reset code.');
         return;
@@ -327,8 +358,8 @@ export default function AuthModal() {
       return;
     }
 
-    if (!newPassword || newPassword.length < 8) {
-      setForgotError('New password must contain at least 8 characters.');
+    if (!newPassword || newPassword.length < 6) {
+      setForgotError('New password must contain at least 6 characters.');
       return;
     }
 
@@ -344,6 +375,11 @@ export default function AuthModal() {
       return;
     }
 
+    const foundMember = (members || []).find(m => m.email && m.email.toLowerCase() === cleanEmail);
+    if (!foundMember) {
+      setForgotError('Account not found.');
+      return;
+    }
 
     setIsResettingPassword(true);
     try {
@@ -476,7 +512,7 @@ export default function AuthModal() {
                   <div className="form-group-clean mb-0">
                     <div className="flex-between items-center mb-1">
                       <label className="form-label-clean mb-0">
-                        Sponsor Referral Code
+                        Sponsor Referral Code <span style={{ color: '#EF4444' }}>*</span>
                       </label>
                       {activeReferral ? (
                         <span className="badge badge-green font-2xs font-bold">
@@ -487,8 +523,8 @@ export default function AuthModal() {
                           Specified
                         </span>
                       ) : (
-                        <span className="badge font-2xs" style={{ background: '#F1F5F9', color: '#64748B' }}>
-                          Optional (Head Office)
+                        <span className="badge badge-rose font-2xs font-bold">
+                          Mandatory
                         </span>
                       )}
                     </div>
@@ -499,7 +535,8 @@ export default function AuthModal() {
                         setSponsorId(e.target.value.toUpperCase().trim());
                         setSponsorError('');
                       }}
-                      placeholder="Enter Sponsor Code or leave empty"
+                      placeholder="e.g. CS743498 (Mandatory)"
+                      required
                       className={`form-input-clean code-font font-bold ${
                         sponsorError 
                           ? 'input-border-red' 
@@ -513,16 +550,16 @@ export default function AuthModal() {
                       const clean = (sponsorId || '').trim().toUpperCase();
                       if (!clean) {
                         return (
-                          <div className="sponsor-direct-hint" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37, 99, 235, 0.06)', border: '1px solid rgba(37, 99, 235, 0.2)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
-                            <ShieldCheck size={16} style={{ color: '#2563EB', flexShrink: 0 }} />
-                            <span style={{ fontSize: '0.78rem', color: '#1E40AF', lineHeight: 1.35 }}>
-                              <strong>Direct Enrollment:</strong> Registered under <strong>Head Office Root (CS123456)</strong> with full partner rights.
+                          <div className="sponsor-direct-hint" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
+                            <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.78rem', color: '#991B1B', lineHeight: 1.35 }}>
+                              <strong>Sponsor Code Required:</strong> Enter a valid referral code from the partner who invited you.
                             </span>
                           </div>
                         );
                       }
 
-                      const check = null;
+                      const check = validateReferralCode ? validateReferralCode(clean, email, mobile) : null;
                       if (check && check.valid) {
                         return (
                           <div className="sponsor-verified-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
