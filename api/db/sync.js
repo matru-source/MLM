@@ -545,17 +545,20 @@ export async function executeSync(req, res, sql) {
           RETURNING *;
         `;
 
+        await ensureAuditTable(sql);
+        const auditId = `audit_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         await sql`
           INSERT INTO audit_logs (
-            action, admin_id, admin_name, member_id, member_name, reason, details, created_at
+            id, action, admin_id, admin_name, member_id, member_name, reason, details, created_at
           ) VALUES (
+            ${auditId},
             'ADMIN_PAYMENT_BYPASS_ACTIVATION',
             ${data?.actor_id || 'admin'},
             ${data?.actor_name || 'Super Admin'},
             ${memberId},
             ${buyer.name},
             ${data?.reason || 'Direct Authorization'},
-            ${'Direct partner activation authorized via admin desk. Ref: ' + (data?.reference_note || 'None')},
+            ${JSON.stringify({ note: 'Direct partner activation authorized via admin desk. Ref: ' + (data?.reference_note || 'None') })},
             NOW()
           );
         `;
@@ -667,17 +670,20 @@ export async function executeSync(req, res, sql) {
           orderRow = oRows[0];
         }
 
+        await ensureAuditTable(sql);
+        const auditId = `audit_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         await sql`
           INSERT INTO audit_logs (
-            action, admin_id, admin_name, member_id, member_name, reason, details, created_at
+            id, action, admin_id, admin_name, member_id, member_name, reason, details, created_at
           ) VALUES (
+            ${auditId},
             'ADMIN_DIRECT_PARTNER_CREATION',
             ${data?.actor_id || 'admin'},
             ${data?.actor_name || 'Super Admin'},
             ${newMemberId},
             ${data.name.trim()},
             ${data?.isRoot ? 'Root Partner Creation' : 'Direct Desk Onboard'},
-            ${'Direct partner onboarded. Referral Code: ' + referralCode + '. Auto-active: ' + autoActivate},
+            ${JSON.stringify({ referral_code: referralCode, auto_active: autoActivate, is_root: Boolean(data?.isRoot) })},
             NOW()
           );
         `;
