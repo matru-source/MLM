@@ -3086,20 +3086,23 @@ export default function AdminPortalView() {
               </button>
             </div>
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (directActivateModal.isSubmitting) return;
-              setDirectActivateModal(prev => ({ ...prev, isSubmitting: true }));
-              
-              await adminDirectActivateMember({
-                memberId: directActivateModal.member.member_id || directActivateModal.member.id,
-                reason: directActivateModal.reason,
-                referenceNote: directActivateModal.referenceNote
-              });
+            <form 
+              style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (directActivateModal.isSubmitting) return;
+                setDirectActivateModal(prev => ({ ...prev, isSubmitting: true }));
+                
+                await adminDirectActivateMember({
+                  memberId: directActivateModal.member.member_id || directActivateModal.member.id,
+                  reason: directActivateModal.reason,
+                  referenceNote: directActivateModal.referenceNote
+                });
 
-              setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false });
-            }}>
-              <div className="admin-modal-body p-4 flex-col gap-3">
+                setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false });
+              }}
+            >
+              <div className="admin-modal-body p-4 flex-col gap-3" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '0.82rem' }}>
                   <div className="flex-between mb-1">
                     <span className="text-muted">Target Partner:</span>
@@ -3216,32 +3219,35 @@ export default function AdminPortalView() {
               </button>
             </div>
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (onboardPartnerModal.isSubmitting) return;
+            <form 
+              style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (onboardPartnerModal.isSubmitting) return;
 
-              if (!onboardPartnerModal.isRoot && !onboardPartnerModal.sponsorCode.trim()) {
-                addToast('error', 'Sponsor Required', 'Please provide a sponsor referral code or choose Company Root Partner.');
-                return;
-              }
+                if (!onboardPartnerModal.isRoot && !onboardPartnerModal.sponsorCode.trim()) {
+                  addToast('error', 'Sponsor Required', 'Please provide a sponsor referral code or choose Company Root Partner.');
+                  return;
+                }
 
-              setOnboardPartnerModal(prev => ({ ...prev, isSubmitting: true }));
+                setOnboardPartnerModal(prev => ({ ...prev, isSubmitting: true }));
 
-              const res = await adminCreateDirectPartner({
-                name: onboardPartnerModal.name,
-                email: onboardPartnerModal.email,
-                phone: onboardPartnerModal.phone,
-                password: onboardPartnerModal.password,
-                isRoot: onboardPartnerModal.isRoot,
-                sponsorCode: onboardPartnerModal.sponsorCode,
-                autoActivate: onboardPartnerModal.autoActivate,
-                bypassReason: onboardPartnerModal.bypassReason,
-                bypassRef: onboardPartnerModal.bypassRef
-              });
+                const res = await adminCreateDirectPartner({
+                  name: onboardPartnerModal.name,
+                  email: onboardPartnerModal.email,
+                  phone: onboardPartnerModal.phone,
+                  password: onboardPartnerModal.password,
+                  isRoot: onboardPartnerModal.isRoot,
+                  sponsorCode: onboardPartnerModal.sponsorCode,
+                  autoActivate: onboardPartnerModal.autoActivate,
+                  bypassReason: onboardPartnerModal.bypassReason,
+                  bypassRef: onboardPartnerModal.bypassRef
+                });
 
-              setOnboardPartnerModal(prev => ({ ...prev, isSubmitting: false, open: !res?.ok }));
-            }}>
-              <div className="admin-modal-body p-4 flex-col gap-3">
+                setOnboardPartnerModal(prev => ({ ...prev, isSubmitting: false, open: !res?.ok }));
+              }}
+            >
+              <div className="admin-modal-body p-4 flex-col gap-3" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 {/* 1. Partner Identity */}
                 <div className="form-group-clean">
                   <label className="form-label-clean" style={{ fontWeight: 700, fontSize: '0.8rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>

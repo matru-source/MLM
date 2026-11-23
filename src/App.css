@@ -3815,9 +3815,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  animation: adminModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 24px 16px;
+  overflow-y: auto;
   box-sizing: border-box;
+  animation: adminModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .admin-modal-card {
@@ -3826,12 +3827,63 @@
   background: #FFFFFF;
   border-radius: 20px;
   box-shadow: 0 30px 60px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(226, 232, 240, 0.95);
-  overflow: hidden;
-  max-height: 90vh;
+  max-height: min(88vh, 760px);
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden;
+  margin: auto;
   animation: adminModalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.admin-modal-card form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-modal-card .admin-modal-header {
+  flex-shrink: 0;
+}
+
+.admin-modal-card .admin-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+  overscroll-behavior: contain;
+}
+
+.admin-modal-card .admin-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.admin-modal-card .admin-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-modal-card .admin-modal-body::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 999px;
+}
+.admin-modal-card .admin-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+.admin-modal-card .admin-modal-footer {
+  padding: 16px 24px;
+  background: #F8FAFC;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 @keyframes adminModalFadeIn {
