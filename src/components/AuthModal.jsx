@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMlm } from '../context/MlmContext';
-import { lookupReferral } from '../services/sessionService';
+import { lookupReferral, checkEmailExists } from '../services/sessionService';
 import { 
   X, 
   ShieldCheck, 
@@ -251,6 +251,15 @@ export default function AuthModal() {
     setIsSendingOtp(true);
 
     try {
+      // Check live database for duplicate email before sending verification OTP
+      const alreadyExists = await checkEmailExists(cleanEmail);
+      if (alreadyExists) {
+        setIsSendingOtp(false);
+        setFormErrorMessage(`An account with ${cleanEmail} is already registered. Switching to Log In...`);
+        addToast('warning', 'Account Already Exists', `An account with ${cleanEmail} is already registered. Switching to Log In.`);
+        setTimeout(() => setAuthMode('login'), 1200);
+        return;
+      }
       let verifiedSponsor = null;
       if (cleanSponsor === 'CS123456' || cleanSponsor === 'ROOT' || cleanSponsor === 'HEAD') {
         verifiedSponsor = {
@@ -399,7 +408,12 @@ export default function AuthModal() {
 
       if (registration && !registration.ok) {
         setIsVerifyingOtp(false);
-        setOtpErrorMessage(registration.error || 'Registration failed to save. Please try logging in.');
+        const errMsg = registration.error || 'Registration failed to save. Please try logging in.';
+        setOtpErrorMessage(errMsg);
+        if (errMsg.toLowerCase().includes('already registered')) {
+          addToast('warning', 'Account Already Exists', errMsg);
+          setTimeout(() => setAuthMode('login'), 2000);
+        }
         return;
       }
 

@@ -12,3 +12,10 @@ export async function lookupReferral(code) {
     return result.ok && result.data ? { valid: true, member: result.data } : { valid: false, message: 'Sponsor not found or inactive' };
   } catch { return { valid: false, message: 'Unable to verify sponsor. Please retry.' }; }
 }
+export async function checkEmailExists(email) {
+  try {
+    const response = await fetch('/api/db/sync?type=check_email&email=' + encodeURIComponent(email));
+    const result = await response.json();
+    return Boolean(result.ok && result.exists);
+  } catch { return false; }
+}

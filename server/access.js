@@ -19,7 +19,7 @@ export function authorizeSync(req) {
   checkOrigin(req);
   if (!['GET', 'POST'].includes(req.method)) throw new HttpError(405, 'Method not allowed');
   req.body = readBody(req);
-  if (req.method === 'GET' && req.query?.type === 'referral') return null;
+  if (req.method === 'GET' && (req.query?.type === 'referral' || req.query?.type === 'check_email')) return null;
   if (req.method === 'POST' && req.body.action === 'register_member') return null;
   const actor = requireSession(req);
   if (req.method === 'POST') {

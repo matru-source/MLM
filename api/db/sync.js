@@ -462,6 +462,13 @@ export async function executeSync(req, res, sql) {
       if (action === 'register_member') {
         const email = normalizeEmail(data?.email);
         await ensureAuthTables(sql);
+        const existingEmail = await sql`SELECT id FROM members WHERE LOWER(email) = ${email} LIMIT 1`;
+        if (existingEmail.length) throw new HttpError(409, `An account with ${email} is already registered. Please log in.`);
+        const cleanPhone = String(data?.phone || '').replace(/\D/g, '');
+        if (cleanPhone.length === 10) {
+          const existingPhone = await sql`SELECT id FROM members WHERE phone = ${cleanPhone} LIMIT 1`;
+          if (existingPhone.length) throw new HttpError(409, `An account with mobile number ${cleanPhone} is already registered. Please log in.`);
+        }
         await consumeVerification(sql, req, email);
         if (!data?.member_id || !/^[A-Za-z0-9_-]{1,100}$/.test(data.member_id) || !data.name?.trim() || !/^\d{10}$/.test(data.phone || '')) throw new HttpError(400, 'Invalid registration details');
         if (!data?.sponsor_code?.trim()) throw new HttpError(400, 'Sponsor referral code is strictly mandatory');
@@ -1155,6 +1162,11 @@ return async function handler(req, res) {
         if (!code || code.length > 100) throw new HttpError(400, 'Enter a referral code');
         const rows = await sql`SELECT id, id AS member_id, name, referral_code, seller_status FROM members WHERE (UPPER(referral_code) = ${code} OR id = ${code}) AND seller_status = 'active' LIMIT 1`;
         return { ok: true, data: rows[0] || null };
+      }
+      if (req.method === 'GET' && req.query?.type === 'check_email') {
+        const email = normalizeEmail(req.query.email);
+        const rows = await sql`SELECT id FROM members WHERE LOWER(email) = ${email} LIMIT 1`;
+        return { ok: true, exists: rows.length > 0 };
       }
       if (req.method === 'GET' && actor.role !== 'admin') {
         await ensureTransactionColumns(sql);
