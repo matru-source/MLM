@@ -13,7 +13,8 @@ import {
   Settings,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Zap
 } from 'lucide-react';
 import { 
   sendEmailOtp, 
@@ -122,9 +123,11 @@ export default function AuthModal() {
   const [authStep, setAuthStep] = useState('form'); // 'form' | 'otp'
   const [otpInput, setOtpInput] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [otpErrorMessage, setOtpErrorMessage] = useState('');
+  const [formErrorMessage, setFormErrorMessage] = useState('');
 
   // Brevo API Key Configuration Modal/Section
   const [showBrevoConfig, setShowBrevoConfig] = useState(false);
@@ -181,6 +184,9 @@ export default function AuthModal() {
       setAuthStep('form');
       setOtpInput('');
       setOtpErrorMessage('');
+      setFormErrorMessage('');
+      setIsSendingOtp(false);
+      setIsVerifyingOtp(false);
     }
   }, [isAuthModalOpen]);
 
@@ -189,9 +195,14 @@ export default function AuthModal() {
   // Handle Step 1: Send OTP via Brevo API
   const handleInitiateRegister = async (e) => {
     e.preventDefault();
+    if (isSendingOtp) return; // Prevent double invocation
+
+    setFormErrorMessage('');
+    setSponsorError('');
 
     // 1. Full Name Validation
     if (!fullName || fullName.trim().length < 2) {
+      setFormErrorMessage('Please enter your full legal name (minimum 2 characters).');
       addToast('error', 'Full Name Required', 'Please enter your full legal name (minimum 2 characters).');
       return;
     }
@@ -200,7 +211,8 @@ export default function AuthModal() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const cleanEmail = (email || '').trim().toLowerCase();
     if (!cleanEmail || !emailRegex.test(cleanEmail)) {
-      addToast('error', 'Invalid Email', 'Please enter a valid email address (e.g., name@example.com) to receive OTP.');
+      setFormErrorMessage('Please enter a valid email address (e.g., name@example.com) to receive OTP.');
+      addToast('error', 'Invalid Email', 'Please enter a valid email address to receive OTP.');
       return;
     }
 
@@ -214,12 +226,14 @@ export default function AuthModal() {
     // 3. 10-Digit Mobile Number Validation
     const cleanMobile = (mobile || '').replace(/\D/g, '');
     if (cleanMobile.length !== 10) {
+      setFormErrorMessage('Please enter a valid 10-digit mobile number.');
       addToast('error', 'Invalid Mobile Number', 'Please enter a valid 10-digit mobile number.');
       return;
     }
 
     // 4. Password Strength Validation
     if (!password || password.length < 6) {
+      setFormErrorMessage('Password must be at least 6 characters long.');
       addToast('error', 'Password Too Short', 'Password must be at least 6 characters long.');
       return;
     }
@@ -228,137 +242,182 @@ export default function AuthModal() {
     const cleanSponsor = (sponsorId || '').trim().toUpperCase();
     if (!cleanSponsor) {
       setSponsorError('Sponsor referral code is strictly mandatory to join CyberNetworking.');
+      setFormErrorMessage('Sponsor referral code is strictly mandatory to join CyberNetworking.');
       addToast('error', 'Sponsor Code Required', 'Please enter a valid sponsor referral code to continue.');
       return;
     }
 
-    let verifiedSponsor = null;
-    if (cleanSponsor === 'CS123456' || cleanSponsor === 'ROOT' || cleanSponsor === 'HEAD') {
-      verifiedSponsor = {
-        member_id: 'mem_matru',
-        id: 'mem_matru',
-        name: 'CyberNetworking Head Office',
-        referral_code: 'CS123456',
-        seller_status: 'active'
-      };
-    } else {
-      const serverCheck = await lookupReferral(cleanSponsor);
-      if (!serverCheck.valid) {
-        const errorMsg = serverCheck.message || `Sponsor code "${cleanSponsor}" does not exist in our authorized partner network.`;
-        setSponsorError(errorMsg);
-        addToast('error', 'Sponsor Verification Failed', errorMsg);
-        return;
-      }
-      verifiedSponsor = serverCheck.member;
-    }
-
-    // Check self-referral
-    if (verifiedSponsor?.email && verifiedSponsor.email.toLowerCase() === cleanEmail) {
-      setSponsorError('You cannot use your own referral code to sponsor yourself.');
-      addToast('error', 'Self-Referral Blocked', 'You cannot use your own referral code to sponsor yourself.');
-      return;
-    }
-
-    setSponsorError('');
+    // Lock button immediately to show spinner and buffer
     setIsSendingOtp(true);
-    setOtpErrorMessage('');
 
     try {
-      const result = await sendEmailOtp({ email, fullName });
+      let verifiedSponsor = null;
+      if (cleanSponsor === 'CS123456' || cleanSponsor === 'ROOT' || cleanSponsor === 'HEAD') {
+        verifiedSponsor = {
+          member_id: 'mem_matru',
+          id: 'mem_matru',
+          name: 'CyberNetworking Head Office',
+          referral_code: 'CS123456',
+          seller_status: 'active'
+        };
+      } else if (liveSponsorInfo?.valid && (liveSponsorInfo.referral_code?.toUpperCase() === cleanSponsor || liveSponsorInfo.name)) {
+        // Fast path: sponsor already validated in state
+        verifiedSponsor = liveSponsorInfo;
+      } else {
+        const serverCheck = await lookupReferral(cleanSponsor);
+        if (!serverCheck.valid) {
+          const errorMsg = serverCheck.message || `Sponsor code "${cleanSponsor}" does not exist in our authorized partner network.`;
+          setSponsorError(errorMsg);
+          setFormErrorMessage(errorMsg);
+          addToast('error', 'Sponsor Verification Failed', errorMsg);
+          setIsSendingOtp(false);
+          return;
+        }
+        verifiedSponsor = serverCheck.member;
+      }
+
+      // Check self-referral
+      if (verifiedSponsor?.email && verifiedSponsor.email.toLowerCase() === cleanEmail) {
+        const selfMsg = 'You cannot use your own referral code to sponsor yourself.';
+        setSponsorError(selfMsg);
+        setFormErrorMessage(selfMsg);
+        addToast('error', 'Self-Referral Blocked', selfMsg);
+        setIsSendingOtp(false);
+        return;
+      }
+
+      setSponsorError('');
+      setFormErrorMessage('');
+      setOtpErrorMessage('');
+
+      const result = await sendEmailOtp({ email: cleanEmail, fullName: fullName.trim() });
       setIsSendingOtp(false);
 
       if (result.success) {
         setAuthStep('otp');
         setOtpCountdown(60);
         setCanResend(false);
-        addToast('success', 'Verification Code Sent!', `Verification email delivered to ${email}. Check your inbox.`);
+        addToast('success', 'Verification Code Sent!', `Verification email delivered to ${cleanEmail}. Check your inbox.`);
+      } else {
+        const failMsg = result.error || 'Failed to send verification code. Please retry.';
+        setFormErrorMessage(failMsg);
+        addToast('error', 'OTP Delivery Failed', failMsg);
       }
     } catch (err) {
       setIsSendingOtp(false);
-      setOtpErrorMessage('Failed to send verification code. Please try again.');
+      const errMsg = err?.message || 'Failed to send verification code. Please wait 60s and try again.';
+      setFormErrorMessage(errMsg);
+      addToast('error', 'Verification Failed', errMsg);
     }
   };
 
   // Resend OTP handler
   const handleResendOtp = async () => {
-    if (!canResend) return;
+    if (!canResend || isSendingOtp) return;
     setIsSendingOtp(true);
     setOtpErrorMessage('');
 
-    const result = await sendEmailOtp({ email, fullName });
-    setIsSendingOtp(false);
-    setOtpCountdown(60);
-    setCanResend(false);
+    try {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      const result = await sendEmailOtp({ email: cleanEmail, fullName: fullName.trim() });
+      setIsSendingOtp(false);
+      setOtpCountdown(60);
+      setCanResend(false);
 
-    if (result.success) {
-      addToast('success', 'OTP Resent!', `New verification code delivered to ${email}. Check your inbox.`);
+      if (result.success) {
+        addToast('success', 'OTP Resent!', `New verification code delivered to ${cleanEmail}. Check your inbox.`);
+      } else {
+        setOtpErrorMessage(result.error || 'Failed to resend code. Please retry.');
+      }
+    } catch (err) {
+      setIsSendingOtp(false);
+      setOtpErrorMessage(err?.message || 'Failed to resend verification code. Please wait 60s.');
     }
   };
 
   // Handle Step 2: Verify OTP and Register
   const handleVerifyOtpAndRegister = async (e) => {
     e.preventDefault();
-    if (otpInput.trim().length !== 6) {
+    if (isVerifyingOtp) return; // Prevent multi-click race condition and duplicate consumption
+
+    const cleanDigits = (otpInput || '').trim().replace(/\D/g, '');
+    if (cleanDigits.length !== 6) {
       setOtpErrorMessage('Please enter the complete 6-digit verification code.');
       return;
     }
 
-    const verification = await verifyEmailOtp({ email, enteredOtp: otpInput });
-    if (!verification.success) {
-      setOtpErrorMessage(verification.reason);
-      return;
-    }
+    setIsVerifyingOtp(true);
+    setOtpErrorMessage('');
 
-    const cleanSponsor = (sponsorId || '').trim().toUpperCase();
-    if (!cleanSponsor) {
-      setOtpErrorMessage('Sponsor referral code is strictly mandatory.');
-      return;
-    }
-
-    let verifiedSponsor = null;
-    if (cleanSponsor === 'CS123456' || cleanSponsor === 'ROOT' || cleanSponsor === 'HEAD') {
-      verifiedSponsor = {
-        member_id: 'mem_matru',
-        id: 'mem_matru',
-        name: 'CyberNetworking Head Office',
-        referral_code: 'CS123456'
-      };
-    } else {
-      const serverCheck = await lookupReferral(cleanSponsor);
-      if (!serverCheck.valid) {
-        setOtpErrorMessage(serverCheck.message || 'Sponsor verification failed');
+    try {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      const verification = await verifyEmailOtp({ email: cleanEmail, enteredOtp: cleanDigits });
+      if (!verification.success) {
+        setIsVerifyingOtp(false);
+        setOtpErrorMessage(verification.reason || 'Invalid or expired verification code. Please request a new code.');
         return;
       }
-      verifiedSponsor = serverCheck.member;
-    }
 
-    // OTP Verified! Register user and advance directly to ZEX connect
-    const registration = await registerUser({
-      fullName: fullName.trim(),
-      email: email.trim(),
-      mobile: (mobile || '').replace(/\D/g, ''),
-      password,
-      sponsorId: cleanSponsor,
-      sponsorMemberId: verifiedSponsor?.member_id || cleanSponsor,
-      sponsorName: verifiedSponsor?.name || 'CyberNetworking Partner',
-      isSeller
-    });
-
-    if (registration && !registration.ok) {
-      setOtpErrorMessage(registration.error || 'Registration failed to save');
-      return;
-    }
-
-    setIsAuthModalOpen(false);
-    addToast('success', 'Email Verified!', 'Account created successfully. Redirecting to ZEX for license activation...');
-
-    const targetMemberId = registration?.member_id || registration?.data?.id;
-    if (targetMemberId && initiateZexConnect) {
-      try {
-        await initiateZexConnect(targetMemberId);
-      } catch (e) {
-        console.warn('[Post-OTP ZEX Handshake] Warning:', e);
+      const cleanSponsor = (sponsorId || '').trim().toUpperCase();
+      if (!cleanSponsor) {
+        setIsVerifyingOtp(false);
+        setOtpErrorMessage('Sponsor referral code is strictly mandatory.');
+        return;
       }
+
+      let verifiedSponsor = null;
+      if (cleanSponsor === 'CS123456' || cleanSponsor === 'ROOT' || cleanSponsor === 'HEAD') {
+        verifiedSponsor = {
+          member_id: 'mem_matru',
+          id: 'mem_matru',
+          name: 'CyberNetworking Head Office',
+          referral_code: 'CS123456'
+        };
+      } else if (liveSponsorInfo?.valid && (liveSponsorInfo.referral_code?.toUpperCase() === cleanSponsor || liveSponsorInfo.name)) {
+        verifiedSponsor = liveSponsorInfo;
+      } else {
+        const serverCheck = await lookupReferral(cleanSponsor);
+        if (!serverCheck.valid) {
+          setIsVerifyingOtp(false);
+          setOtpErrorMessage(serverCheck.message || 'Sponsor verification failed');
+          return;
+        }
+        verifiedSponsor = serverCheck.member;
+      }
+
+      // OTP Verified! Register user and advance directly to ZEX connect
+      const registration = await registerUser({
+        fullName: fullName.trim(),
+        email: cleanEmail,
+        mobile: (mobile || '').replace(/\D/g, ''),
+        password,
+        sponsorId: cleanSponsor,
+        sponsorMemberId: verifiedSponsor?.member_id || verifiedSponsor?.id || cleanSponsor,
+        sponsorName: verifiedSponsor?.name || 'CyberNetworking Partner',
+        isSeller
+      });
+
+      if (registration && !registration.ok) {
+        setIsVerifyingOtp(false);
+        setOtpErrorMessage(registration.error || 'Registration failed to save. Please try logging in.');
+        return;
+      }
+
+      setIsAuthModalOpen(false);
+      setIsVerifyingOtp(false);
+      addToast('success', 'Email Verified!', 'Account created successfully. Redirecting to ZEX for license activation...');
+
+      const targetMemberId = registration?.member_id || registration?.data?.id;
+      if (targetMemberId && initiateZexConnect) {
+        try {
+          await initiateZexConnect(targetMemberId);
+        } catch (e) {
+          console.warn('[Post-OTP ZEX Handshake] Warning:', e);
+        }
+      }
+    } catch (err) {
+      setIsVerifyingOtp(false);
+      setOtpErrorMessage(err?.message || 'Verification failed. Please try again.');
     }
   };
 
@@ -697,15 +756,31 @@ export default function AuthModal() {
                   </span>
                 </label>
 
+                {formErrorMessage && (
+                  <div className="otp-error-banner mb-3" style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', padding: '10px 12px', color: '#B91C1C', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <AlertCircle size={16} className="text-rose flex-shrink-0" />
+                    <span>{formErrorMessage}</span>
+                  </div>
+                )}
+
                 <button 
                   type="submit" 
                   disabled={isSendingOtp}
                   className="btn btn-primary full-width btn-lg flex-center gap-2"
-                  style={{ marginTop: '4px' }}
+                  style={{ marginTop: '4px', cursor: isSendingOtp ? 'not-allowed' : 'pointer', opacity: isSendingOtp ? 0.75 : 1 }}
                 >
-                  <Mail size={16} />
-                  <span>{isSendingOtp ? 'Sending Verification OTP...' : 'Send Verification OTP & Continue'}</span>
-                  <ArrowRight size={16} />
+                  {isSendingOtp ? (
+                    <>
+                      <RotateCcw size={16} className="spin" />
+                      <span>Verifying & Sending OTP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail size={16} />
+                      <span>Send Verification OTP & Continue</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
                 </button>
 
                 <div className="auth-switch-row" style={{ marginTop: '10px' }}>
@@ -730,16 +805,18 @@ export default function AuthModal() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setAuthStep('form')}
+                    onClick={() => {
+                      setAuthStep('form');
+                      setOtpErrorMessage('');
+                    }}
                     className="btn btn-secondary btn-xs ml-auto"
                   >
                     Change Email
                   </button>
                 </div>
 
-
                 {otpErrorMessage && (
-                  <div className="otp-error-banner">
+                  <div className="otp-error-banner" style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', padding: '10px 12px', color: '#B91C1C', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <AlertCircle size={16} className="text-rose flex-shrink-0" />
                     <span>{otpErrorMessage}</span>
                   </div>
@@ -770,8 +847,8 @@ export default function AuthModal() {
                       disabled={isSendingOtp}
                       className="btn-link-action font-semibold text-primary-blue flex-center gap-1"
                     >
-                      <RotateCcw size={13} />
-                      <span>Resend Verification Code</span>
+                      <RotateCcw size={13} className={isSendingOtp ? 'spin' : ''} />
+                      <span>{isSendingOtp ? 'Sending...' : 'Resend Verification Code'}</span>
                     </button>
                   ) : (
                     <span className="text-muted text-xs">
@@ -782,11 +859,30 @@ export default function AuthModal() {
 
                 <button 
                   type="submit" 
+                  disabled={isVerifyingOtp || otpInput.trim().length !== 6}
                   className="btn btn-primary full-width btn-lg mt-4 flex-center gap-2"
+                  style={{ cursor: (isVerifyingOtp || otpInput.trim().length !== 6) ? 'not-allowed' : 'pointer', opacity: (isVerifyingOtp || otpInput.trim().length !== 6) ? 0.75 : 1 }}
                 >
-                  <ShieldCheck size={18} />
-                  <span>Verify OTP & Create Account</span>
+                  {isVerifyingOtp ? (
+                    <>
+                      <RotateCcw size={18} className="spin" />
+                      <span>Verifying OTP & Creating Account...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={18} />
+                      <span>Verify OTP & Create Account</span>
+                    </>
+                  )}
                 </button>
+
+                {/* ZEX Auth Guidance Note */}
+                <div style={{ marginTop: '14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#475569', lineHeight: 1.45 }}>
+                  <Zap size={15} style={{ flexShrink: 0, color: '#2563EB', marginTop: '2px' }} />
+                  <div>
+                    <strong style={{ color: '#0F172A' }}>Next Step (ZEX Link):</strong> If you are new to ZEX, select <strong>Phone (SMS OTP)</strong> or <strong>Continue with Google</strong> on ZEX for instant 1-click verification.
+                  </div>
+                </div>
 
                 <div className="text-center mt-3">
                   <button

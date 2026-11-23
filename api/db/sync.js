@@ -1153,7 +1153,7 @@ return async function handler(req, res) {
       if (req.method === 'GET' && req.query?.type === 'referral') {
         const code = String(req.query.code || '').trim().toUpperCase();
         if (!code || code.length > 100) throw new HttpError(400, 'Enter a referral code');
-        const rows = await sql`SELECT id, id AS member_id, name, referral_code, seller_status FROM members WHERE UPPER(referral_code) = ${code} AND seller_status = 'active' LIMIT 1`;
+        const rows = await sql`SELECT id, id AS member_id, name, referral_code, seller_status FROM members WHERE (UPPER(referral_code) = ${code} OR id = ${code}) AND seller_status = 'active' LIMIT 1`;
         return { ok: true, data: rows[0] || null };
       }
       if (req.method === 'GET' && actor.role !== 'admin') {

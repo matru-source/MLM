@@ -2887,8 +2887,9 @@ export default function MemberDashboardView() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '8px' }}>
                 <span style={{ color: '#64748B' }}>Partner Referral Code:</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#2563EB' }}>
-                  {currentMember?.referral_code || currentMember?.mlm_account?.referral_code || 'CS-ACTIVE'}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#64748B', fontWeight: 600, fontSize: '11px', background: '#F1F5F9', padding: '3px 9px', borderRadius: '6px' }}>
+                  <Lock size={12} style={{ color: '#94A3B8' }} />
+                  <span>Unlocks in Dashboard after ZEX Link</span>
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
@@ -2924,6 +2925,14 @@ export default function MemberDashboardView() {
                   </div>
                   <span><strong>Neon Wallet Security:</strong> Non-repudiable payout tracking in accordance with Direct Selling Rules 2021.</span>
                 </div>
+              </div>
+            </div>
+
+            {/* ZEX Auth Guidance Note */}
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '12px', color: '#334155', lineHeight: 1.45 }}>
+              <Zap size={16} style={{ color: '#2563EB', flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong style={{ color: '#0F172A' }}>Quick Tip for ZEX Verification:</strong> If you are new to ZEX, select <strong>Phone (SMS OTP)</strong> or <strong>Continue with Google</strong> on the next screen for instant 1-click verification without needing a pre-existing password.
               </div>
             </div>
 

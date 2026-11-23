@@ -28,8 +28,18 @@ return async function handler(req, res) {
     try {
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'api-key': process.env.BREVO_API_KEY },
-        body: JSON.stringify({ sender: { email: process.env.BREVO_SENDER_EMAIL, name: 'CyberNetworking' },
-          to: [{ email }], subject: 'Your verification code', textContent: 'Your verification code is ' + code + '. It expires in 10 minutes.' }),
+        body: JSON.stringify({ 
+          sender: { email: process.env.BREVO_SENDER_EMAIL, name: 'CyberNetworking' },
+          to: [{ email }], 
+          subject: `${code} is your CyberNetworking verification code`, 
+          textContent: 'Your verification code is ' + code + '. It expires in 10 minutes.',
+          htmlContent: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:28px 24px;border:1px solid #E2E8F0;border-radius:12px;background:#ffffff">
+            <h2 style="color:#0F172A;font-size:20px;font-weight:700;margin:0 0 12px 0">CyberNetworking Security Verification</h2>
+            <p style="color:#475569;font-size:14px;line-height:1.5;margin:0 0 20px 0">Use the 6-digit verification code below to verify your email address and continue:</p>
+            <div style="background:#F1F5F9;border:1px solid #E2E8F0;padding:16px 20px;border-radius:8px;font-size:32px;font-weight:800;letter-spacing:6px;color:#2563EB;text-align:center;font-family:monospace;margin:0 0 20px 0">${code}</div>
+            <p style="color:#64748B;font-size:12px;line-height:1.5;margin:0">This code expires in 10 minutes. If you did not request this verification, you can safely ignore this email.</p>
+          </div>`
+        }),
         signal: AbortSignal.timeout(15000)
       });
       if (!response.ok) throw new Error('Email provider rejected delivery');
