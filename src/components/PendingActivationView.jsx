@@ -9,7 +9,8 @@ import {
   LogOut, 
   AlertCircle,
   Clock,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 
 export default function PendingActivationView() {
@@ -20,6 +21,7 @@ export default function PendingActivationView() {
     zexLinkStatus, 
     refreshZexStatus, 
     logout,
+    isLoggingOut,
     addToast 
   } = useMlm();
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -106,11 +108,12 @@ export default function PendingActivationView() {
             </div>
             <button
               onClick={logout}
+              disabled={isLoggingOut}
               className="btn btn-secondary btn-sm"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', cursor: isLoggingOut ? 'wait' : 'pointer' }}
             >
-              <LogOut size={14} />
-              <span>Sign Out</span>
+              {isLoggingOut ? <RotateCcw size={14} className="spin" /> : <LogOut size={14} />}
+              <span>{isLoggingOut ? 'Signing Out...' : 'Sign Out'}</span>
             </button>
           </div>
 
@@ -139,11 +142,22 @@ export default function PendingActivationView() {
                     boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px'
+                    gap: '8px',
+                    cursor: isRedirecting ? 'wait' : 'pointer',
+                    opacity: isRedirecting ? 0.8 : 1
                   }}
                 >
-                  <ExternalLink size={16} />
-                  <span>{isRedirecting ? 'Connecting...' : (isZexLinked ? 'Complete Payment on ZEX ➔' : 'Proceed to ZEX Platform ➔')}</span>
+                  {isRedirecting ? (
+                    <>
+                      <RotateCcw size={16} className="spin" />
+                      <span>{isZexLinked ? 'Opening ZEX Checkout...' : 'Connecting to ZEX...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink size={16} />
+                      <span>{isZexLinked ? 'Complete Payment on ZEX ➔' : 'Proceed to ZEX Platform ➔'}</span>
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"

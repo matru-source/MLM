@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMlm } from '../context/MlmContext';
-import { LayoutDashboard, LogIn, UserPlus, Shield, LogOut, Clock, Menu, X, ArrowRight } from 'lucide-react';
+import { LayoutDashboard, LogIn, UserPlus, Shield, LogOut, Clock, Menu, X, ArrowRight, RotateCcw } from 'lucide-react';
 
 export default function Navbar() {
   const { 
@@ -10,13 +10,18 @@ export default function Navbar() {
     setIsAuthModalOpen, 
     setAuthMode,
     currentMember,
-    logout
+    logout,
+    isLoggingOut
   } = useMlm();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const handleNavClick = (pageId, sectionId) => {
     setCurrentPage(pageId);
+    if (typeof window !== 'undefined') {
+      window.location.hash = pageId === 'home' ? '' : `#/${pageId}`;
+    }
     setMobileMenuOpen(false);
     if (sectionId) {
       setTimeout(() => {
@@ -111,21 +116,34 @@ export default function Navbar() {
             ) : (
               <div className="user-logged-group">
                 <button
-                  onClick={() => setCurrentPage('dashboard')}
+                  onClick={() => {
+                    setIsNavigating(true);
+                    setCurrentPage('dashboard');
+                    if (typeof window !== 'undefined') window.location.hash = '#/dashboard';
+                    setTimeout(() => setIsNavigating(false), 500);
+                  }}
+                  disabled={isNavigating}
                   className="btn btn-outline-warning btn-sm flex-center gap-1"
                   title="Awaiting ZEX payment confirmation"
+                  style={{ cursor: isNavigating ? 'wait' : 'pointer' }}
                 >
-                  <Clock size={14} className="text-amber" />
-                  <span>Activation Pending</span>
+                  {isNavigating ? (
+                    <RotateCcw size={14} className="spin text-amber" />
+                  ) : (
+                    <Clock size={14} className="text-amber" />
+                  )}
+                  <span>{isNavigating ? 'Loading Desk...' : 'Activation Pending'}</span>
                 </button>
 
                 <button
                   onClick={logout}
-                  className="btn btn-secondary btn-sm sign-out-btn"
+                  disabled={isLoggingOut}
+                  className="btn btn-secondary btn-sm sign-out-btn flex-center gap-1"
                   title="Sign Out to Visitor Mode"
+                  style={{ cursor: isLoggingOut ? 'wait' : 'pointer' }}
                 >
-                  <LogOut size={14} />
-                  <span>Sign Out</span>
+                  {isLoggingOut ? <RotateCcw size={14} className="spin" /> : <LogOut size={14} />}
+                  <span>{isLoggingOut ? 'Signing Out...' : 'Sign Out'}</span>
                 </button>
               </div>
             )

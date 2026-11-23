@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMlm } from '../context/MlmContext';
-import { ShieldCheck, ExternalLink, X, RefreshCw } from 'lucide-react';
+import { ShieldCheck, ExternalLink, X, RefreshCw, RotateCcw } from 'lucide-react';
 
 export default function CheckoutModal() {
   const { 
@@ -101,11 +101,22 @@ export default function CheckoutModal() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                background: 'linear-gradient(135deg, #06B6D4 0%, #2563EB 100%)'
+                background: 'linear-gradient(135deg, #06B6D4 0%, #2563EB 100%)',
+                cursor: isRedirecting ? 'wait' : 'pointer',
+                opacity: isRedirecting ? 0.8 : 1
               }}
             >
-              <ExternalLink size={16} />
-              <span>{isRedirecting ? 'Connecting to ZEX...' : 'Proceed to ZEX Platform ➔'}</span>
+              {isRedirecting ? (
+                <>
+                  <RotateCcw size={16} className="spin" />
+                  <span>{isZexLinked ? 'Opening ZEX Checkout...' : 'Connecting to ZEX...'}</span>
+                </>
+              ) : (
+                <>
+                  <ExternalLink size={16} />
+                  <span>{isZexLinked ? 'Complete Payment on ZEX ➔' : 'Proceed to ZEX Platform ➔'}</span>
+                </>
+              )}
             </button>
             <button
               type="button"

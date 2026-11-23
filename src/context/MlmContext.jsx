@@ -97,6 +97,7 @@ export function MlmProvider({ children }) {
 
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   useEffect(() => {
+    if (!isAdminMode) return; // Only verify admin credentials when in admin mode or navigating to /admin
     authRequest('/api/admin/auth', { action: 'verify' }).then(result => setIsAdminAuthenticated(Boolean(result.ok)));
   }, [isAdminMode]);
   const loginAdmin = async ({ username, password }) => {
@@ -113,14 +114,43 @@ export function MlmProvider({ children }) {
   };
 
   // User navigation state: 'home', 'plans', 'compensation', 'dashboard', 'network', 'wallet', 'subscriptions', 'profile'
-  const [currentPage, setCurrentPage] = useState('home');
+  const [currentPage, setCurrentPage] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+      if (['dashboard', 'network', 'wallet', 'subscriptions', 'kyc', 'profile', 'plans', 'compensation', 'faq'].includes(hash)) {
+        return hash;
+      }
+    }
+    return 'home';
+  });
   const [currentMemberId, setCurrentMemberId] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   useEffect(() => {
     authRequest('/api/auth/member', { action: 'session' }).then(result => {
-      if (result.ok) { setCurrentMemberId(result.memberId); setIsLoggedIn(true); }
-    });
+      if (result.ok) { 
+        setCurrentMemberId(result.memberId); 
+        setIsLoggedIn(true); 
+      }
+      setIsSessionLoading(false);
+    }).catch(() => setIsSessionLoading(false));
   }, []);
+
+  // Listen to window.location.hash changes for fast navigation
+  useEffect(() => {
+    const handleHash = () => {
+      if (typeof window === 'undefined' || isAdminMode) return;
+      const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+      if (hash && hash !== 'admin' && ['home', 'dashboard', 'network', 'wallet', 'subscriptions', 'kyc', 'profile', 'plans', 'compensation', 'faq'].includes(hash)) {
+        setCurrentPage(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, [isAdminMode]);
 
   // Modals state
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -293,6 +323,8 @@ export function MlmProvider({ children }) {
         }
       } catch (err) {
         console.warn('[Neon Sync] Multi-device background sync warning:', err);
+      } finally {
+        setIsDataLoading(false);
       }
     }
 
@@ -1274,10 +1306,21 @@ export function MlmProvider({ children }) {
   };
   const resetUserPassword = ({ email, newPassword }) => authRequest('/api/auth/member', { action: 'reset_password', email, newPassword });
   const logout = async () => {
-    const result = await authRequest('/api/auth/member', { action: 'logout' });
-    if (!result.ok) { addToast('error', 'Sign out failed', result.error); return; }
-    setIsLoggedIn(false); setCurrentMemberId(null); clearPrivateData(); setCurrentPage('home');
-    localStorage.removeItem('cybershield_currentMemberId'); localStorage.removeItem('cybershield_isLoggedIn');
+    setIsLoggingOut(true);
+    try {
+      const result = await authRequest('/api/auth/member', { action: 'logout' });
+      setIsLoggingOut(false);
+      if (!result.ok) { addToast('error', 'Sign out failed', result.error); return; }
+      setIsLoggedIn(false); 
+      setCurrentMemberId(null); 
+      clearPrivateData(); 
+      setCurrentPage('home');
+      if (typeof window !== 'undefined') window.location.hash = '';
+      localStorage.removeItem('cybershield_currentMemberId'); 
+      localStorage.removeItem('cybershield_isLoggedIn');
+    } catch (e) {
+      setIsLoggingOut(false);
+    }
   };
   const loginAsMember = () => { setAuthMode('login'); setIsAuthModalOpen(true); };
 
@@ -1494,6 +1537,9 @@ export function MlmProvider({ children }) {
       refreshZexStatus,
       initiateZexConnect,
       initiateZexPurchase,
+      isSessionLoading,
+      isDataLoading,
+      isLoggingOut,
       resetAllData,
       learningResources,
       completedResources,

@@ -10,7 +10,7 @@ import CheckoutModal from './components/CheckoutModal';
 import AuthModal from './components/AuthModal';
 import ReferralBanner from './components/ReferralBanner';
 import Toast from './components/Toast';
-import { ShieldCheck, Lock, ExternalLink } from 'lucide-react';
+import { ShieldCheck, Lock, ExternalLink, RotateCcw } from 'lucide-react';
 import './App.css';
 
 function MainApp() {
@@ -21,7 +21,9 @@ function MainApp() {
     currentPage, 
     setCurrentPage,
     currentMember,
-    isLoggedIn
+    isLoggedIn,
+    isSessionLoading,
+    isDataLoading
   } = useMlm();
 
   // If URL is /admin or #admin, require executive authentication before unlocking Admin Portal
@@ -44,6 +46,23 @@ function MainApp() {
 
   // Normal User Web Experience
   const isDashboardView = ['dashboard', 'network', 'wallet', 'subscriptions', 'kyc', 'profile'].includes(currentPage);
+
+  // If session or member profile is still loading for a dashboard route, render workspace synchronizer
+  if (isDashboardView && (isSessionLoading || (isLoggedIn && !currentMember && isDataLoading))) {
+    return (
+      <div className="site-wrapper dashboard-mode" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC' }}>
+        <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg, #06B6D4 0%, #2563EB 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(37,99,235,0.25)', marginBottom: '16px' }}>
+          <RotateCcw size={24} className="spin" style={{ color: '#ffffff' }} />
+        </div>
+        <div style={{ color: '#0F172A', fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>
+          Synchronizing Partner Workspace...
+        </div>
+        <div style={{ color: '#64748B', fontSize: '12px' }}>
+          Loading profile & ZEX Gateway verification
+        </div>
+      </div>
+    );
+  }
 
   // If not authenticated, ensure visitor stays on Public Home
   if (isDashboardView && (!isLoggedIn || !currentMember)) {

@@ -3172,9 +3172,20 @@ export default function AdminPortalView() {
                   type="submit"
                   disabled={directActivateModal.isSubmitting}
                   className="btn btn-primary btn-sm flex items-center gap-1.5"
-                  style={{ background: '#059669', borderColor: '#059669', padding: '8px 18px', fontWeight: 700 }}
+                  style={{ 
+                    background: '#059669', 
+                    borderColor: '#059669', 
+                    padding: '8px 18px', 
+                    fontWeight: 700,
+                    cursor: directActivateModal.isSubmitting ? 'wait' : 'pointer',
+                    opacity: directActivateModal.isSubmitting ? 0.8 : 1
+                  }}
                 >
-                  <CheckCircle2 size={15} />
+                  {directActivateModal.isSubmitting ? (
+                    <RotateCcw size={15} className="spin" />
+                  ) : (
+                    <CheckCircle2 size={15} />
+                  )}
                   <span>{directActivateModal.isSubmitting ? 'Activating...' : 'Confirm & Direct Activate'}</span>
                 </button>
               </div>
@@ -3442,10 +3453,16 @@ export default function AdminPortalView() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                    cursor: onboardPartnerModal.isSubmitting ? 'wait' : 'pointer',
+                    opacity: onboardPartnerModal.isSubmitting ? 0.8 : 1
                   }}
                 >
-                  <UserPlus size={15} />
+                  {onboardPartnerModal.isSubmitting ? (
+                    <RotateCcw size={15} className="spin" />
+                  ) : (
+                    <UserPlus size={15} />
+                  )}
                   <span>{onboardPartnerModal.isSubmitting ? 'Provisioning Partner...' : 'Onboard Partner Now ➔'}</span>
                 </button>
               </div>

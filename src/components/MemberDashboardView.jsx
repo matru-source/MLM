@@ -39,7 +39,8 @@ import {
   Lock,
   Eye,
   EyeOff,
-  GraduationCap
+  GraduationCap,
+  RotateCcw
 } from 'lucide-react';
 import LearningCenterView from './LearningCenterView';
 import { downloadTaxInvoice, downloadForm16A } from '../utils/downloadHelpers';
@@ -86,6 +87,8 @@ export default function MemberDashboardView() {
   const [connectingZex, setConnectingZex] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
+  const [isSubmittingKyc, setIsSubmittingKyc] = useState(false);
   const [walletTab, setWalletTab] = useState('history'); // 'history' | 'requests'
   const [kycTab, setKycTab] = useState('documents'); // 'personal' | 'documents' | 'tax' | 'agreement'
   const [isDirectReferralsModalOpen, setIsDirectReferralsModalOpen] = useState(false);
@@ -358,6 +361,7 @@ export default function MemberDashboardView() {
 
   const handleWithdraw = async (e) => {
     e.preventDefault();
+    if (isSubmittingWithdraw) return;
     const amount = Number(withdrawAmount);
 
     let overrideBank = null;
@@ -375,9 +379,14 @@ export default function MemberDashboardView() {
       };
     }
 
-    if (await requestWithdrawal(amount, overrideBank)) {
-      setWithdrawModalOpen(false);
-      setWithdrawAmount('');
+    setIsSubmittingWithdraw(true);
+    try {
+      if (await requestWithdrawal(amount, overrideBank)) {
+        setWithdrawModalOpen(false);
+        setWithdrawAmount('');
+      }
+    } finally {
+      setIsSubmittingWithdraw(false);
     }
   };
 
@@ -1622,10 +1631,21 @@ export default function MemberDashboardView() {
                       </button>
                       <button 
                         type="submit" 
+                        disabled={isSubmittingWithdraw}
                         className="btn btn-primary flex-center gap-1"
+                        style={{ cursor: isSubmittingWithdraw ? 'wait' : 'pointer', opacity: isSubmittingWithdraw ? 0.8 : 1 }}
                       >
-                        <ArrowUpRight size={15} />
-                        <span>Confirm Withdrawal</span>
+                        {isSubmittingWithdraw ? (
+                          <>
+                            <RotateCcw size={15} className="spin" />
+                            <span>Processing Withdrawal...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ArrowUpRight size={15} />
+                            <span>Confirm Withdrawal</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </form>
@@ -2178,8 +2198,9 @@ export default function MemberDashboardView() {
 
                     <form 
                       key={`tax-form-${currentMember?.member_id}-${currentMember?.kyc?.bank_account_number || 'none'}-${currentMember?.kyc?.pan || 'none'}-${currentMember?.kyc?.aadhaar || 'none'}`}
-                      onSubmit={(e) => {
+                      onSubmit={async (e) => {
                         e.preventDefault();
+                        if (isSubmittingKyc) return;
                         const formData = new FormData(e.target);
                         const panVal = (formData.get('pan') || '').toUpperCase().trim();
                         const aadhaarVal = (taxAadhaarValue || formData.get('aadhaar') || '').trim();
@@ -2206,14 +2227,19 @@ export default function MemberDashboardView() {
                           return;
                         }
 
-                        submitKyc(currentMember.member_id || currentMember.id, {
-                          pan: panVal,
-                          aadhaar: aadhaarVal,
-                          bank_name: bankNameVal,
-                          bank_account_number: accountVal,
-                          bank_ifsc: ifscVal,
-                          legal_name: legalNameVal || currentMember?.name
-                        });
+                        setIsSubmittingKyc(true);
+                        try {
+                          await submitKyc(currentMember.member_id || currentMember.id, {
+                            pan: panVal,
+                            aadhaar: aadhaarVal,
+                            bank_name: bankNameVal,
+                            bank_account_number: accountVal,
+                            bank_ifsc: ifscVal,
+                            legal_name: legalNameVal || currentMember?.name
+                          });
+                        } finally {
+                          setIsSubmittingKyc(false);
+                        }
                       }} 
                       className="kyc-form-grid"
                     >
@@ -2448,8 +2474,20 @@ export default function MemberDashboardView() {
                       </div>
 
                       <div className="full-grid-width mt-2">
-                        <button type="submit" className="btn btn-primary">
-                          Save Bank & Tax Details
+                        <button 
+                          type="submit" 
+                          disabled={isSubmittingKyc}
+                          className="btn btn-primary flex-center gap-2"
+                          style={{ cursor: isSubmittingKyc ? 'wait' : 'pointer', opacity: isSubmittingKyc ? 0.8 : 1 }}
+                        >
+                          {isSubmittingKyc ? (
+                            <>
+                              <RotateCcw size={15} className="spin" />
+                              <span>Saving Bank & Tax Details...</span>
+                            </>
+                          ) : (
+                            <span>Save Bank & Tax Details</span>
+                          )}
                         </button>
                       </div>
                     </form>

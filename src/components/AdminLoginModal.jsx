@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMlm } from '../context/MlmContext';
-import { Lock, Shield, Eye, EyeOff, ArrowLeft, AlertCircle, Key, Clock } from 'lucide-react';
+import { Lock, Shield, Eye, EyeOff, ArrowLeft, AlertCircle, Key, Clock, RotateCcw } from 'lucide-react';
 
 export default function AdminLoginModal() {
   const { loginAdmin, navigateToUserSite, addToast } = useMlm();
@@ -166,15 +166,23 @@ export default function AdminLoginModal() {
             type="submit"
             disabled={isSubmitting || lockoutSeconds > 0}
             className="btn btn-primary full-width btn-lg mt-4 flex-center gap-2"
+            style={{ cursor: (isSubmitting || lockoutSeconds > 0) ? 'not-allowed' : 'pointer' }}
           >
-            <Key size={16} />
-            <span>
-              {lockoutSeconds > 0 
-                ? `Terminal Locked (${Math.floor(lockoutSeconds / 60)}m ${lockoutSeconds % 60}s)` 
-                : isSubmitting 
-                  ? 'Verifying Credentials...' 
-                  : 'Authenticate & Unlock Console'}
-            </span>
+            {isSubmitting ? (
+              <>
+                <RotateCcw size={16} className="spin" />
+                <span>Verifying Credentials...</span>
+              </>
+            ) : (
+              <>
+                <Key size={16} />
+                <span>
+                  {lockoutSeconds > 0 
+                    ? `Terminal Locked (${Math.floor(lockoutSeconds / 60)}m ${lockoutSeconds % 60}s)` 
+                    : 'Authenticate & Unlock Console'}
+                </span>
+              </>
+            )}
           </button>
 
           <div className="admin-gate-footer mt-4 flex-between items-center text-xs text-muted">
