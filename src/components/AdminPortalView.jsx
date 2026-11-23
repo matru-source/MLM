@@ -4,6 +4,11 @@ import {
   ShieldCheck, 
   ArrowLeft, 
   Users, 
+  UserPlus,
+  User,
+  Mail,
+  Phone,
+  Sparkles,
   CreditCard, 
   DollarSign, 
   CheckCircle2, 
@@ -623,9 +628,9 @@ export default function AdminPortalView() {
                     isSubmitting: false
                   })}
                   className="btn btn-primary btn-sm"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#2563EB' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)', padding: '8px 16px', fontWeight: 700, boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)' }}
                 >
-                  <Users size={15} />
+                  <UserPlus size={16} />
                   <span>+ Onboard Direct Partner</span>
                 </button>
               </div>
@@ -699,16 +704,35 @@ export default function AdminPortalView() {
                       return (
                         <tr key={m.member_id || m.id}>
                           <td>
-                            <div className="font-semibold text-main">{m.name}</div>
-                            <div className="code-font text-xs text-muted">{m.member_id || m.id}</div>
-                            {m.referral_code && (
-                              <span className="badge badge-blue font-2xs" style={{ marginTop: '2px' }}>
-                                Ref: {m.referral_code}
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: '10px',
+                                background: isPending ? 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)' : 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                                color: isPending ? '#B45309' : '#1D4ED8',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '0.8rem',
+                                flexShrink: 0
+                              }}>
+                                {m.name ? m.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'PA'}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-main" style={{ fontSize: '0.88rem' }}>{m.name}</div>
+                                <div className="code-font text-xs text-muted">{m.member_id || m.id}</div>
+                                {m.referral_code && (
+                                  <span className="badge badge-blue font-2xs" style={{ marginTop: '2px', display: 'inline-block' }}>
+                                    Ref: {m.referral_code}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td>
-                            <div className="text-sm">{m.email}</div>
+                            <div className="text-sm font-medium">{m.email}</div>
                             <div className="text-xs text-muted">{m.phone || 'No phone'}</div>
                           </td>
                           <td>
@@ -737,8 +761,8 @@ export default function AdminPortalView() {
                             {m.joined_at || m.created_at ? new Date(m.joined_at || m.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent'}
                           </td>
                           <td className="text-right">
-                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                              {isPending && (
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+                              {isPending ? (
                                 <button
                                   type="button"
                                   onClick={() => setDirectActivateModal({
@@ -748,13 +772,18 @@ export default function AdminPortalView() {
                                     referenceNote: '',
                                     isSubmitting: false
                                   })}
-                                  className="btn btn-primary btn-sm flex items-center gap-1"
-                                  style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', borderColor: '#059669', fontSize: '0.75rem', padding: '6px 10px' }}
-                                  title="Activate partner without online payment"
+                                  className="btn btn-primary btn-sm flex items-center gap-1.5"
+                                  style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', borderColor: '#059669', fontSize: '0.78rem', padding: '6px 12px', fontWeight: 700 }}
+                                  title="Authorize instant activation without online payment"
                                 >
-                                  <ShieldCheck size={13} />
+                                  <ShieldCheck size={14} />
                                   <span>⚡ Direct Activate (Bypass)</span>
                                 </button>
+                              ) : (
+                                <span className="badge badge-green font-xs flex items-center gap-1" style={{ padding: '5px 10px', fontWeight: 700 }}>
+                                  <Check size={13} />
+                                  <span>Active License</span>
+                                </span>
                               )}
                               <button
                                 type="button"
@@ -763,10 +792,10 @@ export default function AdminPortalView() {
                                   addToast('info', 'ZEX Query Dispatched', `Checking real-time ZEX gateway status for ${m.name}...`);
                                 }}
                                 className="btn btn-secondary btn-sm"
-                                style={{ fontSize: '0.75rem', padding: '6px 8px' }}
+                                style={{ fontSize: '0.75rem', padding: '6px 9px' }}
                                 title="Sync with ZEX Gateway"
                               >
-                                <RotateCcw size={12} />
+                                <RotateCcw size={13} />
                               </button>
                             </div>
                           </td>
@@ -2814,8 +2843,15 @@ export default function AdminPortalView() {
 
       {/* STATUTORY REJECTION REASON MODAL (DIRECT SELLING RULES 2021 AUDITING) */}
       {rejectionModal.open && rejectionModal.member && (
-        <div className="admin-modal-overlay">
-          <div className="admin-modal-card" style={{ maxWidth: '520px', width: '92%' }}>
+        <div 
+          className="admin-modal-overlay"
+          onClick={() => setRejectionModal({ open: false, member: null, predefinedReason: 'Document illegible or blurred', customReason: '' })}
+        >
+          <div 
+            className="admin-modal-card" 
+            style={{ maxWidth: '520px', width: '92%' }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="admin-modal-header flex-between items-center">
               <div className="flex items-center gap-2">
                 <div style={{ width: 36, height: 36, borderRadius: '8px', background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2924,8 +2960,15 @@ export default function AdminPortalView() {
 
       {/* UNLINKED ZEX APPROVAL WARNING MODAL */}
       {unlinkedApprovalModal.open && unlinkedApprovalModal.act && (
-        <div className="admin-modal-overlay">
-          <div className="admin-modal-card" style={{ maxWidth: '540px', width: '92%' }}>
+        <div 
+          className="admin-modal-overlay"
+          onClick={() => setUnlinkedApprovalModal({ open: false, act: null, targetMember: null })}
+        >
+          <div 
+            className="admin-modal-card" 
+            style={{ maxWidth: '540px', width: '92%' }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="admin-modal-header flex-between items-center" style={{ borderBottom: '1px solid #FEF3C7', background: '#FFFDF5' }}>
               <div className="flex items-center gap-2">
                 <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3014,11 +3057,18 @@ export default function AdminPortalView() {
 
       {/* ADMIN DIRECT ACTIVATION (PAYMENT BYPASS) MODAL */}
       {directActivateModal.open && directActivateModal.member && (
-        <div className="admin-modal-overlay">
-          <div className="admin-modal-card" style={{ maxWidth: '520px', width: '92%' }}>
-            <div className="admin-modal-header flex-between items-center p-4" style={{ borderBottom: '1px solid #E2E8F0' }}>
+        <div 
+          className="admin-modal-overlay" 
+          onClick={() => setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false })}
+        >
+          <div 
+            className="admin-modal-card" 
+            style={{ maxWidth: '520px', width: '92%' }} 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="admin-modal-header flex-between items-center p-4" style={{ borderBottom: '1px solid #E2E8F0', background: 'linear-gradient(135deg, #F8FAFC 0%, #ECFDF5 100%)' }}>
               <div className="flex items-center gap-2">
-                <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#ECFDF5', border: '1px solid #A7F3D0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <ShieldCheck size={22} className="text-emerald" />
                 </div>
                 <div>
@@ -3030,8 +3080,9 @@ export default function AdminPortalView() {
                 type="button" 
                 onClick={() => setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false })}
                 className="btn-icon-close"
+                style={{ border: 'none', background: '#F1F5F9', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
@@ -3048,7 +3099,7 @@ export default function AdminPortalView() {
 
               setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false });
             }}>
-              <div className="p-4 flex-col gap-3">
+              <div className="admin-modal-body p-4 flex-col gap-3">
                 <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '0.82rem' }}>
                   <div className="flex-between mb-1">
                     <span className="text-muted">Target Partner:</span>
@@ -3069,7 +3120,7 @@ export default function AdminPortalView() {
                 </div>
 
                 <div className="form-group-clean">
-                  <label className="form-label-clean">Clearance & Bypass Reason *</label>
+                  <label className="form-label-clean" style={{ fontWeight: 700, fontSize: '0.8rem', color: '#334155' }}>Clearance & Bypass Reason *</label>
                   <select
                     className="form-input-clean"
                     value={directActivateModal.reason}
@@ -3084,7 +3135,7 @@ export default function AdminPortalView() {
                 </div>
 
                 <div className="form-group-clean">
-                  <label className="form-label-clean">Payment / Authorization Reference Note</label>
+                  <label className="form-label-clean" style={{ fontWeight: 700, fontSize: '0.8rem', color: '#334155' }}>Payment / Authorization Reference Note</label>
                   <input
                     type="text"
                     className="form-input-clean code-font"
@@ -3110,6 +3161,7 @@ export default function AdminPortalView() {
                   type="button"
                   onClick={() => setDirectActivateModal({ open: false, member: null, reason: '', referenceNote: '', isSubmitting: false })}
                   className="btn btn-secondary btn-sm"
+                  style={{ padding: '8px 16px', fontWeight: 600 }}
                 >
                   Cancel
                 </button>
@@ -3117,7 +3169,7 @@ export default function AdminPortalView() {
                   type="submit"
                   disabled={directActivateModal.isSubmitting}
                   className="btn btn-primary btn-sm flex items-center gap-1.5"
-                  style={{ background: '#059669', borderColor: '#059669' }}
+                  style={{ background: '#059669', borderColor: '#059669', padding: '8px 18px', fontWeight: 700 }}
                 >
                   <CheckCircle2 size={15} />
                   <span>{directActivateModal.isSubmitting ? 'Activating...' : 'Confirm & Direct Activate'}</span>
@@ -3130,24 +3182,37 @@ export default function AdminPortalView() {
 
       {/* ADMIN DIRECT PARTNER ONBOARDING MODAL (Supports Partner #1 Root) */}
       {onboardPartnerModal.open && (
-        <div className="admin-modal-overlay">
-          <div className="admin-modal-card" style={{ maxWidth: '560px', width: '92%' }}>
-            <div className="admin-modal-header flex-between items-center p-4" style={{ borderBottom: '1px solid #E2E8F0' }}>
-              <div className="flex items-center gap-2">
-                <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Users size={22} className="text-primary-blue" />
+        <div 
+          className="admin-modal-overlay" 
+          onClick={() => setOnboardPartnerModal(prev => ({ ...prev, open: false }))}
+        >
+          <div 
+            className="admin-modal-card" 
+            style={{ maxWidth: '600px', width: '92%' }} 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="admin-modal-header flex-between items-center p-4" style={{ borderBottom: '1px solid #E2E8F0', background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)' }}>
+              <div className="flex items-center gap-3">
+                <div style={{ width: 44, height: 44, borderRadius: '12px', background: 'linear-gradient(135deg, #2563EB 0%, #06B6D4 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)', color: '#FFFFFF' }}>
+                  <UserPlus size={22} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-main" style={{ margin: 0 }}>Onboard Direct Partner</h3>
-                  <p className="text-xs text-muted" style={{ margin: 0 }}>Executive Direct Registration Desk (Root / Downline)</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0F172A' }}>Onboard Direct Partner</h3>
+                    <span className="badge badge-blue font-2xs" style={{ fontWeight: 700 }}>Executive Desk</span>
+                  </div>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
+                    Direct partner registration &amp; 10-tier matrix placement
+                  </p>
                 </div>
               </div>
               <button 
                 type="button" 
                 onClick={() => setOnboardPartnerModal(prev => ({ ...prev, open: false }))}
                 className="btn-icon-close"
+                style={{ border: 'none', background: '#F1F5F9', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
@@ -3156,7 +3221,7 @@ export default function AdminPortalView() {
               if (onboardPartnerModal.isSubmitting) return;
 
               if (!onboardPartnerModal.isRoot && !onboardPartnerModal.sponsorCode.trim()) {
-                addToast('error', 'Sponsor Required', 'Please provide a sponsor referral code or check the Root Partner toggle.');
+                addToast('error', 'Sponsor Required', 'Please provide a sponsor referral code or choose Company Root Partner.');
                 return;
               }
 
@@ -3176,9 +3241,13 @@ export default function AdminPortalView() {
 
               setOnboardPartnerModal(prev => ({ ...prev, isSubmitting: false, open: !res?.ok }));
             }}>
-              <div className="p-4 flex-col gap-3">
+              <div className="admin-modal-body p-4 flex-col gap-3">
+                {/* 1. Partner Identity */}
                 <div className="form-group-clean">
-                  <label className="form-label-clean">Partner Legal Full Name *</label>
+                  <label className="form-label-clean" style={{ fontWeight: 700, fontSize: '0.8rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <User size={13} className="text-muted" />
+                    <span>Partner Legal Full Name *</span>
+                  </label>
                   <input
                     type="text"
                     required
@@ -3186,12 +3255,16 @@ export default function AdminPortalView() {
                     placeholder="e.g. Alex Kumar"
                     value={onboardPartnerModal.name}
                     onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, name: e.target.value }))}
+                    style={{ fontSize: '0.9rem', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #E2E8F0' }}
                   />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div className="form-group-clean">
-                    <label className="form-label-clean">Email Address *</label>
+                    <label className="form-label-clean" style={{ fontWeight: 700, fontSize: '0.8rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Mail size={13} className="text-muted" />
+                      <span>Email Address *</span>
+                    </label>
                     <input
                       type="email"
                       required
@@ -3199,50 +3272,110 @@ export default function AdminPortalView() {
                       placeholder="alex@example.com"
                       value={onboardPartnerModal.email}
                       onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, email: e.target.value }))}
+                      style={{ fontSize: '0.9rem', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #E2E8F0' }}
                     />
                   </div>
                   <div className="form-group-clean">
-                    <label className="form-label-clean">10-Digit Mobile Phone *</label>
+                    <label className="form-label-clean" style={{ fontWeight: 700, fontSize: '0.8rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Phone size={13} className="text-muted" />
+                      <span>10-Digit Mobile *</span>
+                    </label>
                     <input
                       type="tel"
                       required
+                      maxLength={10}
                       className="form-input-clean"
                       placeholder="9876543210"
                       value={onboardPartnerModal.phone}
-                      onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, phone: e.target.value }))}
+                      onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                      style={{ fontSize: '0.9rem', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #E2E8F0' }}
                     />
                   </div>
                 </div>
 
                 <div className="form-group-clean">
-                  <label className="form-label-clean">Initial Login Password *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label className="form-label-clean" style={{ fontWeight: 700, fontSize: '0.8rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                      <Lock size={13} className="text-muted" />
+                      <span>Initial Login Password *</span>
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Partner can reset after login</span>
+                  </div>
                   <input
                     type="text"
                     required
-                    className="form-input-clean"
+                    className="form-input-clean code-font"
                     value={onboardPartnerModal.password}
                     onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, password: e.target.value }))}
+                    style={{ fontSize: '0.88rem', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #E2E8F0' }}
                   />
                 </div>
 
-                {/* Root Partner Toggle */}
-                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#0F172A' }}>
-                    <input
-                      type="checkbox"
-                      checked={onboardPartnerModal.isRoot}
-                      onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, isRoot: e.target.checked }))}
-                      style={{ width: 16, height: 16 }}
-                    />
-                    <span>Root Partner (Top of Network Tree — No Upline Sponsor Required)</span>
+                {/* 2. Network Tree Hierarchy Placement */}
+                <div style={{ marginTop: '4px' }}>
+                  <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                    Network Matrix Hierarchy Placement
                   </label>
-                  <p style={{ margin: '4px 0 0 26px', fontSize: '0.74rem', color: '#64748B' }}>
-                    Enable this when onboarding the 1st partner in the company. All future partners can join using this partner's referral code.
-                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    {/* Option A: Standard Downline */}
+                    <div 
+                      onClick={() => setOnboardPartnerModal(prev => ({ ...prev, isRoot: false }))}
+                      style={{
+                        border: !onboardPartnerModal.isRoot ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+                        background: !onboardPartnerModal.isRoot ? '#EFF6FF' : '#FFFFFF',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <input 
+                          type="radio" 
+                          checked={!onboardPartnerModal.isRoot} 
+                          onChange={() => setOnboardPartnerModal(prev => ({ ...prev, isRoot: false }))}
+                          style={{ accentColor: '#2563EB' }}
+                        />
+                        <strong style={{ fontSize: '0.85rem', color: !onboardPartnerModal.isRoot ? '#1E40AF' : '#1E293B' }}>Downline Partner</strong>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B', lineHeight: 1.35, paddingLeft: '22px' }}>
+                        Placed under an active upline sponsor code.
+                      </p>
+                    </div>
+
+                    {/* Option B: Company Root Partner */}
+                    <div 
+                      onClick={() => setOnboardPartnerModal(prev => ({ ...prev, isRoot: true }))}
+                      style={{
+                        border: onboardPartnerModal.isRoot ? '2px solid #D97706' : '1.5px solid #E2E8F0',
+                        background: onboardPartnerModal.isRoot ? '#FEF3C7' : '#FFFFFF',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <input 
+                          type="radio" 
+                          checked={onboardPartnerModal.isRoot} 
+                          onChange={() => setOnboardPartnerModal(prev => ({ ...prev, isRoot: true }))}
+                          style={{ accentColor: '#D97706' }}
+                        />
+                        <strong style={{ fontSize: '0.85rem', color: onboardPartnerModal.isRoot ? '#92400E' : '#1E293B' }}>👑 Company Root Node</strong>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B', lineHeight: 1.35, paddingLeft: '22px' }}>
+                        Top founding distributor. No upline sponsor required.
+                      </p>
+                    </div>
+                  </div>
 
                   {!onboardPartnerModal.isRoot && (
-                    <div style={{ marginTop: '12px', paddingLeft: '26px' }}>
-                      <label className="form-label-clean">Sponsor Referral Code *</label>
+                    <div style={{ marginTop: '10px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px' }}>
+                      <label className="form-label-clean" style={{ fontWeight: 700, fontSize: '0.78rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Sparkles size={13} className="text-primary-blue" />
+                        <span>Sponsor Referral Code *</span>
+                      </label>
                       <input
                         type="text"
                         required={!onboardPartnerModal.isRoot}
@@ -3250,33 +3383,45 @@ export default function AdminPortalView() {
                         placeholder="e.g. CS123456"
                         value={onboardPartnerModal.sponsorCode}
                         onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, sponsorCode: e.target.value.toUpperCase().trim() }))}
+                        style={{ fontSize: '0.9rem', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', marginTop: '4px' }}
                       />
                     </div>
                   )}
                 </div>
 
-                {/* Auto Activate Toggle */}
-                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '12px 14px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#065F46' }}>
+                {/* 3. Activation & Licensing Policy */}
+                <div style={{
+                  background: onboardPartnerModal.autoActivate ? 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)' : '#F8FAFC',
+                  border: onboardPartnerModal.autoActivate ? '1.5px solid #86EFAC' : '1px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  transition: 'all 0.15s ease'
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={onboardPartnerModal.autoActivate}
                       onChange={(e) => setOnboardPartnerModal(prev => ({ ...prev, autoActivate: e.target.checked }))}
-                      style={{ width: 16, height: 16 }}
+                      style={{ width: 18, height: 18, marginTop: '2px', accentColor: '#059669' }}
                     />
-                    <span>Direct Activate Immediately (Payment Bypass / Complimentary Onboarding)</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.86rem', color: onboardPartnerModal.autoActivate ? '#065F46' : '#1E293B' }}>
+                        Direct Activate Immediately (Payment Bypass)
+                      </div>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: onboardPartnerModal.autoActivate ? '#047857' : '#64748B', lineHeight: 1.4 }}>
+                        Complimentary / executive onboarding: issues 5-device software defense license, sets status to Active, and unlocks 10-tier commission wallet without external ZEX payment.
+                      </p>
+                    </div>
                   </label>
-                  <p style={{ margin: '4px 0 0 26px', fontSize: '0.74rem', color: '#047857' }}>
-                    Automatically unlocks software license, sets status to Active, and allocates matrix placement without requiring ZEX gateway payment.
-                  </p>
                 </div>
               </div>
 
-              <div className="admin-modal-footer flex-between items-center p-3" style={{ borderTop: '1px solid #E2E8F0' }}>
+              <div className="admin-modal-footer flex-between items-center p-3" style={{ borderTop: '1px solid #E2E8F0', background: '#F8FAFC' }}>
                 <button
                   type="button"
                   onClick={() => setOnboardPartnerModal(prev => ({ ...prev, open: false }))}
                   className="btn btn-secondary btn-sm"
+                  style={{ padding: '8px 16px', fontWeight: 600 }}
                 >
                   Cancel
                 </button>
@@ -3284,10 +3429,18 @@ export default function AdminPortalView() {
                   type="submit"
                   disabled={onboardPartnerModal.isSubmitting}
                   className="btn btn-primary btn-sm flex items-center gap-1.5"
-                  style={{ background: '#2563EB', borderColor: '#2563EB' }}
+                  style={{
+                    padding: '8px 20px',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+                  }}
                 >
-                  <Users size={15} />
-                  <span>{onboardPartnerModal.isSubmitting ? 'Onboarding...' : 'Onboard Partner Now'}</span>
+                  <UserPlus size={15} />
+                  <span>{onboardPartnerModal.isSubmitting ? 'Provisioning Partner...' : 'Onboard Partner Now ➔'}</span>
                 </button>
               </div>
             </form>

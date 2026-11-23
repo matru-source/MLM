@@ -38,8 +38,8 @@ export default function CheckoutModal() {
   };
 
   return (
-    <div className="admin-modal-overlay">
-      <div className="admin-modal-card" style={{ maxWidth: '480px', width: '92%', borderRadius: '16px' }}>
+    <div className="admin-modal-overlay" onClick={() => setIsCheckoutOpen(false)}>
+      <div className="admin-modal-card" style={{ maxWidth: '480px', width: '92%', borderRadius: '16px' }} onClick={e => e.stopPropagation()}>
         <div className="admin-modal-header flex-between items-center p-4" style={{ borderBottom: '1px solid #E2E8F0' }}>
           <div className="flex items-center gap-2">
             <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
