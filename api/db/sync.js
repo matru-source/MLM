@@ -13,6 +13,15 @@ export const config = {
 };
 
 
+async function generateUniqueReferralCode(sql) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = 'CS' + Math.floor(100000 + Math.random() * 900000);
+    const existing = await sql`SELECT id FROM members WHERE UPPER(referral_code) = ${candidate} LIMIT 1`;
+    if (existing.length === 0) return candidate;
+  }
+  return 'CS' + Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
 let isAuditTableReady = false;
 async function ensureAuditTable(sql) {
   if (!sql) return;
@@ -444,7 +453,9 @@ export async function executeSync(req, res, sql) {
       }
     }
 
-    const { action, data } = body;
+    const payload = { ...(body || {}), ...(body.data || {}) };
+    const action = body.action || payload.action;
+    const data = payload;
 
     try {
       // 2a. Register New Member
@@ -457,6 +468,7 @@ export async function executeSync(req, res, sql) {
         const sponsorRows = await sql`SELECT id, name, referral_code FROM members WHERE (UPPER(referral_code) = UPPER(${data.sponsor_code.trim()}) OR id = ${data.sponsor_member_id || ''}) AND seller_status = 'active' LIMIT 1`;
         if (!sponsorRows.length) throw new HttpError(400, 'Invalid or inactive sponsor referral code');
         const sponsor = sponsorRows[0];
+        const referralCode = await generateUniqueReferralCode(sql);
         const mem = { ...data, email, password: hashPassword(data.password), seller_status: 'pending_payment', customer_status: 'registered', kyc: {}, sponsor_member_id: sponsor.id, sponsor_code: sponsor.referral_code, sponsor_name: sponsor.name };
         const rows = await sql`
           INSERT INTO members (
@@ -478,7 +490,7 @@ export async function executeSync(req, res, sql) {
             ${mem.sponsor_name || 'Authorized Partner'},
             ${mem.customer_status || 'registered'},
             ${mem.seller_status || 'pending_payment'},
-            ${mem.referral_code || 'CS' + Math.floor(100000 + Math.random() * 900000)},
+            ${referralCode},
             0,
             0,
             ${JSON.stringify(mem.kyc || {})},
@@ -591,7 +603,7 @@ export async function executeSync(req, res, sql) {
         }
 
         const newMemberId = 'mem_' + Math.random().toString(36).substr(2, 9);
-        const referralCode = 'CS' + Math.floor(100000 + Math.random() * 900000);
+        const referralCode = await generateUniqueReferralCode(sql);
         const autoActivate = Boolean(data?.autoActivate);
         const passwordHash = hashPassword(data?.password || 'Partner@2026');
 

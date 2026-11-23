@@ -1,7 +1,19 @@
 import { HttpError, requireSession, requireOwner, readBody, checkOrigin, redact } from './security.js';
 
 const memberActions = new Set(['create_payout', 'update_kyc', 'upload_kyc_doc', 'update_profile']);
-const adminActions = new Set(['approve_payout', 'reject_payout', 'approve_kyc', 'reject_kyc', 'log_audit', 'release_commission_early', 'clawback_commission', 'save_learning_resource', 'delete_learning_resource']);
+const adminActions = new Set([
+  'approve_payout', 
+  'reject_payout', 
+  'approve_kyc', 
+  'reject_kyc', 
+  'log_audit', 
+  'release_commission_early', 
+  'clawback_commission', 
+  'save_learning_resource', 
+  'delete_learning_resource',
+  'admin_direct_activate',
+  'admin_create_partner'
+]);
 
 export function authorizeSync(req) {
   checkOrigin(req);

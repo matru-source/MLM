@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMlm } from '../context/MlmContext';
+import { lookupReferral } from '../services/sessionService';
 import { 
   X, 
   ShieldCheck, 
@@ -52,6 +53,8 @@ export default function AuthModal() {
   // Mandatory Sponsor Code: Auto-fills from URL referral, otherwise requires user to enter valid sponsor
   const [sponsorId, setSponsorId] = useState(() => activeReferral || '');
   const [sponsorError, setSponsorError] = useState('');
+  const [liveSponsorInfo, setLiveSponsorInfo] = useState(null);
+  const [isVerifyingSponsor, setIsVerifyingSponsor] = useState(false);
   const [agreed, setAgreed] = useState(true);
   const [loginErrorMessage, setLoginErrorMessage] = useState('');
 
@@ -62,6 +65,58 @@ export default function AuthModal() {
       setSponsorError('');
     }
   }, [activeReferral, isAuthModalOpen]);
+
+  // Live real-time server verification of sponsor code (works for public visitors without logging in)
+  useEffect(() => {
+    let active = true;
+    const clean = (sponsorId || '').trim().toUpperCase();
+    if (!clean) {
+      setLiveSponsorInfo(null);
+      setIsVerifyingSponsor(false);
+      return;
+    }
+
+    if (clean === 'CS123456' || clean === 'ROOT' || clean === 'HEAD') {
+      setLiveSponsorInfo({
+        name: 'CyberNetworking Head Office',
+        referral_code: 'CS123456',
+        valid: true
+      });
+      setIsVerifyingSponsor(false);
+      return;
+    }
+
+    setIsVerifyingSponsor(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const check = await lookupReferral(clean);
+        if (!active) return;
+        setIsVerifyingSponsor(false);
+        if (check.valid && check.member) {
+          setLiveSponsorInfo({
+            name: check.member.name,
+            referral_code: check.member.referral_code || clean,
+            member_id: check.member.id || check.member.member_id,
+            valid: true
+          });
+          setSponsorError('');
+        } else {
+          setLiveSponsorInfo({
+            valid: false,
+            message: check.message || 'Sponsor code not found'
+          });
+        }
+      } catch (e) {
+        if (!active) return;
+        setIsVerifyingSponsor(false);
+      }
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [sponsorId]);
 
   // OTP Verification State
   const [authStep, setAuthStep] = useState('form'); // 'form' | 'otp'
@@ -169,17 +224,38 @@ export default function AuthModal() {
       return;
     }
 
-    // 5. Sponsor Referral Code (Strictly Mandatory)
+    // 5. Sponsor Referral Code (Strictly Mandatory - Server Verified)
     const cleanSponsor = (sponsorId || '').trim().toUpperCase();
     if (!cleanSponsor) {
       setSponsorError('Sponsor referral code is strictly mandatory to join CyberNetworking.');
       addToast('error', 'Sponsor Code Required', 'Please enter a valid sponsor referral code to continue.');
       return;
     }
-    const sponsorCheck = validateReferralCode(cleanSponsor, email, mobile);
-    if (!sponsorCheck.valid) {
-      setSponsorError(sponsorCheck.message);
-      addToast('error', 'Sponsor Verification Failed', sponsorCheck.message);
+
+    let verifiedSponsor = null;
+    if (cleanSponsor === 'CS123456' || cleanSponsor === 'ROOT' || cleanSponsor === 'HEAD') {
+      verifiedSponsor = {
+        member_id: 'mem_matru',
+        id: 'mem_matru',
+        name: 'CyberNetworking Head Office',
+        referral_code: 'CS123456',
+        seller_status: 'active'
+      };
+    } else {
+      const serverCheck = await lookupReferral(cleanSponsor);
+      if (!serverCheck.valid) {
+        const errorMsg = serverCheck.message || `Sponsor code "${cleanSponsor}" does not exist in our authorized partner network.`;
+        setSponsorError(errorMsg);
+        addToast('error', 'Sponsor Verification Failed', errorMsg);
+        return;
+      }
+      verifiedSponsor = serverCheck.member;
+    }
+
+    // Check self-referral
+    if (verifiedSponsor?.email && verifiedSponsor.email.toLowerCase() === cleanEmail) {
+      setSponsorError('You cannot use your own referral code to sponsor yourself.');
+      addToast('error', 'Self-Referral Blocked', 'You cannot use your own referral code to sponsor yourself.');
       return;
     }
 
@@ -238,12 +314,23 @@ export default function AuthModal() {
       setOtpErrorMessage('Sponsor referral code is strictly mandatory.');
       return;
     }
-    const sponsorCheck = validateReferralCode(cleanSponsor, email, mobile);
-    if (!sponsorCheck.valid) {
-      setOtpErrorMessage(sponsorCheck.message);
-      return;
+
+    let verifiedSponsor = null;
+    if (cleanSponsor === 'CS123456' || cleanSponsor === 'ROOT' || cleanSponsor === 'HEAD') {
+      verifiedSponsor = {
+        member_id: 'mem_matru',
+        id: 'mem_matru',
+        name: 'CyberNetworking Head Office',
+        referral_code: 'CS123456'
+      };
+    } else {
+      const serverCheck = await lookupReferral(cleanSponsor);
+      if (!serverCheck.valid) {
+        setOtpErrorMessage(serverCheck.message || 'Sponsor verification failed');
+        return;
+      }
+      verifiedSponsor = serverCheck.member;
     }
-    const verifiedSponsor = sponsorCheck.member;
 
     // OTP Verified! Register user and advance directly to ZEX connect
     const registration = await registerUser({
@@ -559,48 +646,40 @@ export default function AuthModal() {
                         );
                       }
 
-                      const check = validateReferralCode ? validateReferralCode(clean, email, mobile) : null;
-                      if (check && check.valid) {
+                      if (isVerifyingSponsor) {
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
+                            <RotateCcw size={15} className="spin text-primary-blue" />
+                            <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                              Verifying sponsor code with server...
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (liveSponsorInfo?.valid) {
                         return (
                           <div className="sponsor-verified-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
                             <ShieldCheck size={16} style={{ color: '#10B981', flexShrink: 0 }} />
                             <span style={{ fontSize: '0.78rem', color: '#065F46', lineHeight: 1.35 }}>
-                              Active Sponsor: <strong style={{ color: '#0F172A' }}>{check.member?.name}</strong> <span className="code-font" style={{ color: '#2563EB', fontWeight: 'bold' }}>({check.member?.referral_code})</span>
+                              Active Sponsor: <strong style={{ color: '#0F172A' }}>{liveSponsorInfo.name}</strong> <span className="code-font" style={{ color: '#2563EB', fontWeight: 'bold' }}>({liveSponsorInfo.referral_code})</span>
                             </span>
                           </div>
                         );
                       }
 
-                      if (check && check.reason === 'inactive') {
-                        return (
-                          <div className="sponsor-warning-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
-                            <AlertCircle size={16} className="text-amber shrink-0" />
-                            <span style={{ fontSize: '0.78rem', color: '#B45309', lineHeight: 1.35 }}>
-                              Partner "{check.member?.name}" is pending plan activation.
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      if (check && check.reason === 'self_referral') {
+                      if (liveSponsorInfo && !liveSponsorInfo.valid) {
                         return (
                           <div className="sponsor-error-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
                             <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
                             <span style={{ fontSize: '0.78rem', color: '#991B1B', lineHeight: 1.35 }}>
-                              Cannot use your own referral code.
+                              {liveSponsorInfo.message || `Sponsor code "${clean}" not recognized.`}
                             </span>
                           </div>
                         );
                       }
 
-                      return (
-                        <div className="sponsor-error-pill" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '9px 12px', minHeight: '44px' }}>
-                          <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
-                          <span style={{ fontSize: '0.78rem', color: '#991B1B', lineHeight: 1.35 }}>
-                            {sponsorError || check?.message || `Sponsor code "${clean}" not recognized.`}
-                          </span>
-                        </div>
-                      );
+                      return null;
                     })()}
                   </div>
                 </div>

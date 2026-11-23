@@ -58,16 +58,16 @@ export default function MemberDashboardView() {
     currentMember, 
     currentPage,
     setCurrentPage, 
-    totalEarnings, 
-    teamMembersCount, 
-    availableBalance, 
-    earningsMonthly, 
-    recentActivity,
-    transactions,
-    orders,
+    totalEarnings = 0, 
+    teamMembersCount = 0, 
+    availableBalance = 0, 
+    earningsMonthly = [], 
+    recentActivity = [],
+    transactions = [],
+    orders = [],
     members = [],
-    payoutRequests,
-    pendingPayoutsTotal,
+    payoutRequests = [],
+    pendingPayoutsTotal = 0,
     openCheckout,
     requestWithdrawal,
     submitKyc,
@@ -1182,7 +1182,15 @@ export default function MemberDashboardView() {
             <div className="wallet-balance-banner card-white">
               <div className="balance-info-left">
                 <span className="balance-label-small">Available Balance</span>
-                <div className="balance-amount-big">₹{availableBalance.toLocaleString('en-IN')}</div>
+                <div className={`balance-amount-big ${availableBalance < 0 ? 'text-rose' : ''}`}>
+                  {availableBalance < 0 ? `-₹${Math.abs(availableBalance).toLocaleString('en-IN')}` : `₹${availableBalance.toLocaleString('en-IN')}`}
+                </div>
+                {availableBalance < 0 && (
+                  <div className="pending-balance-callout mt-1" style={{ background: '#FEF2F2', color: '#991B1B', borderColor: '#FECACA' }}>
+                    <AlertCircle size={13} className="text-rose" />
+                    <span><strong>Account In Recovery (Debit):</strong> -₹{Math.abs(availableBalance).toLocaleString('en-IN')} pending due to customer refund adjustment. Future commissions will offset this balance.</span>
+                  </div>
+                )}
                 {coolingOffTotal > 0 && (
                   <div className="pending-balance-callout mt-1" style={{ background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }}>
                     <Clock size={13} className="text-amber" />
@@ -1201,7 +1209,9 @@ export default function MemberDashboardView() {
                 <button
                   type="button"
                   onClick={() => setWithdrawModalOpen(true)}
+                  disabled={availableBalance < 500}
                   className="btn btn-primary"
+                  title={availableBalance < 500 ? 'Minimum withdrawal amount is ₹500' : 'Request bank transfer payout'}
                 >
                   <ArrowUpRight size={16} />
                   <span>Withdraw Payout</span>

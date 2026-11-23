@@ -16,7 +16,28 @@ export default async function handler(req, res) {
   const { request_id, state, code, error } = req.query;
   const portalOrigin = process.env.PORTAL_ORIGIN || 'https://cybernetworking.vercel.app';
   const actor = verifySession(cookie(req, 'cs_member'), 'member');
-  if (!actor) return res.status(401).send('Please sign in and start linking again.');
+  if (!actor) {
+    if (req.headers?.accept?.includes('text/html')) {
+      return res.status(401).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta http-equiv="refresh" content="3;url=${portalOrigin}/?relogin=true">
+            <title>Session Expired • CyberNetworking</title>
+            <style>body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0B1120; color: #F8FAFC; text-align: center; } .box { background: #1E293B; padding: 32px 40px; border-radius: 16px; border: 1px solid #334155; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); } a { color: #38BDF8; text-decoration: none; font-weight: 600; display: inline-block; margin-top: 16px; }</style>
+          </head>
+          <body>
+            <div class="box">
+              <h2 style="margin-top:0;">Session Expired During ZEX Link</h2>
+              <p style="color: #94A3B8; font-size: 14px;">Your browser session was paused. Redirecting to CyberNetworking in 3 seconds...</p>
+              <a href="${portalOrigin}/">Click here to return to sign in ➔</a>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+    return res.status(401).send('Please sign in and start linking again.');
+  }
   if ([request_id, state, code, error].some(value => value !== undefined && typeof value !== 'string')) return res.status(400).send('Invalid callback parameters.');
   if (req.url) {
     const query = new URL(req.url, portalOrigin).searchParams;
