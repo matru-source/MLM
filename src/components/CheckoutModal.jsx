@@ -7,7 +7,8 @@ export default function CheckoutModal() {
     isCheckoutOpen, 
     setIsCheckoutOpen, 
     currentMember, 
-    initiateZexConnect, 
+    initiateZexConnect,
+    initiateZexPurchase, 
     zexLinkStatus, 
     refreshZexStatus,
     addToast 
@@ -15,6 +16,12 @@ export default function CheckoutModal() {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   if (!isCheckoutOpen) return null;
+
+  const isZexLinked = Boolean(
+    zexLinkStatus?.linked || 
+    currentMember?.mlm_account?.zex_user_id || 
+    currentMember?.zex_user_id
+  );
 
   const handleProceed = async () => {
     setIsRedirecting(true);
@@ -25,6 +32,14 @@ export default function CheckoutModal() {
         setIsRedirecting(false);
         return;
       }
+
+      if (isZexLinked) {
+        addToast('info', 'Redirecting to ZEX Checkout...', 'Opening ZEX 4U software license checkout.');
+        await initiateZexPurchase();
+        setIsCheckoutOpen(false);
+        return;
+      }
+
       const res = await initiateZexConnect(memberId);
       if (!res?.ok) {
         addToast('error', 'Connection Error', res?.error || 'Unable to redirect to ZEX platform.');

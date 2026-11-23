@@ -669,6 +669,30 @@ export function MlmProvider({ children }) {
     }
   };
 
+  // Initiate ZEX Purchase Checkout for linked members
+  const initiateZexPurchase = async () => {
+    try {
+      const res = await fetch('/api/integrations/zex/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (data.ok && data.purchase_url) {
+        window.location.href = data.purchase_url;
+        return { ok: true, purchase_url: data.purchase_url };
+      }
+      const fallbackUrl = 'https://zex4u.com/mlm/subscribe';
+      window.location.href = fallbackUrl;
+      return { ok: true, purchase_url: fallbackUrl };
+    } catch (err) {
+      console.warn('[initiateZexPurchase] Direct fallback to ZEX subscribe:', err);
+      const fallbackUrl = 'https://zex4u.com/mlm/subscribe';
+      window.location.href = fallbackUrl;
+      return { ok: true, purchase_url: fallbackUrl };
+    }
+  };
+
   // Calculate pending withdrawals total for current member
   const pendingPayoutsTotal = payoutRequests
     .filter(r => r.member_id === currentMember?.member_id && r.status === 'pending')
@@ -1469,6 +1493,7 @@ export function MlmProvider({ children }) {
       zexLinkStatus,
       refreshZexStatus,
       initiateZexConnect,
+      initiateZexPurchase,
       resetAllData,
       learningResources,
       completedResources,

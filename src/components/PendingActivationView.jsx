@@ -15,13 +15,15 @@ import {
 export default function PendingActivationView() {
   const { 
     currentMember, 
-    initiateZexConnect, 
+    initiateZexConnect,
+    initiateZexPurchase, 
     zexLinkStatus, 
     refreshZexStatus, 
     logout,
     addToast 
   } = useMlm();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const isZexLinked = Boolean(
     zexLinkStatus?.linked || 
@@ -39,6 +41,15 @@ export default function PendingActivationView() {
         setIsRedirecting(false);
         return;
       }
+
+      // If already linked, proceed directly to ZEX Payment checkout!
+      if (isZexLinked) {
+        addToast('info', 'Opening ZEX Checkout...', 'Redirecting to official ZEX platform to complete software license payment.');
+        await initiateZexPurchase();
+        return;
+      }
+
+      // Step 1: Not linked yet -> Initiate ZEX Connect Handshake
       addToast('info', 'Connecting to ZEX 4U...', 'Redirecting you to official ZEX authentication page to complete your software license activation.');
       const res = await initiateZexConnect(activeMemberId);
       if (!res?.ok) {
@@ -48,6 +59,29 @@ export default function PendingActivationView() {
     } catch (err) {
       addToast('error', 'Error', err.message);
       setIsRedirecting(false);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    addToast('info', 'Checking Status...', 'Verifying license activation status with the server.');
+    try {
+      await fetch('/api/integrations/zex/process-pending', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+      }).catch(() => {});
+      await refreshZexStatus();
+      window.dispatchEvent(new Event('mlm:refresh'));
+      setTimeout(() => {
+        setIsRefreshing(false);
+        const active = ['active', 'subscription_expired'].includes(currentMember?.seller_status);
+        if (active) {
+          addToast('success', 'Account Activated!', 'Software license payment confirmed. Unlocking partner dashboard...');
+        } else {
+          addToast('info', 'Verification Update', 'Your ZEX account is linked. Complete payment on ZEX to activate, or refresh once paid.');
+        }
+      }, 750);
+    } catch (err) {
+      setIsRefreshing(false);
     }
   };
 
@@ -113,12 +147,13 @@ export default function PendingActivationView() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { refreshZexStatus(); window.dispatchEvent(new Event('mlm:refresh')); }}
+                  onClick={handleManualRefresh}
+                  disabled={isRefreshing}
                   className="btn btn-secondary"
                   title="Refresh verification status"
-                  style={{ padding: '12px' }}
+                  style={{ padding: '12px', cursor: isRefreshing ? 'wait' : 'pointer' }}
                 >
-                  <RefreshCw size={16} />
+                  <RefreshCw size={16} className={isRefreshing ? 'spin' : ''} />
                 </button>
               </div>
             </div>
